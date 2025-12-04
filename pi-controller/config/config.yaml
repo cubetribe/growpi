@@ -1,0 +1,90 @@
+# GrowPi Controller Configuration
+# MVP Level 1: Feste Lampen-Intensitäten beim Start
+#
+# Hardware: Raspberry Pi 3B+
+# Hostname: growpi
+# IP: 192.168.0.86
+
+# =============================================================================
+# LAMP CONFIGURATION - MVP
+# =============================================================================
+# Jeder Kanal hat eine "default_intensity" die beim Start gesetzt wird.
+# Passe diese Werte an deine gewünschten Helligkeiten an (0-100%).
+
+lamps:
+  update_interval: 1  # Sekunden (für zukünftige Kurven-Updates)
+
+  channels:
+    # Kanal 1: Rot
+    - channel: 1
+      name: "Red"
+      gpio_pin: 12          # Pin 32
+      pwm_frequency: 1000
+      default_intensity: 50  # <-- HIER ANPASSEN (0-100%)
+
+    # Kanal 2: Blau
+    - channel: 2
+      name: "Blue"
+      gpio_pin: 13          # Pin 33
+      pwm_frequency: 1000
+      default_intensity: 50  # <-- HIER ANPASSEN (0-100%)
+
+    # Kanal 3: Warm-Weiß (VERIFIZIERT)
+    - channel: 3
+      name: "Warm White"
+      gpio_pin: 18          # Pin 12 (Hardware PWM - getestet!)
+      pwm_frequency: 1000
+      default_intensity: 75  # <-- HIER ANPASSEN (0-100%)
+
+    # Kanal 4: Kalt-Weiß
+    - channel: 4
+      name: "Cool White"
+      gpio_pin: 19          # Pin 35
+      pwm_frequency: 1000
+      default_intensity: 75  # <-- HIER ANPASSEN (0-100%)
+
+    # Kanal 5: UV
+    - channel: 5
+      name: "UV"
+      gpio_pin: 21          # Pin 40
+      pwm_frequency: 1000
+      software_pwm: true    # Kein Hardware-PWM auf GPIO-21
+      default_intensity: 0   # UV standardmäßig aus (Sicherheit)
+
+# =============================================================================
+# LOGGING
+# =============================================================================
+logging:
+  level: "INFO"  # DEBUG für mehr Details, INFO für normal
+  # file: "/var/log/grow-pi/controller.log"  # Optional: Log in Datei
+
+# =============================================================================
+# ZUKÜNFTIGE KONFIGURATION (nicht in MVP verwendet)
+# =============================================================================
+
+# Server Connection (Level 5)
+# server:
+#   url: "https://growpi.nm-forum.de"
+#   api_key: "your-zone-api-key-here"
+#   timeout: 10
+#   retry_attempts: 3
+#   retry_delay: 5
+
+# Sensor Configuration (Level 3)
+# sensors:
+#   read_interval: 60
+#   dht22:
+#     enabled: true
+#     gpio_pin: 4
+
+# Offline Mode (Level 6)
+# offline:
+#   enabled: true
+#   max_offline_hours: 24
+#   buffer_readings: true
+#   buffer_max_size: 10000
+
+# System (Level 5)
+# system:
+#   heartbeat_interval: 30
+#   command_poll_interval: 10

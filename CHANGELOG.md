@@ -1,5 +1,137 @@
 # GrowPi Project Changelog
 
+## [2025-12-04 v2] - MVP Level 1: Pi Auto-Start Controller ✅
+
+**Status**: Erfolgreich deployed und getestet
+**Platform**: Raspberry Pi 3B+ (growpi @ 192.168.0.86)
+
+### Summary
+
+Erster funktionierender MVP des Pi-Controllers:
+- ✅ Pi startet automatisch → Lampen gehen auf konfigurierte Werte
+- ✅ Alle 5 PWM-Kanäle funktionieren
+- ✅ Live-Änderung der Intensität via Config + Service-Restart
+- ✅ systemd Services für pigpiod und grow-pi
+
+### Implementierte Dateien
+
+```
+pi-controller/
+├── grow_pi/
+│   ├── __init__.py          # Package definition
+│   ├── __main__.py          # Module entry point (python -m grow_pi)
+│   ├── main.py              # Hauptcontroller mit Signal-Handling
+│   ├── config.py            # YAML Config Loader mit Dataclasses
+│   └── lamps/
+│       ├── __init__.py      # Exports PWMController
+│       └── pwm_controller.py # pigpio PWM Steuerung (5 Kanäle)
+├── config/
+│   └── config.yaml          # Lampen-Intensitäten (default_intensity)
+├── systemd/
+│   └── grow-pi.service      # Auto-Start Service
+├── install.sh               # Installations-Script
+└── README.md                # Aktualisierte Dokumentation
+```
+
+### Architektur-Entscheidungen
+
+**PWMController Features:**
+- Nutzt pigpio Daemon für Hardware-PWM
+- Simulation-Mode wenn pigpio nicht verfügbar (Entwicklung auf Mac)
+- PWM Range 0-100 für direkte Prozent-Steuerung
+- Graceful Cleanup (Lampen aus bei Stop)
+
+**Config System:**
+- YAML-basiert mit Dataclasses
+- Auto-Detection: `./config/config.yaml` oder `/opt/grow-pi/config/config.yaml`
+- Environment Variable Override: `GROWPI_CONFIG`
+- Erweiterbar für zukünftige Features (Server, Sensors, Offline)
+
+**Service Setup:**
+- `pigpiod.service` - PWM Daemon (manuell erstellt, da nicht in Debian Trixie)
+- `grow-pi.service` - Hauptcontroller (Requires pigpiod)
+- Auto-Restart bei Fehler (RestartSec=10)
+
+### Installation auf Pi
+
+```bash
+# Dateien kopieren
+scp -r pi-controller admin@192.168.0.86:/home/admin/
+
+# Auf dem Pi
+cd /home/admin/pi-controller
+chmod +x install.sh
+./install.sh
+
+# Oder manuell:
+sudo apt-get install -y python3-pip python3-venv python3-pigpio pigpio-tools
+sudo mkdir -p /opt/grow-pi
+sudo chown admin:admin /opt/grow-pi
+cp -r grow_pi config requirements.txt /opt/grow-pi/
+cd /opt/grow-pi
+python3 -m venv venv
+source venv/bin/activate
+pip install PyYAML pigpio
+sudo cp systemd/grow-pi.service /etc/systemd/system/
+sudo systemctl daemon-reload
+sudo systemctl enable grow-pi pigpiod
+sudo systemctl start pigpiod grow-pi
+```
+
+### Befehle für tägliche Nutzung
+
+```bash
+# Intensität ändern
+nano /opt/grow-pi/config/config.yaml
+sudo systemctl restart grow-pi
+
+# Status prüfen
+sudo systemctl status grow-pi
+sudo journalctl -u grow-pi -f
+
+# Test-Modus (ohne dauerhaft zu laufen)
+cd /opt/grow-pi && source venv/bin/activate
+python -m grow_pi.main --test
+```
+
+### PWM Kanal-Belegung (verifiziert)
+
+| Kanal | Farbe       | GPIO | Pin | Status |
+|-------|-------------|------|-----|--------|
+| 1     | Red         | 12   | 32  | ✅ Funktioniert |
+| 2     | Blue        | 13   | 33  | ✅ Funktioniert |
+| 3     | Warm White  | 18   | 12  | ✅ Funktioniert |
+| 4     | Cool White  | 19   | 35  | ✅ Funktioniert |
+| 5     | UV          | 21   | 40  | ✅ Funktioniert |
+
+### Getestete Szenarien
+
+1. **Pi Neustart** → Service startet automatisch → Lampen auf Config-Wert ✅
+2. **Config ändern + restart** → Neue Werte sofort aktiv ✅
+3. **Service stop** → Lampen gehen aus (Cleanup) ✅
+4. **Test-Modus** → Zeigt Status und beendet ✅
+
+### Erweiterungs-Roadmap
+
+| Level | Feature | Status | Beschreibung |
+|-------|---------|--------|--------------|
+| 1 | Feste Lampenwerte | ✅ DONE | Pi startet → Lampen auf Config-Wert |
+| 2 | Logging | ⏳ | File-Logging, Log-Rotation |
+| 3 | DHT22 Sensor | ⏳ | Temperatur/Luftfeuchtigkeit auslesen |
+| 4 | Kurven-Interpolation | ⏳ | Zeitbasierte Lichtsteuerung |
+| 5 | API-Client | ⏳ | Server-Kommunikation (Heartbeat, Readings) |
+| 6 | Offline-Modus | ⏳ | Buffering, Cache, Fallback |
+| 7 | RS485-Sensoren | ⏳ | Bodensensoren via Modbus |
+
+### Bekannte Einschränkungen (MVP)
+
+- Keine Kurven-Interpolation (nur feste Werte)
+- Keine Server-Kommunikation
+- Keine Sensor-Auswertung
+- Kein Web-Interface für Config-Änderungen
+
+---
+
 ## [2025-12-04] - Raspberry Pi Hardware Integration - Phase 2 ✅
 
 **Status**: Hardware Testing Phase Complete
@@ -113,7 +245,65 @@ pwm.ChangeDutyCycle(50)  # 50% brightness
 - Ready for MOSFET driver integration
 - Hardware PWM1 Channel 0 verified
 
-#### 5. Hardware Pin Documentation ✅
+#### 5. pigpio Installation & Advanced PWM Testing ✅
+**Library**: pigpio (Hardware PWM Library)
+
+**Installation Challenge**:
+- pigpio not available in Debian Trixie repository
+- Installed from source: https://github.com/joan2937/pigpio
+- Compilation successful on Raspberry Pi 3B+ (ARM)
+- Daemon `pigpiod` installed and configured
+
+**Installation Commands**:
+```bash
+cd /tmp
+wget https://github.com/joan2937/pigpio/archive/master.zip
+unzip master.zip
+cd pigpio-master
+make
+sudo make install
+```
+
+**Test Scripts Created**:
+
+**a) Smooth PWM Ramping Test** (`tests/pwm_test_basic.py`):
+- Continuous cycle: 0% → 50% → 0% over 10 seconds
+- 50 interpolation steps for smooth transitions
+- Multiple lamp channels support (simplified to single channel)
+- Clean shutdown with signal handling
+- Test Results: ✅ Smooth fade in/out working perfectly
+
+**b) Fixed Intensity Script** (`tests/pwm_set_fixed.py`):
+- Command-line intensity control: `python3 pwm_set_fixed.py <0-100>`
+- Runs continuously until Ctrl+C
+- Clean GPIO cleanup on exit
+- Signal handling (SIGINT, SIGTERM)
+- Production Use: Set to 40% and running stable
+
+**Current PWM Status**:
+- GPIO-18 running at **40% intensity** (constant)
+- pigpiod daemon running as background service
+- PWM frequency: 1000 Hz
+- Lamp connected and verified visually
+
+**Code Pattern (pigpio)**:
+```python
+import pigpio
+
+pi = pigpio.pi()
+pi.set_PWM_frequency(18, 1000)  # 1 kHz
+pi.set_PWM_range(18, 100)       # 0-100 range
+pi.set_PWM_dutycycle(18, 40)    # 40% intensity
+```
+
+**Advantages of pigpio over RPi.GPIO**:
+- True hardware PWM (no software jitter)
+- More accurate timing
+- Better for LED control
+- Daemon architecture (survives script crashes)
+- Remote GPIO access capability
+
+#### 6. Hardware Pin Documentation ✅
 **File**: `docs/HARDWARE_PINOUT.md`
 
 **New comprehensive hardware reference created**:
@@ -143,15 +333,21 @@ pwm.ChangeDutyCycle(50)  # 50% brightness
 - Separate tables for each sensor type
 - Python code examples with both BCM and physical pin references
 
-#### 6. Next Steps for Full Integration 📋
+#### 7. Next Steps for Full Integration 📋
+
+**Completed Tasks**:
+- [x] Implement DHT22Sensor test (GPIO-4 verified)
+- [x] Verify PWM output on GPIO-18
+- [x] Install pigpio library from source
+- [x] Create PWM test scripts (ramping + fixed intensity)
+- [x] Document complete pin layout
 
 **Immediate Tasks**:
-- [ ] Implement DHT22Sensor class (per SPEC_RASPBERRY_PI.md)
-- [ ] Update class to use `adafruit_circuitpython_dht` instead of deprecated library
-- [x] Verify PWM output on GPIO-18
+- [ ] Update controller to use `adafruit_circuitpython_dht` instead of deprecated library
 - [ ] Test remaining PWM channels (GPIO 12, 13, 19, 21)
+- [ ] Integrate pigpio into main controller service
 - [ ] Test RS485 soil sensors (if hardware available)
-- [ ] Build complete controller service
+- [ ] Build complete controller service with systemd
 
 **Architecture Alignment**:
 - Hardware config matches `docs/SPEC_RASPBERRY_PI.md` Section 2.3

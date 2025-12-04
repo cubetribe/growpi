@@ -4,11 +4,65 @@ Python-basierter Controller-Service für den Raspberry Pi 3B+.
 
 ## Übersicht
 
-Dieser Controller läuft auf dem Raspberry Pi und:
-- Liest Sensor-Daten (DHT22, RS485 Bodensensoren)
-- Steuert 5-Kanal PWM LED-Lampen
-- Kommuniziert mit dem VPS-Server via HTTPS API
-- Arbeitet autonom bei Netzwerkausfall (Offline-Modus)
+Dieser Controller läuft auf dem Raspberry Pi und steuert Grow-Lampen via PWM.
+
+**Aktueller Stand: MVP Level 1** - Lampen werden beim Start auf feste Werte gesetzt.
+
+## Quick Start (MVP)
+
+### 1. Auf den Pi kopieren
+
+```bash
+# Vom Entwicklungs-PC:
+scp -r pi-controller admin@192.168.0.86:/home/admin/
+```
+
+### 2. Installation
+
+```bash
+# Auf dem Pi:
+cd /home/admin/pi-controller
+chmod +x install.sh
+./install.sh
+```
+
+### 3. Konfiguration anpassen
+
+```bash
+nano /opt/grow-pi/config/config.yaml
+```
+
+Setze die gewünschten Lampen-Intensitäten (0-100%):
+
+```yaml
+lamps:
+  channels:
+    - channel: 1
+      name: "Red"
+      gpio_pin: 12
+      default_intensity: 50   # <-- Hier anpassen
+
+    - channel: 3
+      name: "Warm White"
+      gpio_pin: 18
+      default_intensity: 75   # <-- Hier anpassen
+    # ...
+```
+
+### 4. Service starten
+
+```bash
+sudo systemctl start grow-pi
+sudo systemctl status grow-pi
+```
+
+### 5. Logs prüfen
+
+```bash
+sudo journalctl -u grow-pi -f
+```
+
+---
 
 ## Hardware
 
@@ -16,133 +70,144 @@ Dieser Controller läuft auf dem Raspberry Pi und:
 - **Hostname**: growpi
 - **IP**: 192.168.0.86
 
+### PWM Kanäle
+
+| Kanal | Farbe       | GPIO | Pin | Status       |
+|-------|-------------|------|-----|--------------|
+| 1     | Red         | 12   | 32  | ⏳ Pending   |
+| 2     | Blue        | 13   | 33  | ⏳ Pending   |
+| 3     | Warm White  | 18   | 12  | ✅ Verifiziert |
+| 4     | Cool White  | 19   | 35  | ⏳ Pending   |
+| 5     | UV          | 21   | 40  | ⏳ Pending   |
+
 Detaillierte Pin-Belegung: [`../docs/HARDWARE_PINOUT.md`](../docs/HARDWARE_PINOUT.md)
 
-## Installation
-
-### Voraussetzungen
-
-```bash
-# System-Pakete
-sudo apt-get update
-sudo apt-get install -y python3-pip python3-venv pigpio
-
-# pigpio Daemon starten
-sudo systemctl enable pigpiod
-sudo systemctl start pigpiod
-```
-
-### Setup
-
-```bash
-# Virtual Environment erstellen
-cd pi-controller
-python3 -m venv venv
-source venv/bin/activate
-
-# Dependencies installieren
-pip install -r requirements.txt
-
-# Konfiguration anpassen
-cp config/config.example.yaml config/config.yaml
-# Bearbeite config/config.yaml mit deinem API-Key
-```
+---
 
 ## Entwicklung
 
-### Lokale Tests
+### Test-Modus (ohne Service)
 
 ```bash
-# Virtual Environment aktivieren
+cd /opt/grow-pi
 source venv/bin/activate
 
-# Controller starten
+# Test: Initialisieren und Status zeigen, dann beenden
+python -m grow_pi.main --test
+
+# Normal starten (Ctrl+C zum Stoppen)
 python -m grow_pi.main
-
-# Tests ausführen
-pytest tests/
 ```
 
-### Sensor-Tests
+### Debug-Logging
 
-```bash
-# DHT22 Sensor testen
-python -m grow_pi.tests.test_dht22
+In `config/config.yaml`:
 
-# PWM Test
-python -m grow_pi.tests.test_pwm
+```yaml
+logging:
+  level: "DEBUG"
 ```
 
-## Deployment
+---
 
-### Systemd Service
+## Architektur (MVP)
+
+```
+pi-controller/
+├── grow_pi/
+│   ├── __init__.py
+│   ├── __main__.py      # Module entry point
+│   ├── main.py          # Hauptcontroller
+│   ├── config.py        # YAML Konfiguration laden
+│   └── lamps/
+│       ├── __init__.py
+│       └── pwm_controller.py  # PWM Steuerung
+├── config/
+│   └── config.yaml      # Konfiguration mit Intensitäten
+├── systemd/
+│   └── grow-pi.service  # Auto-Start Service
+├── install.sh           # Installations-Script
+└── requirements.txt
+```
+
+---
+
+## Erweiterungs-Roadmap
+
+| Level | Feature              | Status |
+|-------|----------------------|--------|
+| 1     | Feste Lampenwerte    | ✅ MVP  |
+| 2     | Logging verbessern   | ⏳     |
+| 3     | DHT22 Sensor         | ⏳     |
+| 4     | Kurven-Interpolation | ⏳     |
+| 5     | API-Client (Server)  | ⏳     |
+| 6     | Offline-Modus        | ⏳     |
+| 7     | RS485 Bodensensoren  | ⏳     |
+
+---
+
+## Service-Befehle
 
 ```bash
-# Service installieren
-sudo cp systemd/grow-pi.service /etc/systemd/system/
-sudo systemctl daemon-reload
-sudo systemctl enable grow-pi
-sudo systemctl start grow-pi
-
-# Status prüfen
+# Status
 sudo systemctl status grow-pi
 
-# Logs anzeigen
+# Start / Stop / Restart
+sudo systemctl start grow-pi
+sudo systemctl stop grow-pi
+sudo systemctl restart grow-pi
+
+# Auto-Start aktivieren/deaktivieren
+sudo systemctl enable grow-pi
+sudo systemctl disable grow-pi
+
+# Logs (live)
 sudo journalctl -u grow-pi -f
+
+# Logs (letzte 100 Zeilen)
+sudo journalctl -u grow-pi -n 100
 ```
 
-## Konfiguration
+---
 
-Siehe [`config/config.example.yaml`](config/config.example.yaml) für alle Optionen.
+## Troubleshooting
 
-**Wichtige Einstellungen:**
-- `server.url`: VPS API URL
-- `server.api_key`: Zone API Key (von Web-Dashboard)
-- `sensors.read_interval`: Sensor-Polling-Intervall (Sekunden)
-- `lamps.channels`: GPIO-Pin-Zuordnung
+### pigpiod nicht gestartet
 
-## Architektur
-
-```
-grow_pi/
-├── main.py              # Entry Point
-├── config.py            # Config Loader
-├── sensors/
-│   ├── base.py          # Abstract Sensor Class
-│   ├── dht22.py         # DHT22 Implementation
-│   └── rs485_soil.py    # RS485 Soil Sensors
-├── lamps/
-│   ├── pwm_controller.py
-│   └── lamp_manager.py
-├── api/
-│   ├── client.py        # HTTP Client für VPS
-│   └── models.py
-├── scheduler/
-│   ├── sensor_scheduler.py
-│   └── lamp_scheduler.py
-└── utils/
-    └── interpolation.py  # Curve Interpolation
+```bash
+sudo systemctl start pigpiod
+sudo systemctl status pigpiod
 ```
 
-## Hardware-Status
+### Keine Berechtigung für GPIO
 
-### ✅ Verifiziert
+```bash
+# User zur gpio Gruppe hinzufügen
+sudo usermod -a -G gpio admin
+# Neu einloggen erforderlich
+```
 
-- DHT22 Sensor (GPIO-4 / Pin 7)
-- PWM GPIO-18 (Pin 12 / Kanal 3)
+### Service startet nicht
 
-### ⏳ Ausstehend
+```bash
+# Manuell testen
+cd /opt/grow-pi
+source venv/bin/activate
+python -m grow_pi.main --test
 
-- PWM GPIO-12, 13, 19, 21 (Kanäle 1, 2, 4, 5)
-- RS485 Bodensensoren
+# Fehler in Logs prüfen
+sudo journalctl -u grow-pi -n 50 --no-pager
+```
+
+---
 
 ## Referenzen
 
 - **Hardware Pinout**: [`../docs/HARDWARE_PINOUT.md`](../docs/HARDWARE_PINOUT.md)
 - **Raspberry Pi Spec**: [`../docs/SPEC_RASPBERRY_PI.md`](../docs/SPEC_RASPBERRY_PI.md)
-- **Architektur**: [`../docs/ARCHITECTURE.md`](../docs/ARCHITECTURE.md)
 
 ---
 
-**Python Version**: 3.13.5
-**Basierend auf**: SPEC_RASPBERRY_PI.md
+**Python Version**: 3.11+
+**Aktuelles Level**: MVP (Level 1)
+**Stand**: 2025-12-04

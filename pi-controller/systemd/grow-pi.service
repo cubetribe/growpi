@@ -1,0 +1,32 @@
+[Unit]
+Description=GrowPi Greenhouse Controller
+Documentation=https://github.com/cubetribe/GrowPi
+After=network.target pigpiod.service
+Requires=pigpiod.service
+
+[Service]
+Type=simple
+User=admin
+Group=admin
+WorkingDirectory=/opt/grow-pi
+
+# Main executable
+ExecStart=/opt/grow-pi/venv/bin/python -m grow_pi.main
+
+# Restart policy
+Restart=always
+RestartSec=10
+
+# Environment
+Environment=PYTHONUNBUFFERED=1
+
+# Logging to journald
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=grow-pi
+
+# Security hardening
+NoNewPrivileges=true
+
+[Install]
+WantedBy=multi-user.target
