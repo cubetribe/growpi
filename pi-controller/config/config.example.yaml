@@ -1,0 +1,100 @@
+# GrowPi Controller Configuration Example
+# Copy to config.yaml and adjust values
+
+# Server Connection
+server:
+  url: "https://growpi.nm-forum.de"
+  api_key: "your-zone-api-key-here"  # Get from web dashboard
+  timeout: 10  # seconds
+  retry_attempts: 3
+  retry_delay: 5  # seconds
+
+# Sensor Configuration
+sensors:
+  read_interval: 60  # seconds (can be overridden by server)
+
+  # DHT22 Temperature/Humidity Sensor
+  dht22:
+    enabled: true
+    gpio_pin: 4  # GPIO-4 = Pin 7
+
+  # RS485 Soil Sensors
+  rs485:
+    enabled: false  # Set to true when hardware available
+    port: "/dev/ttyUSB0"
+    baudrate: 9600
+    timeout: 1
+
+    devices:
+      - address: 1
+        type: "soil_moisture"
+        register: 0
+
+      - address: 2
+        type: "soil_temperature"
+        register: 0
+
+      - address: 3
+        type: "soil_ph"
+        register: 0
+
+      - address: 4
+        type: "soil_ec"
+        register: 0
+
+      - address: 5
+        type: "soil_npk"
+        registers:
+          n: 0
+          p: 1
+          k: 2
+
+# Lamp Configuration
+lamps:
+  update_interval: 1  # seconds (how often to recalculate intensity)
+
+  channels:
+    - channel: 1
+      name: "Red"
+      gpio_pin: 12  # Pin 32
+      pwm_frequency: 1000
+
+    - channel: 2
+      name: "Blue"
+      gpio_pin: 13  # Pin 33
+      pwm_frequency: 1000
+
+    - channel: 3
+      name: "Warm White"
+      gpio_pin: 18  # Pin 12 (Verified ✅)
+      pwm_frequency: 1000
+
+    - channel: 4
+      name: "Cool White"
+      gpio_pin: 19  # Pin 35
+      pwm_frequency: 1000
+
+    - channel: 5
+      name: "UV"
+      gpio_pin: 21  # Pin 40
+      pwm_frequency: 1000
+      software_pwm: true  # No hardware PWM on GPIO-21
+
+# Offline Mode
+offline:
+  enabled: true  # Continue with last curves when offline
+  max_offline_hours: 24  # Safety shutdown after this time
+  buffer_readings: true  # Store readings locally
+  buffer_max_size: 10000
+
+# Logging
+logging:
+  level: "INFO"  # DEBUG, INFO, WARNING, ERROR
+  file: "/var/log/grow-pi/controller.log"
+  max_size_mb: 10
+  backup_count: 5
+
+# System
+system:
+  heartbeat_interval: 30  # seconds
+  command_poll_interval: 10  # seconds
