@@ -211,6 +211,460 @@
         }
 
         .error-msg.show { display: block; }
+
+        /* Tabs */
+        .tabs {
+            display: flex;
+            margin-bottom: 20px;
+            border-radius: 12px;
+            background: rgba(20, 20, 20, 0.9);
+            padding: 4px;
+            border: 1px solid #2a2a2a;
+        }
+
+        .tab-btn {
+            flex: 1;
+            padding: 12px;
+            border: none;
+            background: transparent;
+            color: #888;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            border-radius: 8px;
+            transition: all 0.2s;
+        }
+
+        .tab-btn.active {
+            background: #11ff55;
+            color: #0a0a0a;
+        }
+
+        .tab-content {
+            display: none;
+        }
+
+        .tab-content.active {
+            display: block;
+        }
+
+        /* Curve Editor */
+        .curve-channel {
+            background: rgba(20, 20, 20, 0.9);
+            border-radius: 12px;
+            padding: 16px;
+            margin-bottom: 16px;
+            border: 1px solid #2a2a2a;
+        }
+
+        .curve-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 12px;
+        }
+
+        .curve-name {
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .curve-dot {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+        }
+
+        .curve-toggle {
+            position: relative;
+            width: 44px;
+            height: 24px;
+            background: #333;
+            border-radius: 12px;
+            cursor: pointer;
+            transition: background 0.3s;
+        }
+
+        .curve-toggle.enabled {
+            background: #11ff55;
+        }
+
+        .curve-toggle::after {
+            content: '';
+            position: absolute;
+            width: 20px;
+            height: 20px;
+            background: white;
+            border-radius: 50%;
+            top: 2px;
+            left: 2px;
+            transition: transform 0.3s;
+        }
+
+        .curve-toggle.enabled::after {
+            transform: translateX(20px);
+        }
+
+        .curve-points {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .curve-point {
+            display: grid;
+            grid-template-columns: 70px 70px 1fr;
+            gap: 8px;
+            align-items: center;
+        }
+
+        .curve-point input {
+            padding: 10px 12px;
+            border: 1px solid #333;
+            border-radius: 8px;
+            background: rgba(0,0,0,0.3);
+            color: white;
+            font-size: 16px;
+            text-align: center;
+        }
+
+        .curve-point input:focus {
+            outline: none;
+            border-color: #11ff55;
+        }
+
+        .curve-point input::placeholder {
+            color: #666;
+        }
+
+        .btn-remove {
+            width: 36px;
+            height: 36px;
+            border-radius: 8px;
+            border: 1px solid #ff4444;
+            background: rgba(255, 68, 68, 0.1);
+            color: #ff4444;
+            cursor: pointer;
+            font-size: 18px;
+        }
+
+        .btn-move {
+            width: 28px;
+            height: 28px;
+            border-radius: 6px;
+            border: 1px solid #666;
+            background: rgba(255, 255, 255, 0.05);
+            color: #888;
+            cursor: pointer;
+            font-size: 14px;
+            padding: 0;
+        }
+
+        .btn-move:hover {
+            border-color: #11ff55;
+            color: #11ff55;
+        }
+
+        .btn-move:disabled {
+            opacity: 0.3;
+            cursor: not-allowed;
+        }
+
+        .point-actions {
+            display: flex;
+            gap: 4px;
+            align-items: center;
+        }
+
+        .btn-add {
+            width: 100%;
+            padding: 12px;
+            border: 1px dashed #444;
+            border-radius: 8px;
+            background: transparent;
+            color: #888;
+            cursor: pointer;
+            font-size: 14px;
+            margin-top: 8px;
+        }
+
+        .btn-add:hover {
+            border-color: #11ff55;
+            color: #11ff55;
+        }
+
+        .btn-save {
+            width: 100%;
+            padding: 14px;
+            border: none;
+            border-radius: 12px;
+            background: #11ff55;
+            color: #0a0a0a;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            margin-top: 16px;
+        }
+
+        .btn-save:disabled {
+            background: #333;
+            color: #666;
+            cursor: not-allowed;
+        }
+
+        .current-intensity {
+            font-size: 24px;
+            font-weight: 700;
+            text-align: center;
+            padding: 8px;
+        }
+
+        /* Preview Chart */
+        .preview-section {
+            background: rgba(20, 20, 20, 0.9);
+            border-radius: 12px;
+            padding: 16px;
+            margin-bottom: 20px;
+            border: 1px solid #2a2a2a;
+        }
+
+        .preview-title {
+            font-size: 14px;
+            font-weight: 600;
+            margin-bottom: 12px;
+            color: #888;
+        }
+
+        .preview-chart {
+            display: flex;
+            height: 80px;
+            gap: 2px;
+            align-items: flex-end;
+        }
+
+        .preview-bar {
+            flex: 1;
+            background: linear-gradient(to top, #11ff55, rgba(17, 255, 85, 0.3));
+            border-radius: 2px 2px 0 0;
+            min-height: 2px;
+        }
+
+        .preview-labels {
+            display: flex;
+            justify-content: space-between;
+            margin-top: 4px;
+            font-size: 10px;
+            color: #666;
+        }
+
+        .success-msg {
+            background: rgba(17, 255, 85, 0.2);
+            border: 1px solid #11ff55;
+            color: #11ff55;
+            padding: 12px;
+            border-radius: 8px;
+            margin-bottom: 16px;
+            font-size: 13px;
+            display: none;
+        }
+
+        .success-msg.show { display: block; }
+
+        /* JSON Editor */
+        .json-section {
+            background: rgba(20, 20, 20, 0.9);
+            border-radius: 12px;
+            padding: 16px;
+            margin-top: 20px;
+            border: 1px solid #2a2a2a;
+        }
+
+        .json-section.expanded .json-textarea {
+            min-height: 350px;
+        }
+
+        .json-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 12px;
+            cursor: pointer;
+        }
+
+        .json-title {
+            font-size: 14px;
+            font-weight: 600;
+            color: #888;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .json-title::before {
+            content: '▶';
+            font-size: 10px;
+            transition: transform 0.2s;
+        }
+
+        .json-section.expanded .json-title::before {
+            transform: rotate(90deg);
+        }
+
+        .json-content {
+            display: none;
+        }
+
+        .json-section.expanded .json-content {
+            display: block;
+        }
+
+        .json-preview {
+            padding: 8px 12px;
+            border-radius: 8px;
+            background: rgba(0, 0, 0, 0.3);
+            color: #666;
+            font-family: 'Monaco', 'Menlo', monospace;
+            font-size: 11px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .json-section.expanded .json-preview {
+            display: none;
+        }
+
+        .json-buttons {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 12px;
+            flex-wrap: wrap;
+        }
+
+        .btn-json {
+            padding: 8px 12px;
+            border-radius: 8px;
+            border: 1px solid #444;
+            background: rgba(255, 255, 255, 0.05);
+            color: #888;
+            cursor: pointer;
+            font-size: 12px;
+            font-weight: 600;
+        }
+
+        .btn-json:hover {
+            border-color: #11ff55;
+            color: #11ff55;
+        }
+
+        .btn-json.primary {
+            background: #11ff55;
+            color: #0a0a0a;
+            border-color: #11ff55;
+        }
+
+        .btn-json.primary:disabled {
+            background: #333;
+            color: #666;
+            border-color: #333;
+            cursor: not-allowed;
+        }
+
+        .json-textarea {
+            width: 100%;
+            min-height: 200px;
+            padding: 12px;
+            border-radius: 8px;
+            border: 1px solid #333;
+            background: rgba(0, 0, 0, 0.5);
+            color: #11ff55;
+            font-family: 'Monaco', 'Menlo', monospace;
+            font-size: 11px;
+            line-height: 1.4;
+            resize: vertical;
+        }
+
+        .json-textarea:focus {
+            outline: none;
+            border-color: #11ff55;
+        }
+
+        .json-textarea.invalid {
+            border-color: #ff4444;
+            color: #ff8888;
+        }
+
+        .json-status {
+            font-size: 11px;
+            margin-top: 8px;
+            padding: 6px 10px;
+            border-radius: 6px;
+        }
+
+        .json-status.valid {
+            background: rgba(17, 255, 85, 0.1);
+            color: #11ff55;
+        }
+
+        .json-status.invalid {
+            background: rgba(255, 68, 68, 0.1);
+            color: #ff4444;
+        }
+
+        /* Mode Switch */
+        .mode-section {
+            background: rgba(20, 20, 20, 0.9);
+            border-radius: 12px;
+            padding: 16px;
+            margin-bottom: 20px;
+            border: 1px solid #2a2a2a;
+        }
+
+        .mode-switch {
+            display: flex;
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 10px;
+            padding: 4px;
+        }
+
+        .mode-option {
+            flex: 1;
+            padding: 12px;
+            border: none;
+            background: transparent;
+            color: #888;
+            font-size: 13px;
+            font-weight: 600;
+            cursor: pointer;
+            border-radius: 8px;
+            transition: all 0.2s;
+        }
+
+        .mode-option.active {
+            background: #11ff55;
+            color: #0a0a0a;
+        }
+
+        .mode-option:not(.active):hover {
+            color: #fff;
+        }
+
+        .section.disabled {
+            opacity: 0.4;
+            pointer-events: none;
+        }
+
+        .section.disabled::after {
+            content: 'Zeitsteuerung aktiv';
+            display: block;
+            text-align: center;
+            color: #666;
+            font-size: 12px;
+            margin-top: 12px;
+            font-style: italic;
+        }
     </style>
 </head>
 <body>
@@ -222,8 +676,22 @@
         </header>
 
         <div class="error-msg" id="errorMsg"></div>
+        <div class="success-msg" id="successMsg"></div>
 
-        <section class="section">
+        <div class="tabs">
+            <button class="tab-btn active" data-tab="control">Steuerung</button>
+            <button class="tab-btn" data-tab="curves">Kurven</button>
+        </div>
+
+        <div id="tab-control" class="tab-content active">
+            <div class="mode-section">
+                <div class="mode-switch">
+                    <button class="mode-option" data-mode="auto" id="modeAuto">Zeitsteuerung</button>
+                    <button class="mode-option active" data-mode="manual" id="modeManual">Manuell</button>
+                </div>
+            </div>
+
+            <section class="section">
             <div class="temp-grid">
                 <div class="temp-card">
                     <div class="temp-label">Temperatur</div>
@@ -236,7 +704,7 @@
             </div>
         </section>
 
-        <section class="section">
+        <section class="section" id="lampSection">
             <h2 class="section-title">Beleuchtung</h2>
 
             <div class="lamp-control lamp-farred">
@@ -271,6 +739,42 @@
                 <input type="range" id="lamp4" min="0" max="100" value="0" data-channel="4">
             </div>
         </section>
+        </div>
+
+        <div id="tab-curves" class="tab-content">
+            <div class="preview-section">
+                <div class="preview-title">24h Vorschau (aktueller Kanal)</div>
+                <div class="preview-chart" id="previewChart"></div>
+                <div class="preview-labels">
+                    <span>00:00</span>
+                    <span>06:00</span>
+                    <span>12:00</span>
+                    <span>18:00</span>
+                    <span>24:00</span>
+                </div>
+            </div>
+
+            <div id="curvesContainer"></div>
+
+            <button class="btn-save" id="btnSaveCurves">Kurven Speichern</button>
+
+            <div class="json-section" id="jsonSection">
+                <div class="json-header" id="jsonHeader">
+                    <span class="json-title">JSON Editor</span>
+                </div>
+                <div class="json-preview" id="jsonPreview">Klicken zum Öffnen...</div>
+                <div class="json-content">
+                    <div class="json-buttons">
+                        <button class="btn-json" id="btnExportJson">Exportieren</button>
+                        <button class="btn-json" id="btnCopyJson">Kopieren</button>
+                        <button class="btn-json" id="btnDownloadJson">Download</button>
+                        <button class="btn-json primary" id="btnImportJson" disabled>Importieren</button>
+                    </div>
+                    <textarea class="json-textarea" id="jsonTextarea" placeholder="JSON hier einfügen oder bearbeiten..."></textarea>
+                    <div class="json-status" id="jsonStatus"></div>
+                </div>
+            </div>
+        </div>
     </div>
 
     <script>
@@ -279,12 +783,32 @@
         const tempValue = document.getElementById('tempValue');
         const humidityValue = document.getElementById('humidityValue');
         const errorMsg = document.getElementById('errorMsg');
+        const successMsg = document.getElementById('successMsg');
+        const curvesContainer = document.getElementById('curvesContainer');
+        const previewChart = document.getElementById('previewChart');
+        const btnSaveCurves = document.getElementById('btnSaveCurves');
         let debounceTimers = {};
+        let curvesData = {};
+        let previewData = [];
+        let activeChannel = 1;
+
+        const channelColors = {
+            1: '#ff4444',  // Far Red
+            2: '#ffbb44',  // Warm White
+            3: '#88ddff',  // Cool White
+            4: '#cc66ff'   // UV
+        };
 
         function showError(message) {
             errorMsg.textContent = message;
             errorMsg.classList.add('show');
             setTimeout(() => errorMsg.classList.remove('show'), 5000);
+        }
+
+        function showSuccess(message) {
+            successMsg.textContent = message;
+            successMsg.classList.add('show');
+            setTimeout(() => successMsg.classList.remove('show'), 3000);
         }
 
         function updateStatus(online) {
@@ -296,12 +820,40 @@
             return new Date().toLocaleTimeString('de-DE', {hour: '2-digit', minute: '2-digit', second: '2-digit'});
         }
 
+        // === Tab Management ===
+        document.querySelectorAll('.tab-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+                document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+                btn.classList.add('active');
+                document.getElementById(`tab-${btn.dataset.tab}`).classList.add('active');
+                if (btn.dataset.tab === 'curves') {
+                    fetchCurves();
+                }
+            });
+        });
+
+        // === Control Tab Functions ===
         async function fetchStatus() {
             try {
-                const response = await fetch('/api/status');
-                if (!response.ok) throw new Error(`HTTP ${response.status}`);
+                // Fetch status and curve intensities in parallel
+                const [statusRes, intensitiesRes] = await Promise.all([
+                    fetch('/api/status'),
+                    fetch('/api/curves/intensities')
+                ]);
 
-                const data = await response.json();
+                if (!statusRes.ok) throw new Error(`HTTP ${statusRes.status}`);
+
+                const data = await statusRes.json();
+                let curveIntensities = {};
+
+                // Get curve intensities if available
+                if (intensitiesRes.ok) {
+                    const intensitiesData = await intensitiesRes.json();
+                    if (intensitiesData.success && intensitiesData.intensities) {
+                        curveIntensities = intensitiesData.intensities;
+                    }
+                }
 
                 if (data.temperature !== null && data.temperature !== undefined) {
                     tempValue.innerHTML = `${data.temperature.toFixed(1)}<span class="temp-unit">°C</span>`;
@@ -316,8 +868,12 @@
                         const slider = document.getElementById(`lamp${lamp.channel}`);
                         const valueEl = document.getElementById(`lamp${lamp.channel}Value`);
                         if (slider && valueEl) {
-                            slider.value = lamp.intensity;
-                            valueEl.textContent = `${lamp.intensity}%`;
+                            // In auto mode, show curve intensities; in manual mode, show actual lamp values
+                            const displayValue = (currentMode === 'auto' && curveIntensities[lamp.channel] !== undefined)
+                                ? curveIntensities[lamp.channel]
+                                : lamp.intensity;
+                            slider.value = displayValue;
+                            valueEl.textContent = `${displayValue}%`;
                         }
                     });
                 }
@@ -359,8 +915,441 @@
             });
         }
 
+        // === Curves Tab Functions ===
+        async function fetchCurves() {
+            try {
+                const [curvesRes, previewRes] = await Promise.all([
+                    fetch('/api/curves'),
+                    fetch('/api/curves/preview')
+                ]);
+
+                const curvesJson = await curvesRes.json();
+                const previewJson = await previewRes.json();
+
+                if (curvesJson.success) {
+                    curvesData = {};
+                    curvesJson.curves.forEach(c => {
+                        curvesData[c.channel] = c;
+                    });
+                    renderCurves();
+                }
+
+                if (previewJson.success) {
+                    previewData = previewJson.preview;
+                    renderPreview();
+                }
+
+            } catch (error) {
+                console.error('Fetch curves error:', error);
+                showError('Kurven konnten nicht geladen werden');
+            }
+        }
+
+        function renderCurves() {
+            curvesContainer.innerHTML = '';
+
+            Object.values(curvesData).sort((a, b) => a.channel - b.channel).forEach(curve => {
+                const div = document.createElement('div');
+                div.className = 'curve-channel';
+                div.innerHTML = `
+                    <div class="curve-header">
+                        <div class="curve-name">
+                            <span class="curve-dot" style="background: ${channelColors[curve.channel]}"></span>
+                            ${curve.name}
+                            <span class="current-intensity" style="color: ${channelColors[curve.channel]}">${curve.current_intensity}%</span>
+                        </div>
+                        <div class="curve-toggle ${curve.enabled ? 'enabled' : ''}" data-channel="${curve.channel}"></div>
+                    </div>
+                    <div class="curve-points" data-channel="${curve.channel}">
+                        ${curve.curve.map((p, i) => `
+                            <div class="curve-point">
+                                <input type="text" value="${p.time}" data-idx="${i}" data-field="time" placeholder="HH:MM" maxlength="5" pattern="[0-9]{2}:[0-9]{2}">
+                                <input type="number" min="0" max="100" value="${p.intensity}" data-idx="${i}" data-field="intensity" placeholder="%">
+                                <div class="point-actions">
+                                    <button class="btn-move btn-up" data-idx="${i}" ${i === 0 ? 'disabled' : ''}>↑</button>
+                                    <button class="btn-move btn-down" data-idx="${i}" ${i === curve.curve.length - 1 ? 'disabled' : ''}>↓</button>
+                                    <button class="btn-remove" data-idx="${i}">×</button>
+                                </div>
+                            </div>
+                        `).join('')}
+                    </div>
+                    <button class="btn-add" data-channel="${curve.channel}">+ Punkt hinzufügen</button>
+                `;
+                curvesContainer.appendChild(div);
+            });
+
+            // Setup event listeners
+            document.querySelectorAll('.curve-toggle').forEach(toggle => {
+                toggle.addEventListener('click', () => {
+                    const ch = parseInt(toggle.dataset.channel);
+                    curvesData[ch].enabled = !curvesData[ch].enabled;
+                    toggle.classList.toggle('enabled');
+                });
+            });
+
+            document.querySelectorAll('.curve-points input').forEach(input => {
+                input.addEventListener('change', (e) => {
+                    const container = e.target.closest('.curve-points');
+                    const ch = parseInt(container.dataset.channel);
+                    const idx = parseInt(e.target.dataset.idx);
+                    const field = e.target.dataset.field;
+                    let value = e.target.value;
+                    if (field === 'intensity') value = parseInt(value);
+                    curvesData[ch].curve[idx][field] = value;
+                    updateLocalPreview(ch);
+                });
+
+                input.addEventListener('focus', (e) => {
+                    const container = e.target.closest('.curve-points');
+                    activeChannel = parseInt(container.dataset.channel);
+                    updateLocalPreview(activeChannel);
+                });
+            });
+
+            document.querySelectorAll('.btn-remove').forEach(btn => {
+                btn.addEventListener('click', (e) => {
+                    const container = e.target.closest('.curve-points');
+                    const ch = parseInt(container.dataset.channel);
+                    const idx = parseInt(e.target.dataset.idx);
+                    curvesData[ch].curve.splice(idx, 1);
+                    renderCurves();
+                });
+            });
+
+            document.querySelectorAll('.btn-add').forEach(btn => {
+                btn.addEventListener('click', (e) => {
+                    const ch = parseInt(e.target.dataset.channel);
+                    curvesData[ch].curve.push({ time: '12:00', intensity: 0 });
+                    renderCurves();
+                });
+            });
+
+            // Move up/down buttons
+            document.querySelectorAll('.btn-up').forEach(btn => {
+                btn.addEventListener('click', (e) => {
+                    const container = e.target.closest('.curve-points');
+                    const ch = parseInt(container.dataset.channel);
+                    const idx = parseInt(e.target.dataset.idx);
+                    if (idx > 0) {
+                        const temp = curvesData[ch].curve[idx];
+                        curvesData[ch].curve[idx] = curvesData[ch].curve[idx - 1];
+                        curvesData[ch].curve[idx - 1] = temp;
+                        renderCurves();
+                    }
+                });
+            });
+
+            document.querySelectorAll('.btn-down').forEach(btn => {
+                btn.addEventListener('click', (e) => {
+                    const container = e.target.closest('.curve-points');
+                    const ch = parseInt(container.dataset.channel);
+                    const idx = parseInt(e.target.dataset.idx);
+                    if (idx < curvesData[ch].curve.length - 1) {
+                        const temp = curvesData[ch].curve[idx];
+                        curvesData[ch].curve[idx] = curvesData[ch].curve[idx + 1];
+                        curvesData[ch].curve[idx + 1] = temp;
+                        renderCurves();
+                    }
+                });
+            });
+        }
+
+        function renderPreview() {
+            previewChart.innerHTML = '';
+            previewData.forEach(p => {
+                const intensity = p.intensities[activeChannel] || 0;
+                const bar = document.createElement('div');
+                bar.className = 'preview-bar';
+                bar.style.height = `${Math.max(intensity, 2)}%`;
+                bar.style.background = `linear-gradient(to top, ${channelColors[activeChannel]}, ${channelColors[activeChannel]}44)`;
+                bar.title = `${p.time}: ${intensity}%`;
+                previewChart.appendChild(bar);
+            });
+        }
+
+        function updateLocalPreview(channel) {
+            // Quick local preview calculation - 15 min resolution (96 bars)
+            activeChannel = channel;
+            const curve = curvesData[channel]?.curve || [];
+            if (curve.length === 0) {
+                previewData = Array(96).fill(null).map((_, i) => {
+                    const hour = Math.floor(i / 4);
+                    const min = (i % 4) * 15;
+                    return {
+                        time: `${hour.toString().padStart(2, '0')}:${min.toString().padStart(2, '0')}`,
+                        intensities: { [channel]: 0 }
+                    };
+                });
+            } else {
+                previewData = Array(96).fill(null).map((_, i) => {
+                    const hour = Math.floor(i / 4);
+                    const min = (i % 4) * 15;
+                    const intensity = interpolateLocalMinutes(curve, hour * 60 + min);
+                    return {
+                        time: `${hour.toString().padStart(2, '0')}:${min.toString().padStart(2, '0')}`,
+                        intensities: { [channel]: intensity }
+                    };
+                });
+            }
+            renderPreview();
+        }
+
+        function interpolateLocalMinutes(curve, currentMinutes) {
+            if (!curve.length) return 0;
+            const sorted = [...curve].sort((a, b) => {
+                const [ah, am] = a.time.split(':').map(Number);
+                const [bh, bm] = b.time.split(':').map(Number);
+                return (ah * 60 + am) - (bh * 60 + bm);
+            });
+
+            let prev = sorted[sorted.length - 1];
+            let next = sorted[0];
+
+            for (let i = 0; i < sorted.length; i++) {
+                const [h, m] = sorted[i].time.split(':').map(Number);
+                const mins = h * 60 + m;
+                if (mins > currentMinutes) {
+                    next = sorted[i];
+                    prev = sorted[i - 1] || sorted[sorted.length - 1];
+                    break;
+                }
+            }
+
+            const [ph, pm] = prev.time.split(':').map(Number);
+            const [nh, nm] = next.time.split(':').map(Number);
+            let prevMins = ph * 60 + pm;
+            let nextMins = nh * 60 + nm;
+            let currMins = currentMinutes;
+
+            if (nextMins <= prevMins) nextMins += 24 * 60;
+            if (currMins < prevMins) currMins += 24 * 60;
+
+            if (nextMins === prevMins) return prev.intensity;
+            const ratio = (currMins - prevMins) / (nextMins - prevMins);
+            return Math.round(prev.intensity + ratio * (next.intensity - prev.intensity));
+        }
+
+        async function saveCurves() {
+            btnSaveCurves.disabled = true;
+            btnSaveCurves.textContent = 'Speichern...';
+
+            try {
+                for (const [ch, data] of Object.entries(curvesData)) {
+                    const response = await fetch(`/api/curves/${ch}`, {
+                        method: 'PUT',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            curve: data.curve,
+                            enabled: data.enabled
+                        })
+                    });
+
+                    if (!response.ok) {
+                        throw new Error(`Kanal ${ch} fehlgeschlagen`);
+                    }
+                }
+
+                showSuccess('Alle Kurven gespeichert!');
+                fetchCurves();
+
+            } catch (error) {
+                console.error('Save error:', error);
+                showError(`Speichern fehlgeschlagen: ${error.message}`);
+            } finally {
+                btnSaveCurves.disabled = false;
+                btnSaveCurves.textContent = 'Kurven Speichern';
+            }
+        }
+
+        btnSaveCurves.addEventListener('click', saveCurves);
+
+        // === Mode Switch ===
+        const modeAuto = document.getElementById('modeAuto');
+        const modeManual = document.getElementById('modeManual');
+        const lampSection = document.getElementById('lampSection');
+        let currentMode = 'auto'; // Default to auto (Zeitsteuerung)
+
+        async function setMode(mode) {
+            currentMode = mode;
+
+            // Update UI
+            modeAuto.classList.toggle('active', mode === 'auto');
+            modeManual.classList.toggle('active', mode === 'manual');
+            lampSection.classList.toggle('disabled', mode === 'auto');
+
+            // Save to server
+            try {
+                const response = await fetch('/api/mode', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({ mode: mode })
+                });
+                const data = await response.json();
+
+                // After mode change, immediately refresh status to show current lamp values
+                await fetchStatus();
+
+                if (data.success) {
+                    console.log(`Mode changed to ${mode}`, data.applied_intensities || {});
+                }
+            } catch (e) {
+                console.error('Mode save error:', e);
+            }
+        }
+
+        async function fetchMode() {
+            try {
+                const res = await fetch('/api/mode');
+                const data = await res.json();
+                if (data.mode) {
+                    currentMode = data.mode;
+                    modeAuto.classList.toggle('active', data.mode === 'auto');
+                    modeManual.classList.toggle('active', data.mode === 'manual');
+                    lampSection.classList.toggle('disabled', data.mode === 'auto');
+                }
+            } catch (e) {
+                console.error('Mode fetch error:', e);
+            }
+        }
+
+        modeAuto.addEventListener('click', () => setMode('auto'));
+        modeManual.addEventListener('click', () => setMode('manual'));
+
+        // === JSON Editor ===
+        const jsonSection = document.getElementById('jsonSection');
+        const jsonHeader = document.getElementById('jsonHeader');
+        const jsonPreview = document.getElementById('jsonPreview');
+        const jsonTextarea = document.getElementById('jsonTextarea');
+        const jsonStatus = document.getElementById('jsonStatus');
+        const btnExportJson = document.getElementById('btnExportJson');
+        const btnCopyJson = document.getElementById('btnCopyJson');
+        const btnDownloadJson = document.getElementById('btnDownloadJson');
+        const btnImportJson = document.getElementById('btnImportJson');
+
+        // Expand/Collapse
+        jsonHeader.addEventListener('click', () => {
+            jsonSection.classList.toggle('expanded');
+            if (jsonSection.classList.contains('expanded') && !jsonTextarea.value) {
+                btnExportJson.click();
+            }
+        });
+
+        // Validate JSON on input
+        function validateJson() {
+            const text = jsonTextarea.value.trim();
+            if (!text) {
+                jsonTextarea.classList.remove('invalid');
+                jsonStatus.className = 'json-status';
+                jsonStatus.textContent = '';
+                btnImportJson.disabled = true;
+                return null;
+            }
+
+            try {
+                const parsed = JSON.parse(text);
+                jsonTextarea.classList.remove('invalid');
+                jsonStatus.className = 'json-status valid';
+
+                // Count channels
+                const channels = Object.keys(parsed).length;
+                jsonStatus.textContent = `✓ Gültiges JSON (${channels} Kanäle)`;
+                btnImportJson.disabled = false;
+                return parsed;
+            } catch (e) {
+                jsonTextarea.classList.add('invalid');
+                jsonStatus.className = 'json-status invalid';
+                jsonStatus.textContent = `✗ ${e.message}`;
+                btnImportJson.disabled = true;
+                return null;
+            }
+        }
+
+        jsonTextarea.addEventListener('input', validateJson);
+
+        // Export
+        btnExportJson.addEventListener('click', () => {
+            const exportData = {};
+            Object.values(curvesData).forEach(c => {
+                exportData[c.name] = {
+                    channel: c.channel,
+                    enabled: c.enabled,
+                    curve: c.curve
+                };
+            });
+            jsonTextarea.value = JSON.stringify(exportData, null, 2);
+            jsonPreview.textContent = `${Object.keys(exportData).length} Kanäle exportiert`;
+            validateJson();
+            showSuccess('Kurven exportiert!');
+        });
+
+        // Copy
+        btnCopyJson.addEventListener('click', async () => {
+            if (!jsonTextarea.value) {
+                btnExportJson.click();
+            }
+            try {
+                await navigator.clipboard.writeText(jsonTextarea.value);
+                showSuccess('In Zwischenablage kopiert!');
+            } catch (e) {
+                jsonTextarea.select();
+                document.execCommand('copy');
+                showSuccess('Kopiert!');
+            }
+        });
+
+        // Download
+        btnDownloadJson.addEventListener('click', () => {
+            if (!jsonTextarea.value) {
+                btnExportJson.click();
+            }
+            const blob = new Blob([jsonTextarea.value], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `growpi-curves-${new Date().toISOString().slice(0,10)}.json`;
+            a.click();
+            URL.revokeObjectURL(url);
+            showSuccess('Download gestartet!');
+        });
+
+        // Import
+        btnImportJson.addEventListener('click', () => {
+            const parsed = validateJson();
+            if (!parsed) {
+                showError('Ungültiges JSON');
+                return;
+            }
+
+            try {
+                Object.entries(parsed).forEach(([key, data]) => {
+                    let channel = data.channel;
+
+                    if (!channel) {
+                        const found = Object.values(curvesData).find(c => c.name === key);
+                        if (found) channel = found.channel;
+                    }
+
+                    if (channel && curvesData[channel]) {
+                        if (data.curve) curvesData[channel].curve = data.curve;
+                        if (data.enabled !== undefined) curvesData[channel].enabled = data.enabled;
+                    }
+                });
+
+                renderCurves();
+                showSuccess('Kurven importiert! Klicke "Speichern" um zu übernehmen.');
+
+            } catch (e) {
+                showError('Import fehlgeschlagen: ' + e.message);
+            }
+        });
+
         // Initial fetch and auto-refresh
-        fetchStatus();
+        // IMPORTANT: Fetch mode FIRST, then status (so currentMode is set before status display)
+        async function initializeApp() {
+            await fetchMode();
+            await fetchStatus();
+        }
+        initializeApp();
         setInterval(fetchStatus, 10000);
     </script>
 </body>

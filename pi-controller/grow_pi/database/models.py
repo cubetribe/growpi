@@ -7,7 +7,7 @@ Kompatibel mit PostgreSQL-Server Schema für spätere Synchronisation.
 
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import Optional, Dict, Any
+from typing import Optional, Dict, Any, List
 import uuid
 
 
@@ -198,3 +198,99 @@ SENSOR_UNITS = {
     SensorType.SOIL_P: 'mg/kg',
     SensorType.SOIL_K: 'mg/kg',
 }
+
+
+@dataclass
+class CurvePoint:
+    """
+    Ein Punkt auf der Lichtkurve.
+
+    Verwendet für per-Kanal Kurven-Definition.
+    """
+    time: str       # Format: "HH:MM"
+    intensity: int  # 0-100%
+
+    def __post_init__(self):
+        """Validate time format and intensity."""
+        # Validate time format
+        try:
+            hours, minutes = map(int, self.time.split(":"))
+            if not (0 <= hours <= 23 and 0 <= minutes <= 59):
+                raise ValueError
+        except (ValueError, AttributeError):
+            raise ValueError(f"Invalid time format: {self.time}. Must be HH:MM")
+
+        # Validate intensity
+        if not 0 <= self.intensity <= 100:
+            raise ValueError(f"Invalid intensity: {self.intensity}. Must be 0-100")
+
+    def to_dict(self) -> Dict[str, Any]:
+        """Convert to dictionary."""
+        return {'time': self.time, 'intensity': self.intensity}
+
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> 'CurvePoint':
+        """Create from dictionary."""
+        return cls(time=data['time'], intensity=data['intensity'])
+
+
+@dataclass
+class LampCurve:
+    """
+    Lichtkurve für einen Lampen-Kanal.
+
+    Jeder Kanal hat seine eigene Kurve für individuelle Sonnenauf-/untergang Sequenzen.
+    """
+    channel: int                    # Kanal 1-4
+    name: str                       # 'Far Red', 'Warm White', etc.
+    enabled: bool = True            # Kurve aktiv?
+    curve: List[Dict[str, Any]] = field(default_factory=list)  # [{time, intensity}, ...]
+    id: str = field(default_factory=generate_uuid)
+    created_at: str = field(default_factory=now_iso)
+    updated_at: str = field(default_factory=now_iso)
+    synced_at: Optional[str] = None
+
+    def __post_init__(self):
+        """Validate channel."""
+        if not 1 <= self.channel <= 4:
+            raise ValueError(f"Invalid channel: {self.channel}. Must be 1-4")
+
+    def get_curve_points(self) -> List[CurvePoint]:
+        """Convert curve list to CurvePoint objects."""
+        return [CurvePoint.from_dict(p) for p in self.curve]
+
+    def set_curve_points(self, points: List[CurvePoint]) -> None:
+        """Set curve from CurvePoint objects."""
+        self.curve = [p.to_dict() for p in points]
+        self.updated_at = now_iso()
+
+    def to_dict(self) -> Dict[str, Any]:
+        """Convert to dictionary for database insert."""
+        return {
+            'id': self.id,
+            'channel': self.channel,
+            'name': self.name,
+            'enabled': self.enabled,
+            'curve': self.curve,
+            'created_at': self.created_at,
+            'updated_at': self.updated_at,
+            'synced_at': self.synced_at,
+        }
+
+    @classmethod
+    def from_row(cls, row: tuple) -> 'LampCurve':
+        """Create from database row."""
+        import json
+        curve_data = row[4]
+        if isinstance(curve_data, str):
+            curve_data = json.loads(curve_data)
+        return cls(
+            id=row[0],
+            channel=row[1],
+            name=row[2],
+            enabled=bool(row[3]),
+            curve=curve_data,
+            created_at=row[5],
+            updated_at=row[6],
+            synced_at=row[7],
+        )

@@ -2,20 +2,21 @@
 """
 GrowPi Controller - Main Entry Point
 
-Level 4: Sonnenkurven-Modus mit zeitbasierter Intensität.
+Level 5: Per-Channel Kurven mit Web-API.
 
 Usage:
     python -m grow_pi.main
     python -m grow_pi.main --config /path/to/config.yaml
     python -m grow_pi.main --mode fixed    # Feste Werte aus Config
-    python -m grow_pi.main --mode curve    # Sonnenkurve (default)
+    python -m grow_pi.main --mode curve    # Per-Channel Kurven (default)
     python -m grow_pi.main --preview       # Zeige 24h Kurven-Vorschau
+    python -m grow_pi.main --no-web        # Ohne Web-API starten
 
-Sonnenkurve:
-    05:00 - 08:00  → Sonnenaufgang: 10% → 60%
-    08:00 - 20:00  → Tageslicht: 60%
-    20:00 - 23:00  → Sonnenuntergang: 60% → 10%
-    23:00 - 05:00  → Nacht: 0%
+Per-Channel Kurven (Standard):
+    Far Red:     05:45-06:30 → 0-100%
+    Cool White:  06:00-07:00 → 15-50%
+    Warm White:  05:30-06:30 → 0-50%
+    UV:          Immer 0%
 """
 
 import argparse
@@ -23,11 +24,47 @@ import logging
 import signal
 import sys
 import time
+import threading
 from datetime import datetime
 from typing import Optional
 
 from .config import load_config, GrowPiConfig
 from .lamps import PWMController
+from .lamps.pwm_controller import get_pwm_controller
+
+# Try to import curve controller
+CURVE_CONTROLLER_AVAILABLE = False
+try:
+    from .utils.curve_controller import CurveController, get_curve_controller
+    CURVE_CONTROLLER_AVAILABLE = True
+except ImportError:
+    pass
+
+# Try to import mode manager
+MODE_MANAGER_AVAILABLE = False
+mode_manager = None
+try:
+    from .utils.mode_manager import get_mode_manager
+    MODE_MANAGER_AVAILABLE = True
+except ImportError:
+    pass
+
+# Try to import web API
+WEB_API_AVAILABLE = False
+try:
+    from .web.api import app, run_server, start_data_logger
+    WEB_API_AVAILABLE = True
+except ImportError:
+    pass
+
+
+def _get_current_mode() -> str:
+    """Get current mode from ModeManager (single source of truth)."""
+    if MODE_MANAGER_AVAILABLE and mode_manager:
+        return mode_manager.get_mode()
+    return 'auto'
+
+# Fallback to old sun_curve if new controller not available
 from .utils.sun_curve import (
     interpolate_intensity,
     get_default_sun_curve,
@@ -42,16 +79,25 @@ class GrowPiController:
 
     Supports two modes:
     - fixed: Static intensities from config file
-    - curve: Dynamic sun curve interpolation
+    - curve: Per-channel curve interpolation
     """
 
-    def __init__(self, config: GrowPiConfig, mode: str = "curve"):
+    def __init__(self, config: GrowPiConfig, mode: str = "curve", enable_web: bool = True):
+        global mode_manager
         self.config = config
         self.mode = mode
-        self.pwm_controller = PWMController()
+        self.enable_web = enable_web
+        self.pwm_controller = get_pwm_controller()  # Use singleton
         self.running = False
-        self.sun_curve = get_default_sun_curve()
-        self.last_intensity = -1  # Track last intensity to avoid unnecessary updates
+        self.curve_controller: Optional[CurveController] = None
+        self.sun_curve = get_default_sun_curve()  # Fallback
+        self.last_intensities = {}  # Track last intensities per channel
+        self.web_thread: Optional[threading.Thread] = None
+
+        # Initialize ModeManager (single source of truth for mode)
+        if MODE_MANAGER_AVAILABLE:
+            mode_manager = get_mode_manager()
+
         self._setup_logging()
 
     def _setup_logging(self) -> None:
@@ -101,10 +147,33 @@ class GrowPiController:
                     f"[GPIO-{ch.gpio_pin}]"
                 )
         else:
-            # Curve mode - calculate current intensity
-            logger.info("Mode: CURVE - Using sun curve interpolation")
-            logger.info("Kurve: 05:00-08:00 Aufgang, 08:00-20:00 Tag, 20:00-23:00 Untergang, 23:00-05:00 Nacht")
-            self._update_intensity_from_curve()
+            # Curve mode - initialize curve controller
+            if CURVE_CONTROLLER_AVAILABLE:
+                logger.info("Mode: CURVE - Using per-channel curve interpolation")
+                try:
+                    channel_names = {ch.channel: ch.name for ch in channels}
+                    self.curve_controller = get_curve_controller()
+                    self.curve_controller.initialize(channel_names)
+                    logger.info("CurveController initialized with per-channel curves")
+                except Exception as e:
+                    logger.warning(f"CurveController init failed: {e}, using fallback")
+                    self.curve_controller = None
+            else:
+                logger.info("Mode: CURVE - Using legacy single sun curve (fallback)")
+
+            # CRITICAL: On startup, always apply curve values immediately
+            # This ensures lamps are set correctly after power outage/restart
+            current_mode = _get_current_mode()
+            logger.info(f"Startup mode: {current_mode}")
+            if current_mode == "auto":
+                logger.info("Applying curve values on startup...")
+                self._update_intensity_from_curve()
+            else:
+                logger.info("Manual mode active - not applying curves on startup")
+
+        # Start Web API in background thread
+        if self.enable_web and WEB_API_AVAILABLE:
+            self._start_web_api()
 
         logger.info("=" * 50)
         logger.info("Initialization complete!")
@@ -112,36 +181,72 @@ class GrowPiController:
 
         return True
 
-    def _update_intensity_from_curve(self) -> bool:
-        """
-        Update lamp intensity based on current time and sun curve.
-
-        Returns:
-            True if intensity was changed
-        """
+    def _start_web_api(self) -> None:
+        """Start Flask Web API in background thread."""
         logger = logging.getLogger(__name__)
 
+        def run_flask():
+            try:
+                # Start data logger first
+                start_data_logger()
+                # Run Flask (without debug, threaded)
+                app.run(host='0.0.0.0', port=5000, debug=False, threaded=True, use_reloader=False)
+            except Exception as e:
+                logger.error(f"Web API error: {e}")
+
+        self.web_thread = threading.Thread(target=run_flask, name="WebAPI", daemon=True)
+        self.web_thread.start()
+        logger.info("Web API started on http://0.0.0.0:5000")
+
+    def _update_intensity_from_curve(self) -> bool:
+        """
+        Update lamp intensity based on current time and curves.
+
+        Returns:
+            True if any intensity was changed
+        """
+        logger = logging.getLogger(__name__)
         now = datetime.now()
-        intensity = interpolate_intensity(self.sun_curve, now)
+        changed = False
 
-        # Only update if intensity changed
-        if intensity != self.last_intensity:
-            # Set same intensity for all channels (except UV which stays at config value)
-            for ch in self.config.lamps.channels:
-                if ch.name == "UV":
-                    # UV stays at configured value
-                    self.pwm_controller.set_intensity(ch.channel, ch.default_intensity)
-                else:
-                    self.pwm_controller.set_intensity(ch.channel, intensity)
+        # Use per-channel curve controller if available
+        if self.curve_controller:
+            intensities = self.curve_controller.get_current_intensities(now)
 
-            logger.info(
-                f"Kurve Update [{now.strftime('%H:%M')}]: "
-                f"Intensität {self.last_intensity}% → {intensity}%"
-            )
-            self.last_intensity = intensity
-            return True
+            for channel, intensity in intensities.items():
+                last = self.last_intensities.get(channel, -1)
+                if intensity != last:
+                    self.pwm_controller.set_intensity(channel, intensity)
+                    self.last_intensities[channel] = intensity
+                    changed = True
 
-        return False
+            if changed:
+                state_str = ", ".join(
+                    f"Ch{ch}:{i}%"
+                    for ch, i in sorted(intensities.items())
+                )
+                logger.info(f"Kurve Update [{now.strftime('%H:%M')}]: [{state_str}]")
+
+        else:
+            # Fallback: Legacy single curve for all channels
+            intensity = interpolate_intensity(self.sun_curve, now)
+            last = self.last_intensities.get(0, -1)
+
+            if intensity != last:
+                for ch in self.config.lamps.channels:
+                    if ch.name == "UV":
+                        self.pwm_controller.set_intensity(ch.channel, ch.default_intensity)
+                    else:
+                        self.pwm_controller.set_intensity(ch.channel, intensity)
+
+                logger.info(
+                    f"Kurve Update [{now.strftime('%H:%M')}]: "
+                    f"Intensität {last}% → {intensity}%"
+                )
+                self.last_intensities[0] = intensity
+                changed = True
+
+        return changed
 
     def run(self) -> None:
         """
@@ -165,13 +270,27 @@ class GrowPiController:
         try:
             last_update = 0
             last_heartbeat = time.time()
+            last_known_mode = _get_current_mode()  # Track mode changes
 
             while self.running:
                 time.sleep(1)
                 now = time.time()
 
-                # Curve mode: Update intensity periodically
-                if self.mode == "curve" and (now - last_update >= update_interval):
+                # Get current mode from ModeManager (single source of truth)
+                current_mode = _get_current_mode()
+
+                # CRITICAL: Detect mode change from manual to auto
+                # Clear the intensity cache to force a fresh update
+                if current_mode == "auto" and last_known_mode != "auto":
+                    logger.info("Mode change detected (manual -> auto) - forcing curve update")
+                    self.last_intensities = {}  # Clear cache to force update!
+                    last_update = 0  # Force immediate update
+
+                last_known_mode = current_mode
+
+                # Curve mode: Update intensity periodically (only if mode is 'auto')
+                # This is the ONLY place where curves update lamp values
+                if self.mode == "curve" and current_mode == "auto" and (now - last_update >= update_interval):
                     self._update_intensity_from_curve()
                     last_update = now
 
@@ -183,7 +302,7 @@ class GrowPiController:
                         f"Ch{ch}:{intensity}%"
                         for ch, intensity in sorted(state.items())
                     )
-                    logger.info(f"Heartbeat [{current_time}] - Lamps: [{state_str}]")
+                    logger.info(f"Heartbeat [{current_time}] Mode={current_mode} - Lamps: [{state_str}]")
                     last_heartbeat = now
 
         except KeyboardInterrupt:
@@ -241,6 +360,11 @@ def main(config_path: Optional[str] = None) -> int:
         action="store_true",
         help="Show 24h curve preview and exit"
     )
+    parser.add_argument(
+        "--no-web",
+        action="store_true",
+        help="Disable Web API (run controller only)"
+    )
     args = parser.parse_args()
 
     # Preview mode: Just show curve and exit
@@ -259,7 +383,7 @@ def main(config_path: Optional[str] = None) -> int:
         config = load_config(args.config)
 
         # Create controller with selected mode
-        controller = GrowPiController(config, mode=args.mode)
+        controller = GrowPiController(config, mode=args.mode, enable_web=not args.no_web)
 
         # Setup signal handlers for graceful shutdown
         def signal_handler(sig, frame):

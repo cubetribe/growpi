@@ -37,12 +37,31 @@ class LampChannel:
     current_intensity: int = 0
 
 
+# Singleton instance
+_pwm_controller_instance: Optional["PWMController"] = None
+
+
+def get_pwm_controller() -> "PWMController":
+    """
+    Get the global PWMController singleton instance.
+
+    Returns:
+        The shared PWMController instance
+    """
+    global _pwm_controller_instance
+    if _pwm_controller_instance is None:
+        _pwm_controller_instance = PWMController()
+    return _pwm_controller_instance
+
+
 class PWMController:
     """
     PWM Controller for GrowPi LED lamps.
 
     Uses pigpio daemon for hardware PWM control.
     Falls back to simulation mode when pigpio is not available.
+
+    Note: Use get_pwm_controller() to get the singleton instance.
     """
 
     def __init__(self):

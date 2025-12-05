@@ -1,5 +1,235 @@
 # GrowPi Project Changelog
 
+## [2025-12-05 v5] - Mode Management & Stale Cache Fix
+
+**Status**: In Progress - Mode-Switching Rework
+**Platform**: Raspberry Pi 3B+ (growpi @ 192.168.0.86)
+**Web Interface**: http://192.168.0.86:5000
+**API Version**: 1.2.1
+
+### Summary
+
+Komplette Überarbeitung der Mode-Umschaltung zwischen "Zeitsteuerung" (auto) und "Manuell":
+- Neuer zentraler ModeManager als Single Source of Truth
+- Fix für "Stale Cache" Problem beim Mode-Wechsel
+- Deaktivierung des separaten growpi-web.service
+- Verbessertes Startup-Verhalten nach Stromausfall
+
+### Problemanalyse
+
+**Symptom**: Beim Wechsel von "Manuell" zu "Zeitsteuerung" gingen alle Lampen aus statt auf Kurven-Werte.
+
+**Root Causes**:
+1. **Stale Cache**: `self.last_intensities` in main.py behielt alte Werte, sodass bei erneutem "auto" Mode keine Updates gesendet wurden
+2. **Zwei PWMController**: api.py und main.py hatten separate Instanzen wegen inkonsistenter Python-Imports
+3. **Separater Service**: `growpi-web.service` lief parallel zu `grow-pi.service` und kämpfte um Port 5000
+4. **Mode nur im RAM**: Modus wurde nicht persistiert, ging bei Restart verloren
+
+### Neue Features
+
+#### 1. ModeManager (`utils/mode_manager.py`)
+```python
+# Singleton Pattern für zentrales Mode-Management
+mode_manager = get_mode_manager()
+mode_manager.set_mode("auto")  # oder "manual"
+current = mode_manager.get_mode()
+```
+
+**Features**:
+- Thread-safe mit Lock
+- Persistiert in `/tmp/growpi_mode.txt`
+- Nach Reboot automatisch "auto" (Sicherheit für Pflanzen)
+- Callback-System für Mode-Änderungen
+
+#### 2. Cache-Clearing beim Mode-Wechsel
+```python
+# In main.py run() loop:
+if current_mode == "auto" and last_known_mode != "auto":
+    logger.info("Mode change detected - forcing curve update")
+    self.last_intensities = {}  # Cache leeren!
+    last_update = 0  # Sofortiges Update erzwingen
+```
+
+#### 3. Service-Konsolidierung
+- `growpi-web.service` deaktiviert (`sudo systemctl disable growpi-web.service`)
+- Nur noch `grow-pi.service` läuft (startet main.py, das intern die Web-API startet)
+
+### Neue/Geänderte Dateien
+
+```
+pi-controller/grow_pi/
+├── utils/
+│   ├── __init__.py              # + ModeManager exports
+│   └── mode_manager.py          # NEU: Zentrales Mode-Management
+├── main.py                      # + Cache-Clearing bei Mode-Wechsel
+│                                # + ModeManager Integration
+│                                # + Verbessertes Startup-Logging
+└── web/
+    ├── api.py                   # + ModeManager statt globaler Variable
+    │                            # + _apply_curve_values() Hilfsfunktion
+    │                            # + _get_current_mode() Hilfsfunktion
+    └── static/index.html        # + fetchStatus() nach Mode-Wechsel
+                                 # + Korrekte Init-Reihenfolge (Mode vor Status)
+```
+
+### API-Änderungen
+
+**GET/POST /api/mode** - Nutzt jetzt ModeManager:
+```json
+// POST /api/mode {"mode": "auto"}
+{
+  "success": true,
+  "mode": "auto",
+  "applied_intensities": {"1": 15, "2": 22, "3": 43, "4": 0}
+}
+```
+
+### Bekannte Einschränkungen
+
+**Verbleibendes Problem**: Python-Import-System erstellt zwei PWMController-Instanzen:
+- `lamps.pwm_controller` (von api.py via sys.path)
+- `grow_pi.lamps.pwm_controller` (von main.py via relative import)
+
+Das Singleton-Pattern greift nicht bei unterschiedlichen Modul-Pfaden. Die physischen Lampen werden korrekt gesteuert (main.py), aber die API zeigt möglicherweise falsche Werte an.
+
+**Workaround**: Die main.py Loop ist authoritative für PWM-Werte. Die API-Anzeige kann abweichen.
+
+### Systemd Service-Konfiguration
+
+**Aktiv**:
+```
+grow-pi.service - Startet main.py (enthält Web-API)
+```
+
+**Deaktiviert**:
+```
+growpi-web.service - War separater API-Prozess (Konflikt!)
+```
+
+### Test-Szenario
+
+1. **Startup**: `sudo systemctl start grow-pi` → Lampen auf Kurven-Werte
+2. **Manuell**: Slider bewegen → Lampen reagieren sofort
+3. **Zurück zu Auto**: → Kurven-Werte werden angewendet (Cache geleert)
+4. **Stromausfall**: Nach Reboot → automatisch "auto" Mode
+
+---
+
+## [2025-12-05 v4] - Per-Channel Lighting Curves
+
+**Status**: Production-Ready mit individuellem Kurven-Editor pro Lampe
+**Platform**: Raspberry Pi 3B+ (growpi @ 192.168.0.86)
+**Web Interface**: http://192.168.0.86:5000
+**API Version**: 1.2.0
+
+### Summary
+
+Individuelle Lichtkurven pro Kanal für realistische Sonnenauf-/untergangs-Sequenzen:
+- Jede Lampe hat eigene Zeit-/Intensitäts-Kurve
+- Standard-Sunrise: Far Red → Cool White → Warm White (gestaffelt)
+- UV bleibt permanent auf 0%
+- Web-UI mit Kurven-Editor und 24h-Vorschau
+
+### Neue Features
+
+#### 1. Per-Channel Kurven-System
+
+**Default Sunrise Sequence (max 50%)**:
+| Kanal | Lampe | Start | Peak (50%) |
+|-------|-------|-------|------------|
+| 1 | Far Red | 05:00 | 06:00 |
+| 3 | Cool White | 05:15 | 06:15 |
+| 2 | Warm White | 05:30 | 06:30 |
+| 4 | UV | - | 0% immer |
+
+**Sunset (umgekehrte Reihenfolge)**:
+- Warm White fällt zuerst (20:00)
+- Cool White folgt (20:15)
+- Far Red zuletzt (20:30)
+
+#### 2. Datenbank-Erweiterung
+```sql
+-- Neue Tabelle für Kurven
+lamp_curves (id, channel, name, enabled, curve, created_at, updated_at, synced_at)
+```
+
+#### 3. CurveController (`utils/curve_controller.py`)
+- `CurveController` Klasse für Multi-Kanal Interpolation
+- `get_current_intensities()` - Alle Kanäle gleichzeitig
+- `get_intensity(channel)` - Einzelner Kanal
+- `update_curve(channel, points)` - Kurve aktualisieren
+- Lineare Interpolation mit Mitternachts-Wraparound
+
+#### 4. Neue API-Endpoints
+| Endpoint | Methode | Beschreibung |
+|----------|---------|--------------|
+| `/api/curves` | GET | Alle Kurven abrufen |
+| `/api/curves/<channel>` | GET | Kurve für Kanal |
+| `/api/curves/<channel>` | PUT | Kurve aktualisieren |
+| `/api/curves/preview` | GET | 24h Vorschau aller Kanäle |
+| `/api/curves/intensities` | GET | Aktuelle interpolierte Werte |
+
+#### 5. Web-UI Kurven-Editor
+- Tabs: "Steuerung" und "Kurven"
+- Pro Kanal: Enable/Disable Toggle, Zeit/Intensitäts-Punkte
+- Live 24h-Vorschau Chart
+- Punkte hinzufügen/entfernen
+- "Kurven Speichern" Button
+
+### Neue/Geänderte Dateien
+
+```
+pi-controller/grow_pi/
+├── database/
+│   ├── models.py           # + LampCurve, CurvePoint dataclasses
+│   ├── db.py               # + lamp_curves Tabelle & Methoden
+│   └── __init__.py         # + LampCurve, CurvePoint exports
+├── utils/
+│   └── curve_controller.py # NEU: Multi-Channel Curve Controller
+└── web/
+    ├── api.py              # + Curves API Endpoints (v1.2.0)
+    └── static/index.html   # + Tabs, Kurven-Editor UI
+```
+
+### API Response Beispiele
+
+**GET /api/curves**
+```json
+{
+  "success": true,
+  "curves": [
+    {
+      "channel": 1,
+      "name": "Far Red",
+      "enabled": true,
+      "curve": [
+        {"time": "05:00", "intensity": 0},
+        {"time": "06:00", "intensity": 50}
+      ],
+      "current_intensity": 45
+    }
+  ]
+}
+```
+
+**GET /api/curves/preview**
+```json
+{
+  "success": true,
+  "preview": [
+    {"hour": 0, "time": "00:00", "intensities": {1: 0, 2: 0, 3: 0, 4: 0}},
+    {"hour": 6, "time": "06:00", "intensities": {1: 50, 2: 25, 3: 38, 4: 0}}
+  ]
+}
+```
+
+### Migration
+
+Die neue `lamp_curves` Tabelle wird automatisch beim Start erstellt.
+Default-Kurven werden initialisiert wenn keine existieren.
+
+---
+
 ## [2025-12-05 v3] - SQLite Logging System Complete
 
 **Status**: Production-Ready mit vollständigem Daten-Logging

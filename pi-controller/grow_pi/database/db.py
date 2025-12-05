@@ -12,7 +12,7 @@ from datetime import datetime, timedelta
 from typing import Optional, List, Dict, Any
 from contextlib import contextmanager
 
-from .models import SensorReading, LampStateLog, SystemEvent
+from .models import SensorReading, LampStateLog, SystemEvent, LampCurve
 
 logger = logging.getLogger(__name__)
 
@@ -84,6 +84,21 @@ CREATE TABLE IF NOT EXISTS sync_status (
 
 -- Insert initial sync status if not exists
 INSERT OR IGNORE INTO sync_status (id, status) VALUES (1, 'never');
+
+-- Lamp Curves Table (per-channel curves)
+CREATE TABLE IF NOT EXISTS lamp_curves (
+    id TEXT PRIMARY KEY,
+    channel INTEGER NOT NULL UNIQUE,
+    name TEXT NOT NULL,
+    enabled INTEGER NOT NULL DEFAULT 1,
+    curve TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL,
+    synced_at TEXT DEFAULT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_lamp_curves_channel
+ON lamp_curves(channel);
 """
 
 
@@ -409,6 +424,136 @@ class Database:
                 params
             )
             return [SystemEvent.from_row(row) for row in cursor.fetchall()]
+
+    # =========================================================================
+    # Lamp Curves
+    # =========================================================================
+
+    def insert_lamp_curve(self, curve: LampCurve) -> None:
+        """Insert or replace a lamp curve."""
+        import json
+        with self._cursor() as cursor:
+            cursor.execute(
+                """
+                INSERT OR REPLACE INTO lamp_curves
+                (id, channel, name, enabled, curve, created_at, updated_at, synced_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (curve.id, curve.channel, curve.name, int(curve.enabled),
+                 json.dumps(curve.curve), curve.created_at, curve.updated_at, curve.synced_at)
+            )
+
+    def get_lamp_curve(self, channel: int) -> Optional[LampCurve]:
+        """Get lamp curve for a specific channel."""
+        with self._cursor() as cursor:
+            cursor.execute(
+                """
+                SELECT id, channel, name, enabled, curve, created_at, updated_at, synced_at
+                FROM lamp_curves
+                WHERE channel = ?
+                """,
+                (channel,)
+            )
+            row = cursor.fetchone()
+            return LampCurve.from_row(row) if row else None
+
+    def get_all_lamp_curves(self) -> List[LampCurve]:
+        """Get all lamp curves."""
+        with self._cursor() as cursor:
+            cursor.execute(
+                """
+                SELECT id, channel, name, enabled, curve, created_at, updated_at, synced_at
+                FROM lamp_curves
+                ORDER BY channel
+                """
+            )
+            return [LampCurve.from_row(row) for row in cursor.fetchall()]
+
+    def update_lamp_curve(self, channel: int, curve_points: List[Dict], enabled: bool = True) -> Optional[LampCurve]:
+        """Update curve points for a channel."""
+        import json
+        from .models import now_iso
+
+        existing = self.get_lamp_curve(channel)
+        if not existing:
+            return None
+
+        with self._cursor() as cursor:
+            cursor.execute(
+                """
+                UPDATE lamp_curves
+                SET curve = ?, enabled = ?, updated_at = ?, synced_at = NULL
+                WHERE channel = ?
+                """,
+                (json.dumps(curve_points), int(enabled), now_iso(), channel)
+            )
+
+        return self.get_lamp_curve(channel)
+
+    def initialize_default_curves(self, channels: Dict[int, str]) -> None:
+        """
+        Initialize default curves for all channels if not exists.
+
+        Default sunrise sequence (max 50%):
+        - Far Red (ch1): Starts first at 05:00, reaches 50% by 06:00
+        - Cool White (ch3): Starts 15min later at 05:15, reaches 50% by 06:15
+        - Warm White (ch2): Starts 30min later at 05:30, reaches 50% by 06:30
+        - UV (ch4): Always 0
+
+        Sunset sequence (reverse order):
+        - Warm White drops first at 20:00
+        - Cool White drops 15min later
+        - Far Red drops last
+
+        Args:
+            channels: Dict mapping channel number to name {1: "Far Red", ...}
+        """
+        import json
+        from .models import now_iso, generate_uuid
+
+        # Default curves - UV always 0
+        default_curves = {
+            1: [  # Far Red - starts first at 05:45, reaches 100%
+                {"time": "05:45", "intensity": 0},
+                {"time": "06:15", "intensity": 50},   # 30min: 0 → 50%
+                {"time": "06:30", "intensity": 100},  # 15min: 50 → 100%
+                {"time": "20:30", "intensity": 100},  # Start sunset last
+                {"time": "21:00", "intensity": 50},
+                {"time": "21:30", "intensity": 0},    # Sunset complete
+            ],
+            2: [  # Warm White - starts at 05:30 (unchanged)
+                {"time": "05:30", "intensity": 0},
+                {"time": "06:30", "intensity": 50},   # Sunrise complete
+                {"time": "20:00", "intensity": 50},   # Start sunset first
+                {"time": "21:00", "intensity": 0},    # Sunset complete
+            ],
+            3: [  # Cool White - starts at 06:00, gradual ramp
+                {"time": "06:00", "intensity": 15},   # Start with 15%
+                {"time": "06:30", "intensity": 30},   # 30min: 30%
+                {"time": "07:00", "intensity": 50},   # 60min: 50% reached
+                {"time": "20:15", "intensity": 50},   # Start sunset middle
+                {"time": "21:15", "intensity": 0},    # Sunset complete
+            ],
+            4: [  # UV - always 0
+                {"time": "00:00", "intensity": 0},
+                {"time": "12:00", "intensity": 0},
+            ],
+        }
+
+        for channel, name in channels.items():
+            existing = self.get_lamp_curve(channel)
+            if existing:
+                logger.debug(f"Curve for channel {channel} already exists")
+                continue
+
+            curve = LampCurve(
+                channel=channel,
+                name=name,
+                enabled=(channel != 4),  # UV disabled by default
+                curve=default_curves.get(channel, []),
+            )
+            self.insert_lamp_curve(curve)
+            logger.info(f"Created default curve for {name} (ch{channel})")
 
     # =========================================================================
     # Statistics & Maintenance

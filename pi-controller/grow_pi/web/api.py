@@ -26,7 +26,7 @@ from datetime import datetime
 # Add parent directory for imports
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from lamps.pwm_controller import PWMController
+from lamps.pwm_controller import PWMController, get_pwm_controller
 
 # Try to import DHT22 sensor
 DHT_AVAILABLE = False
@@ -45,6 +45,30 @@ try:
     DB_AVAILABLE = True
 except ImportError:
     logging.warning("Database module not available - logging disabled")
+
+# Try to import curve controller
+CURVE_AVAILABLE = False
+curve_controller_module = None
+try:
+    from utils.curve_controller import CurveController, get_curve_controller
+    CURVE_AVAILABLE = True
+except ImportError as e:
+    logging.warning(f"CurveController not available - curve features disabled: {e}")
+
+# Try to import mode manager
+MODE_MANAGER_AVAILABLE = False
+mode_manager = None
+try:
+    # Relative import (when run as module)
+    from ..utils.mode_manager import get_mode_manager
+    MODE_MANAGER_AVAILABLE = True
+except ImportError:
+    try:
+        # Absolute import (fallback)
+        from grow_pi.utils.mode_manager import get_mode_manager
+        MODE_MANAGER_AVAILABLE = True
+    except ImportError as e:
+        logging.warning(f"ModeManager not available: {e}")
 
 
 # ============================================================================
@@ -87,7 +111,7 @@ def load_lamp_channels():
 load_lamp_channels()
 
 # API Configuration
-API_VERSION = "1.1.0"  # Bumped for logging feature
+API_VERSION = "1.2.0"  # Bumped for per-channel curves
 API_PORT = 5000
 API_HOST = "0.0.0.0"
 
@@ -114,14 +138,15 @@ logger = logging.getLogger(__name__)
 # Hardware Initialization
 # ============================================================================
 
-# Initialize PWM Controller
+# Initialize PWM Controller (use singleton)
 pwm_controller = None
 try:
-    pwm_controller = PWMController()
-    # Initialize with channel configs
-    from config import load_config
-    config = load_config()
-    pwm_controller.initialize(config.lamps.channels)
+    pwm_controller = get_pwm_controller()  # Use singleton!
+    # Initialize with channel configs (only if not already initialized)
+    if not pwm_controller._initialized:
+        from config import load_config
+        config = load_config()
+        pwm_controller.initialize(config.lamps.channels)
     logger.info("PWM Controller initialized successfully")
 except Exception as e:
     logger.error(f"Failed to initialize PWM Controller: {e}")
@@ -144,6 +169,25 @@ if DB_AVAILABLE:
         logger.info("DataLogger initialized successfully")
     except Exception as e:
         logger.error(f"Failed to initialize DataLogger: {e}")
+
+# Initialize CurveController
+curve_controller: Optional[CurveController] = None
+if CURVE_AVAILABLE and DB_AVAILABLE:
+    try:
+        channels = {ch: cfg.name for ch, cfg in LAMP_CHANNELS.items()}
+        curve_controller = get_curve_controller()
+        curve_controller.initialize(channels)
+        logger.info("CurveController initialized successfully")
+    except Exception as e:
+        logger.error(f"Failed to initialize CurveController: {e}")
+
+# Initialize ModeManager
+if MODE_MANAGER_AVAILABLE:
+    try:
+        mode_manager = get_mode_manager()
+        logger.info(f"ModeManager initialized (current mode: {mode_manager.get_mode()})")
+    except Exception as e:
+        logger.error(f"Failed to initialize ModeManager: {e}")
 
 
 # ============================================================================
@@ -477,6 +521,261 @@ def get_log_stats():
 
 
 # ============================================================================
+# Curve API Routes
+# ============================================================================
+
+@app.route('/api/curves', methods=['GET'])
+def get_all_curves():
+    """Get all lamp curves"""
+    if not CURVE_AVAILABLE or not curve_controller:
+        return jsonify(create_response(False, error="Curves not available")), 503
+
+    try:
+        curves = []
+        for channel in range(1, 5):
+            curve_data = curve_controller.get_curve(channel)
+            curves.append({
+                "channel": channel,
+                "name": curve_controller.get_channel_name(channel),
+                "enabled": curve_controller.is_enabled(channel),
+                "curve": curve_data or [],
+                "current_intensity": curve_controller.get_intensity(channel)
+            })
+
+        return jsonify(create_response(True, {
+            "curves": curves,
+            "status": curve_controller.get_status()
+        }))
+
+    except Exception as e:
+        logger.error(f"Error in get_all_curves: {e}")
+        return jsonify(create_response(False, error=str(e))), 500
+
+
+@app.route('/api/curves/<int:channel>', methods=['GET'])
+def get_curve(channel: int):
+    """Get curve for a specific channel"""
+    if not CURVE_AVAILABLE or not curve_controller:
+        return jsonify(create_response(False, error="Curves not available")), 503
+
+    if channel not in LAMP_CHANNELS:
+        return jsonify(create_response(False, error=f"Invalid channel: {channel}")), 400
+
+    try:
+        curve_data = curve_controller.get_curve(channel)
+        return jsonify(create_response(True, {
+            "channel": channel,
+            "name": curve_controller.get_channel_name(channel),
+            "enabled": curve_controller.is_enabled(channel),
+            "curve": curve_data or [],
+            "current_intensity": curve_controller.get_intensity(channel)
+        }))
+
+    except Exception as e:
+        logger.error(f"Error in get_curve: {e}")
+        return jsonify(create_response(False, error=str(e))), 500
+
+
+@app.route('/api/curves/<int:channel>', methods=['PUT'])
+def update_curve(channel: int):
+    """Update curve for a specific channel"""
+    if not CURVE_AVAILABLE or not curve_controller:
+        return jsonify(create_response(False, error="Curves not available")), 503
+
+    if channel not in LAMP_CHANNELS:
+        return jsonify(create_response(False, error=f"Invalid channel: {channel}")), 400
+
+    if not request.is_json:
+        return jsonify(create_response(False, error="Request must be JSON")), 400
+
+    try:
+        data = request.get_json()
+        curve_points = data.get('curve', [])
+        enabled = data.get('enabled', True)
+
+        # Validate curve points
+        for point in curve_points:
+            if 'time' not in point or 'intensity' not in point:
+                return jsonify(create_response(False, error="Each point needs 'time' and 'intensity'")), 400
+            if not isinstance(point['intensity'], (int, float)) or not 0 <= point['intensity'] <= 100:
+                return jsonify(create_response(False, error="Intensity must be 0-100")), 400
+
+        # Update curve
+        success = curve_controller.update_curve(channel, curve_points, enabled)
+        if not success:
+            return jsonify(create_response(False, error="Failed to update curve")), 500
+
+        # Log the change
+        if data_logger:
+            data_logger.log_event(
+                'curve_update',
+                'info',
+                f'Curve updated for {curve_controller.get_channel_name(channel)}',
+                {'channel': channel, 'points': len(curve_points), 'enabled': enabled}
+            )
+
+        logger.info(f"Updated curve for channel {channel}: {len(curve_points)} points")
+
+        return jsonify(create_response(True, {
+            "channel": channel,
+            "name": curve_controller.get_channel_name(channel),
+            "enabled": enabled,
+            "curve": curve_points,
+            "current_intensity": curve_controller.get_intensity(channel)
+        }))
+
+    except Exception as e:
+        logger.error(f"Error in update_curve: {e}")
+        return jsonify(create_response(False, error=str(e))), 500
+
+
+@app.route('/api/curves/preview', methods=['GET'])
+def get_curve_preview():
+    """Get 24h preview of all curve intensities"""
+    if not CURVE_AVAILABLE or not curve_controller:
+        return jsonify(create_response(False, error="Curves not available")), 503
+
+    try:
+        from datetime import datetime
+
+        preview = []
+        for hour in range(24):
+            test_time = datetime.now().replace(hour=hour, minute=0, second=0, microsecond=0)
+            intensities = curve_controller.get_current_intensities(test_time)
+            preview.append({
+                "hour": hour,
+                "time": f"{hour:02d}:00",
+                "intensities": intensities
+            })
+
+        return jsonify(create_response(True, {
+            "preview": preview,
+            "channels": {
+                ch: curve_controller.get_channel_name(ch)
+                for ch in range(1, 5)
+            }
+        }))
+
+    except Exception as e:
+        logger.error(f"Error in get_curve_preview: {e}")
+        return jsonify(create_response(False, error=str(e))), 500
+
+
+@app.route('/api/curves/intensities', methods=['GET'])
+def get_current_intensities():
+    """Get current interpolated intensities for all channels"""
+    if not CURVE_AVAILABLE or not curve_controller:
+        return jsonify(create_response(False, error="Curves not available")), 503
+
+    try:
+        intensities = curve_controller.get_current_intensities()
+        return jsonify(create_response(True, {
+            "intensities": intensities,
+            "channels": {
+                ch: {
+                    "name": curve_controller.get_channel_name(ch),
+                    "enabled": curve_controller.is_enabled(ch),
+                    "intensity": intensities.get(ch, 0)
+                }
+                for ch in range(1, 5)
+            },
+            "timestamp": datetime.now().isoformat()
+        }))
+
+    except Exception as e:
+        logger.error(f"Error in get_current_intensities: {e}")
+        return jsonify(create_response(False, error=str(e))), 500
+
+
+# ============================================================================
+# Mode API Routes
+# ============================================================================
+
+def _apply_curve_values() -> dict:
+    """Apply current curve values to lamps. Returns applied intensities."""
+    applied = {}
+    if curve_controller and pwm_controller:
+        intensities = curve_controller.get_current_intensities()
+        for channel, intensity in intensities.items():
+            pwm_controller.set_intensity(channel, intensity)
+            applied[channel] = intensity
+        logger.info(f"Applied curve intensities: {applied}")
+    return applied
+
+
+def _get_current_mode() -> str:
+    """Get current mode from ModeManager or fallback."""
+    if mode_manager:
+        return mode_manager.get_mode()
+    return "auto"
+
+
+@app.route('/api/mode', methods=['GET'])
+def get_mode():
+    """Get current operating mode"""
+    current = _get_current_mode()
+    return jsonify(create_response(True, {
+        "mode": current,
+        "modes": {
+            "auto": "Zeitsteuerung (Kurven aktiv)",
+            "manual": "Manuell (Slider aktiv)"
+        }
+    }))
+
+
+@app.route('/api/mode', methods=['POST'])
+def set_mode():
+    """Set operating mode"""
+    if not request.is_json:
+        return jsonify(create_response(False, error="Request must be JSON")), 400
+
+    try:
+        data = request.get_json()
+        mode = data.get('mode')
+
+        if mode not in ('auto', 'manual'):
+            return jsonify(create_response(False, error="Mode must be 'auto' or 'manual'")), 400
+
+        old_mode = _get_current_mode()
+        applied_intensities = {}
+
+        # Update mode in ModeManager
+        if mode_manager:
+            mode_manager.set_mode(mode)
+
+        # When switching to auto mode, immediately apply curve values
+        if mode == 'auto':
+            applied_intensities = _apply_curve_values()
+
+        # When switching to manual mode, keep current lamp values (no change needed)
+        # The sliders in UI will show current values and user can adjust from there
+
+        # Log the change
+        if data_logger and old_mode != mode:
+            try:
+                data_logger.log_event(
+                    'mode_change',
+                    'info',
+                    f'Mode changed from {old_mode} to {mode}',
+                    {'old_mode': old_mode, 'new_mode': mode, 'applied': applied_intensities}
+                )
+            except Exception as e:
+                logger.warning(f"Failed to log mode change: {e}")
+
+        logger.info(f"Mode changed: {old_mode} -> {mode}")
+
+        return jsonify(create_response(True, {
+            "mode": mode,
+            "message": f"Mode set to {mode}",
+            "applied_intensities": applied_intensities
+        }))
+
+    except Exception as e:
+        logger.error(f"Error in set_mode: {e}")
+        return jsonify(create_response(False, error=str(e))), 500
+
+
+# ============================================================================
 # Health & Info
 # ============================================================================
 
@@ -489,7 +788,8 @@ def health_check():
         "pwm_available": pwm_controller is not None,
         "sensor_available": dht_sensor is not None or not DHT_AVAILABLE,
         "logging_available": DB_AVAILABLE and data_logger is not None,
-        "logging_running": data_logger._running if data_logger else False
+        "logging_running": data_logger._running if data_logger else False,
+        "curves_available": CURVE_AVAILABLE and curve_controller is not None
     })
 
 
