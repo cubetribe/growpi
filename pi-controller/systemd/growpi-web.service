@@ -1,0 +1,20 @@
+[Unit]
+Description=GrowPi Web API
+After=network.target pigpiod.service
+Requires=pigpiod.service
+
+[Service]
+Type=simple
+User=admin
+Group=admin
+WorkingDirectory=/opt/grow-pi
+ExecStart=/opt/grow-pi/venv/bin/python -m grow_pi.web.api
+Restart=always
+RestartSec=10
+Environment=PYTHONUNBUFFERED=1
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=growpi-web
+
+[Install]
+WantedBy=multi-user.target

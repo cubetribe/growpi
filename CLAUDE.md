@@ -26,12 +26,20 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - **Authentication**: JWT in HTTP-only cookies
 - **i18n**: German (de) / English (en)
 
-### Hardware Integration (Planned)
-- **Target**: Raspberry Pi 4 Model B
-- **Backend**: Python 3.11+ with pigpio
-- **Communication**: HTTPS API polling
-- **Sensors**: RS485 soil sensors, DHT22 temperature/humidity
-- **Lighting**: 5-channel PWM LED control
+### Hardware Integration (ACTIVE - 2025-12-05)
+- **Target**: Raspberry Pi 3B+ (hostname: growpi, IP: 192.168.0.86)
+- **Backend**: Python 3.13 with pigpio
+- **Communication**: Local Flask API on port 5000
+- **Sensors**: DHT22 temperature/humidity (GPIO 4)
+- **Lighting**: 4-channel PWM LED control
+
+#### Pin Configuration (FINAL)
+| Channel | Name | GPIO | Pin |
+|---------|------|------|-----|
+| 1 | Far Red | 16 | 36 |
+| 2 | Warm White | 13 | 33 |
+| 3 | Cool White | 12 | 32 |
+| 4 | UV | 18 | 12 |
 
 ---
 

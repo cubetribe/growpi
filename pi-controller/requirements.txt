@@ -9,6 +9,10 @@ Adafruit-Blinka>=8.68.0
 minimalmodbus>=2.0.1
 pyserial>=3.5
 
+# Web API
+flask>=3.0.0
+flask-cors>=4.0.0
+
 # HTTP Client
 requests>=2.28.0
 httpx>=0.24.0

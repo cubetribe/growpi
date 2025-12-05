@@ -1,0 +1,367 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>GrowPi Control</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #0a0a0a 0%, #1a1a1a 100%);
+            color: #ffffff;
+            min-height: 100vh;
+            padding: 16px;
+            -webkit-font-smoothing: antialiased;
+        }
+
+        .container {
+            max-width: 480px;
+            margin: 0 auto;
+        }
+
+        header {
+            text-align: center;
+            margin-bottom: 24px;
+            padding: 16px 0;
+            border-bottom: 2px solid #11ff55;
+        }
+
+        h1 {
+            font-size: 28px;
+            font-weight: 700;
+            color: #11ff55;
+            text-shadow: 0 0 20px rgba(17, 255, 85, 0.5);
+        }
+
+        .status-badge {
+            display: inline-block;
+            padding: 6px 16px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 600;
+            margin-top: 8px;
+        }
+
+        .status-online {
+            background: rgba(17, 255, 85, 0.2);
+            color: #11ff55;
+            border: 1px solid #11ff55;
+        }
+
+        .status-offline {
+            background: rgba(255, 68, 68, 0.2);
+            color: #ff4444;
+            border: 1px solid #ff4444;
+        }
+
+        .last-update {
+            font-size: 11px;
+            color: #888;
+            margin-top: 6px;
+        }
+
+        .section {
+            background: rgba(20, 20, 20, 0.9);
+            border-radius: 16px;
+            padding: 20px;
+            margin-bottom: 20px;
+            border: 1px solid #2a2a2a;
+        }
+
+        .temp-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 16px;
+        }
+
+        .temp-card {
+            text-align: center;
+            padding: 16px;
+            background: rgba(255, 255, 255, 0.03);
+            border-radius: 12px;
+        }
+
+        .temp-label {
+            font-size: 12px;
+            color: #888;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin-bottom: 8px;
+        }
+
+        .temp-value {
+            font-size: 36px;
+            font-weight: 700;
+            color: #11ff55;
+        }
+
+        .temp-unit {
+            font-size: 18px;
+            color: #666;
+        }
+
+        .section-title {
+            font-size: 16px;
+            font-weight: 600;
+            margin-bottom: 16px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .section-title::before {
+            content: '';
+            width: 4px;
+            height: 16px;
+            background: #11ff55;
+            border-radius: 2px;
+        }
+
+        .lamp-control {
+            margin-bottom: 20px;
+            padding-bottom: 16px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .lamp-control:last-child {
+            margin-bottom: 0;
+            padding-bottom: 0;
+            border-bottom: none;
+        }
+
+        .lamp-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+        }
+
+        .lamp-name {
+            font-size: 15px;
+            font-weight: 600;
+        }
+
+        .lamp-value {
+            font-size: 18px;
+            font-weight: 700;
+            min-width: 50px;
+            text-align: right;
+        }
+
+        input[type="range"] {
+            -webkit-appearance: none;
+            width: 100%;
+            height: 44px;
+            background: transparent;
+            cursor: pointer;
+        }
+
+        input[type="range"]::-webkit-slider-runnable-track {
+            width: 100%;
+            height: 8px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 4px;
+        }
+
+        input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 28px;
+            height: 28px;
+            border-radius: 50%;
+            background: #fff;
+            border: 3px solid currentColor;
+            margin-top: -10px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+        }
+
+        input[type="range"]::-moz-range-track {
+            height: 8px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 4px;
+        }
+
+        input[type="range"]::-moz-range-thumb {
+            width: 24px;
+            height: 24px;
+            border-radius: 50%;
+            background: #fff;
+            border: 3px solid currentColor;
+        }
+
+        .lamp-farred { color: #ff4444; }
+        .lamp-warm { color: #ffbb44; }
+        .lamp-cool { color: #88ddff; }
+        .lamp-uv { color: #cc66ff; }
+
+        .error-msg {
+            background: rgba(255, 68, 68, 0.2);
+            border: 1px solid #ff4444;
+            color: #ff4444;
+            padding: 12px;
+            border-radius: 8px;
+            margin-bottom: 16px;
+            font-size: 13px;
+            display: none;
+        }
+
+        .error-msg.show { display: block; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>GrowPi Control</h1>
+            <div class="status-badge status-offline" id="statusBadge">Verbinde...</div>
+            <div class="last-update" id="lastUpdate">-</div>
+        </header>
+
+        <div class="error-msg" id="errorMsg"></div>
+
+        <section class="section">
+            <div class="temp-grid">
+                <div class="temp-card">
+                    <div class="temp-label">Temperatur</div>
+                    <div class="temp-value" id="tempValue">--<span class="temp-unit">°C</span></div>
+                </div>
+                <div class="temp-card">
+                    <div class="temp-label">Luftfeuchtigkeit</div>
+                    <div class="temp-value" id="humidityValue">--<span class="temp-unit">%</span></div>
+                </div>
+            </div>
+        </section>
+
+        <section class="section">
+            <h2 class="section-title">Beleuchtung</h2>
+
+            <div class="lamp-control lamp-farred">
+                <div class="lamp-header">
+                    <span class="lamp-name">Far Red</span>
+                    <span class="lamp-value" id="lamp1Value">0%</span>
+                </div>
+                <input type="range" id="lamp1" min="0" max="100" value="0" data-channel="1">
+            </div>
+
+            <div class="lamp-control lamp-warm">
+                <div class="lamp-header">
+                    <span class="lamp-name">Warm White</span>
+                    <span class="lamp-value" id="lamp2Value">0%</span>
+                </div>
+                <input type="range" id="lamp2" min="0" max="100" value="0" data-channel="2">
+            </div>
+
+            <div class="lamp-control lamp-cool">
+                <div class="lamp-header">
+                    <span class="lamp-name">Cool White</span>
+                    <span class="lamp-value" id="lamp3Value">0%</span>
+                </div>
+                <input type="range" id="lamp3" min="0" max="100" value="0" data-channel="3">
+            </div>
+
+            <div class="lamp-control lamp-uv">
+                <div class="lamp-header">
+                    <span class="lamp-name">UV</span>
+                    <span class="lamp-value" id="lamp4Value">0%</span>
+                </div>
+                <input type="range" id="lamp4" min="0" max="100" value="0" data-channel="4">
+            </div>
+        </section>
+    </div>
+
+    <script>
+        const statusBadge = document.getElementById('statusBadge');
+        const lastUpdate = document.getElementById('lastUpdate');
+        const tempValue = document.getElementById('tempValue');
+        const humidityValue = document.getElementById('humidityValue');
+        const errorMsg = document.getElementById('errorMsg');
+        let debounceTimers = {};
+
+        function showError(message) {
+            errorMsg.textContent = message;
+            errorMsg.classList.add('show');
+            setTimeout(() => errorMsg.classList.remove('show'), 5000);
+        }
+
+        function updateStatus(online) {
+            statusBadge.className = `status-badge ${online ? 'status-online' : 'status-offline'}`;
+            statusBadge.textContent = online ? 'Online' : 'Offline';
+        }
+
+        function formatTime() {
+            return new Date().toLocaleTimeString('de-DE', {hour: '2-digit', minute: '2-digit', second: '2-digit'});
+        }
+
+        async function fetchStatus() {
+            try {
+                const response = await fetch('/api/status');
+                if (!response.ok) throw new Error(`HTTP ${response.status}`);
+
+                const data = await response.json();
+
+                if (data.temperature !== null && data.temperature !== undefined) {
+                    tempValue.innerHTML = `${data.temperature.toFixed(1)}<span class="temp-unit">°C</span>`;
+                }
+
+                if (data.humidity !== null && data.humidity !== undefined) {
+                    humidityValue.innerHTML = `${data.humidity.toFixed(0)}<span class="temp-unit">%</span>`;
+                }
+
+                if (data.lamps) {
+                    data.lamps.forEach(lamp => {
+                        const slider = document.getElementById(`lamp${lamp.channel}`);
+                        const valueEl = document.getElementById(`lamp${lamp.channel}Value`);
+                        if (slider && valueEl) {
+                            slider.value = lamp.intensity;
+                            valueEl.textContent = `${lamp.intensity}%`;
+                        }
+                    });
+                }
+
+                updateStatus(true);
+                lastUpdate.textContent = `Aktualisiert: ${formatTime()}`;
+
+            } catch (error) {
+                console.error('Fetch error:', error);
+                updateStatus(false);
+            }
+        }
+
+        async function setLamp(channel, intensity) {
+            try {
+                await fetch(`/api/lamp/${channel}`, {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({intensity: parseInt(intensity)})
+                });
+            } catch (error) {
+                showError(`Fehler bei Lampe ${channel}`);
+            }
+        }
+
+        function debounce(fn, delay, key) {
+            clearTimeout(debounceTimers[key]);
+            debounceTimers[key] = setTimeout(fn, delay);
+        }
+
+        // Setup sliders
+        for (let i = 1; i <= 4; i++) {
+            const slider = document.getElementById(`lamp${i}`);
+            const valueEl = document.getElementById(`lamp${i}Value`);
+
+            slider.addEventListener('input', (e) => {
+                valueEl.textContent = `${e.target.value}%`;
+                debounce(() => setLamp(i, e.target.value), 300, `lamp${i}`);
+            });
+        }
+
+        // Initial fetch and auto-refresh
+        fetchStatus();
+        setInterval(fetchStatus, 10000);
+    </script>
+</body>
+</html>

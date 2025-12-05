@@ -1,17 +1,194 @@
 # GrowPi Project Changelog
 
-## [2025-12-04 v2] - MVP Level 1: Pi Auto-Start Controller ✅
+## [2025-12-05 v2] - DHT22 Sensor Integration Complete
 
-**Status**: Erfolgreich deployed und getestet
+**Status**: Production-Ready mit echten Sensordaten
+**Platform**: Raspberry Pi 3B+ (growpi @ 192.168.0.86)
+**Web Interface**: http://192.168.0.86:5000
+
+### Summary
+
+DHT22 Temperatur- und Luftfeuchtigkeit-Sensor vollständig integriert:
+- Echte Sensor-Werte statt Mock-Daten
+- Robuste Retry-Logik mit Caching
+- API liefert Temperatur und Luftfeuchtigkeit in Echtzeit
+
+### DHT22 Sensor-Integration
+
+#### Hardware-Konfiguration (3-Pin)
+| DHT22 Pin | Funktion | Raspberry Pi |
+|-----------|----------|--------------|
+| 1 | VCC | Pin 1 (3.3V) |
+| 2 | DATA | Pin 7 (GPIO-4) |
+| 3 | GND | Pin 6 (GND) |
+
+**Hinweis**: Der DHT22 hat 3 Pins (nicht 4). Die Pinbelegung ist unverändert zu früheren Dokumentationen.
+
+#### Installierte Pakete
+```bash
+# Python-Bibliotheken (im venv)
+adafruit-circuitpython-dht==4.0.10
+Adafruit-Blinka==8.68.0
+
+# System-Bibliotheken
+libgpiod3
+gpiod
+```
+
+#### API-Verbesserungen
+- **Caching**: Sensor-Werte werden 3 Sekunden gecacht (DHT22 braucht min. 2s zwischen Messungen)
+- **Retry-Logik**: Bis zu 3 Versuche bei Lesefehlern
+- **Fallback**: Letzte bekannte Werte werden zurückgegeben wenn Sensor temporär nicht lesbar
+
+#### Verifizierte Werte
+```json
+{
+  "temperature": 22.6,
+  "humidity": 59.6,
+  "unit_temperature": "°C",
+  "unit_humidity": "%"
+}
+```
+
+### Geänderte Dateien
+
+```
+pi-controller/grow_pi/web/api.py
+├── DHT_CACHE_SECONDS = 3
+├── _dht_cache = {"temp": None, "humidity": None, "timestamp": 0}
+└── read_dht22() - Mit Caching und Retry-Logik
+```
+
+### Deployment auf Pi
+
+```bash
+# Bibliothek installieren
+source /opt/grow-pi/venv/bin/activate
+pip install adafruit-circuitpython-dht
+
+# Service neu starten
+sudo systemctl restart growpi-web
+```
+
+### Bekannte Eigenschaften
+
+- DHT22 liefert manchmal beim ersten Leseversuch Fehler ("Checksum did not validate") - das ist normal
+- Minimum 2 Sekunden zwischen Messungen erforderlich
+- Bei schnellen API-Aufrufen werden gecachte Werte zurückgegeben
+
+---
+
+## [2025-12-05] - MVP Complete: Web Interface & Final Pin Configuration
+
+**Status**: Production-Ready
+**Platform**: Raspberry Pi 3B+ (growpi @ 192.168.0.86)
+**Web Interface**: http://192.168.0.86:5000
+
+### Summary
+
+Vollständiges MVP mit Web-Interface für Smartphone-Steuerung:
+- Web-App auf Port 5000 für 4 Lampenkanäle
+- Sonnenkurven-Modus mit automatischer Tageszeit-Interpolation
+- Temperatur/Luftfeuchtigkeit Anzeige (DHT22)
+- Finale GPIO-Pin-Konfiguration etabliert
+
+### Finale Pin-Konfiguration (ACTIVE)
+
+| Kanal | Name | GPIO | Pin | Farbe (UI) |
+|-------|------|------|-----|------------|
+| 1 | Far Red | 16 | 36 | #ff4444 |
+| 2 | Warm White | 13 | 33 | #ffbb44 |
+| 3 | Cool White | 12 | 32 | #88ddff |
+| 4 | UV | 18 | 12 | #cc66ff |
+
+**Hinweis**: GPIO 13 (Pin 33) war initial defekt/instabil, wurde durch Umkonfiguration behoben.
+
+### Neue Features
+
+#### 1. Sonnenkurven-Modus (Level 4)
+- Automatische Intensitätssteuerung basierend auf Tageszeit
+- Kurve: 05:00-08:00 Sonnenaufgang (10%→60%), 08:00-20:00 Tag (60%), 20:00-23:00 Sonnenuntergang (60%→10%), 23:00-05:00 Nacht (0%)
+- Linear-Interpolation zwischen Kurvenpunkten
+- `--mode curve` (default) oder `--mode fixed`
+- `--preview` zeigt 24h Kurven-Vorschau
+
+#### 2. Web-Interface (Flask API)
+- Mobile-optimiertes Dark-Theme UI
+- 4 Slider für Lampensteuerung (Far Red, Warm White, Cool White, UV)
+- Temperatur & Luftfeuchtigkeit Anzeige
+- Auto-Refresh alle 10 Sekunden
+- Debounced Slider Updates (300ms)
+- REST API: GET /api/status, POST /api/lamp/<channel>, GET /api/temperature
+
+#### 3. Dynamische Konfiguration
+- API lädt Kanäle aus config.yaml
+- Keine hardcodierten GPIO-Pins mehr in api.py
+- Fallback-Konfiguration bei Ladefehler
+
+### Neue Dateien
+
+```
+pi-controller/grow_pi/
+├── utils/
+│   └── sun_curve.py          # Sonnenkurven-Interpolation
+├── web/
+│   ├── __init__.py           # Web module exports
+│   ├── api.py                # Flask REST API
+│   └── static/
+│       └── index.html        # Mobile Web-Interface
+```
+
+### Neue systemd Services
+
+```
+/etc/systemd/system/growpi-web.service  # Flask API auf Port 5000
+```
+
+### Befehle
+
+```bash
+# Web-Interface starten
+sudo systemctl start growpi-web
+
+# Sonnenkurven-Modus (läuft bereits)
+sudo systemctl status grow-pi
+
+# Kurven-Vorschau anzeigen
+cd /opt/grow-pi && source venv/bin/activate
+python -m grow_pi.main --preview
+
+# Manuell feste Werte setzen
+python -m grow_pi.main --mode fixed
+```
+
+### Aktualisierte Dokumentation
+
+- `CLAUDE.md` - Pin-Tabelle im Hardware-Abschnitt
+- `docs/SPEC_RASPBERRY_PI.md` - Hardware Connections und Lamp Configuration
+- `pi-controller/config/config.yaml` - Finale 4-Kanal Konfiguration
+
+### Bekannte Einschränkungen
+
+- ~~DHT22 zeigt Mock-Daten~~ → **GELÖST in v2** (echte Sensordaten)
+- Keine Server-Kommunikation (nur lokales Netzwerk)
+- Kein HTTPS auf Web-Interface
+
+---
+
+## [2025-12-04 v2] - MVP Level 1: Pi Auto-Start Controller
+
+**Status**: Superseded by 2025-12-05
 **Platform**: Raspberry Pi 3B+ (growpi @ 192.168.0.86)
 
 ### Summary
 
 Erster funktionierender MVP des Pi-Controllers:
 - ✅ Pi startet automatisch → Lampen gehen auf konfigurierte Werte
-- ✅ Alle 5 PWM-Kanäle funktionieren
+- ✅ PWM-Kanäle funktionieren
 - ✅ Live-Änderung der Intensität via Config + Service-Restart
 - ✅ systemd Services für pigpiod und grow-pi
+
+**Hinweis**: Pin-Konfiguration wurde in v2025-12-05 finalisiert (4 Kanäle statt 5).
 
 ### Implementierte Dateien
 
@@ -94,15 +271,16 @@ cd /opt/grow-pi && source venv/bin/activate
 python -m grow_pi.main --test
 ```
 
-### PWM Kanal-Belegung (verifiziert)
+### PWM Kanal-Belegung (VERALTET - siehe 2025-12-05)
+
+**ACHTUNG**: Diese Konfiguration wurde ersetzt. Aktuelle Konfiguration siehe oben.
 
 | Kanal | Farbe       | GPIO | Pin | Status |
 |-------|-------------|------|-----|--------|
-| 1     | Red         | 12   | 32  | ✅ Funktioniert |
-| 2     | Blue        | 13   | 33  | ✅ Funktioniert |
-| 3     | Warm White  | 18   | 12  | ✅ Funktioniert |
-| 4     | Cool White  | 19   | 35  | ✅ Funktioniert |
-| 5     | UV          | 21   | 40  | ✅ Funktioniert |
+| 1     | Far Red     | 16   | 36  | ✅ Final |
+| 2     | Warm White  | 13   | 33  | ✅ Final |
+| 3     | Cool White  | 12   | 32  | ✅ Final |
+| 4     | UV          | 18   | 12  | ✅ Final |
 
 ### Getestete Szenarien
 

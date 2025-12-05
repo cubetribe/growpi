@@ -41,14 +41,13 @@ The Pi software is responsible for:
 ### 2.3 Hardware Connections
 
 ```
-Raspberry Pi 4
+Raspberry Pi 3B+ (growpi / 192.168.0.86)
 │
-├── GPIO Pins (PWM Output)
-│   ├── GPIO 12 (PWM0) → Lamp Channel 1 (Red)
-│   ├── GPIO 13 (PWM1) → Lamp Channel 2 (Blue)
-│   ├── GPIO 18 (PWM0) → Lamp Channel 3 (Warm White)
-│   ├── GPIO 19 (PWM1) → Lamp Channel 4 (Cool White)
-│   └── GPIO 21       → Lamp Channel 5 (UV) [Software PWM]
+├── GPIO Pins (PWM Output) - ACTIVE CONFIG 2025-12-05
+│   ├── GPIO 16 (Pin 36) → Lamp Channel 1 (Far Red)
+│   ├── GPIO 13 (Pin 33) → Lamp Channel 2 (Warm White)
+│   ├── GPIO 12 (Pin 32) → Lamp Channel 3 (Cool White)
+│   └── GPIO 18 (Pin 12) → Lamp Channel 4 (UV)
 │
 ├── GPIO Pins (Sensor Input)
 │   ├── GPIO 4  → DHT22 (Temperature + Humidity)
@@ -237,36 +236,30 @@ sensors:
                   p: 1
                   k: 2
 
-# Lamp Configuration
+# Lamp Configuration - ACTIVE CONFIG 2025-12-05
 lamps:
     update_interval: 1 # seconds (how often to recalculate intensity)
 
     channels:
         - channel: 1
-          name: "Red"
-          gpio_pin: 12
+          name: "Far Red"
+          gpio_pin: 16  # Pin 36
           pwm_frequency: 1000
 
         - channel: 2
-          name: "Blue"
-          gpio_pin: 13
+          name: "Warm White"
+          gpio_pin: 13  # Pin 33
           pwm_frequency: 1000
 
         - channel: 3
-          name: "Warm White"
-          gpio_pin: 18
+          name: "Cool White"
+          gpio_pin: 12  # Pin 32
           pwm_frequency: 1000
 
         - channel: 4
-          name: "Cool White"
-          gpio_pin: 19
-          pwm_frequency: 1000
-
-        - channel: 5
           name: "UV"
-          gpio_pin: 21
+          gpio_pin: 18  # Pin 12
           pwm_frequency: 1000
-          software_pwm: true # Use software PWM for non-hardware PWM pins
 
 # Offline Mode
 offline:

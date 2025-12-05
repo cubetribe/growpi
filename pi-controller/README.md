@@ -6,7 +6,10 @@ Python-basierter Controller-Service für den Raspberry Pi 3B+.
 
 Dieser Controller läuft auf dem Raspberry Pi und steuert Grow-Lampen via PWM.
 
-**Aktueller Stand: MVP Level 1** - Lampen werden beim Start auf feste Werte gesetzt.
+**Aktueller Stand: MVP Complete (2025-12-05)**
+- Web-Interface auf Port 5000
+- Sonnenkurven-Modus mit automatischer Tageszeit-Interpolation
+- 4 PWM-Kanäle für LED-Steuerung
 
 ## Quick Start (MVP)
 
@@ -38,15 +41,24 @@ Setze die gewünschten Lampen-Intensitäten (0-100%):
 lamps:
   channels:
     - channel: 1
-      name: "Red"
-      gpio_pin: 12
-      default_intensity: 50   # <-- Hier anpassen
+      name: "Far Red"
+      gpio_pin: 16          # Pin 36
+      default_intensity: 10
+
+    - channel: 2
+      name: "Warm White"
+      gpio_pin: 13          # Pin 33
+      default_intensity: 10
 
     - channel: 3
-      name: "Warm White"
-      gpio_pin: 18
-      default_intensity: 75   # <-- Hier anpassen
-    # ...
+      name: "Cool White"
+      gpio_pin: 12          # Pin 32
+      default_intensity: 10
+
+    - channel: 4
+      name: "UV"
+      gpio_pin: 18          # Pin 12
+      default_intensity: 0
 ```
 
 ### 4. Service starten
@@ -70,15 +82,14 @@ sudo journalctl -u grow-pi -f
 - **Hostname**: growpi
 - **IP**: 192.168.0.86
 
-### PWM Kanäle
+### PWM Kanäle (FINAL - 2025-12-05)
 
-| Kanal | Farbe       | GPIO | Pin | Status       |
-|-------|-------------|------|-----|--------------|
-| 1     | Red         | 12   | 32  | ⏳ Pending   |
-| 2     | Blue        | 13   | 33  | ⏳ Pending   |
-| 3     | Warm White  | 18   | 12  | ✅ Verifiziert |
-| 4     | Cool White  | 19   | 35  | ⏳ Pending   |
-| 5     | UV          | 21   | 40  | ⏳ Pending   |
+| Kanal | Farbe       | GPIO | Pin | Status |
+|-------|-------------|------|-----|--------|
+| 1     | Far Red     | 16   | 36  | ✅ Aktiv |
+| 2     | Warm White  | 13   | 33  | ✅ Aktiv |
+| 3     | Cool White  | 12   | 32  | ✅ Aktiv |
+| 4     | UV          | 18   | 12  | ✅ Aktiv |
 
 Detaillierte Pin-Belegung: [`../docs/HARDWARE_PINOUT.md`](../docs/HARDWARE_PINOUT.md)
 
@@ -136,13 +147,15 @@ pi-controller/
 
 | Level | Feature              | Status |
 |-------|----------------------|--------|
-| 1     | Feste Lampenwerte    | ✅ MVP  |
-| 2     | Logging verbessern   | ⏳     |
-| 3     | DHT22 Sensor         | ⏳     |
-| 4     | Kurven-Interpolation | ⏳     |
-| 5     | API-Client (Server)  | ⏳     |
-| 6     | Offline-Modus        | ⏳     |
-| 7     | RS485 Bodensensoren  | ⏳     |
+| 1     | Feste Lampenwerte    | ✅ Done |
+| 2     | Logging verbessern   | ✅ Done |
+| 3     | DHT22 Sensor         | ✅ Done (2025-12-05) |
+| 4     | Kurven-Interpolation | ✅ Done |
+| 4b    | Web-Interface        | ✅ Done |
+| 5     | Sensor-Logging       | ⏳     |
+| 6     | API-Client (Server)  | ⏳     |
+| 7     | Offline-Modus        | ⏳     |
+| 8     | RS485 Bodensensoren  | ⏳     |
 
 ---
 
@@ -208,6 +221,7 @@ sudo journalctl -u grow-pi -n 50 --no-pager
 
 ---
 
-**Python Version**: 3.11+
-**Aktuelles Level**: MVP (Level 1)
-**Stand**: 2025-12-04
+**Python Version**: 3.13
+**Aktuelles Level**: MVP Complete (Level 4b)
+**Stand**: 2025-12-05
+**Web-Interface**: http://192.168.0.86:5000
