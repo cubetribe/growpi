@@ -152,10 +152,26 @@ pi-controller/
 | 3     | DHT22 Sensor         | ✅ Done (2025-12-05) |
 | 4     | Kurven-Interpolation | ✅ Done |
 | 4b    | Web-Interface        | ✅ Done |
-| 5     | Sensor-Logging       | ⏳     |
+| 5     | SQLite Daten-Logging | ✅ Done (2025-12-05) |
 | 6     | API-Client (Server)  | ⏳     |
 | 7     | Offline-Modus        | ⏳     |
 | 8     | RS485 Bodensensoren  | ⏳     |
+
+### Logging API Endpoints
+
+```bash
+# Sensor-Historie (letzte 24h)
+curl "http://192.168.0.86:5000/api/logs/sensors?type=temperature&hours=24"
+
+# Lampen-Historie für Kanal 1
+curl "http://192.168.0.86:5000/api/logs/lamps?channel=1&hours=24"
+
+# System-Events
+curl "http://192.168.0.86:5000/api/logs/events"
+
+# Logging-Statistiken
+curl "http://192.168.0.86:5000/api/logs/stats"
+```
 
 ---
 

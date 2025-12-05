@@ -1,5 +1,117 @@
 # GrowPi Project Changelog
 
+## [2025-12-05 v3] - SQLite Logging System Complete
+
+**Status**: Production-Ready mit vollständigem Daten-Logging
+**Platform**: Raspberry Pi 3B+ (growpi @ 192.168.0.86)
+**Web Interface**: http://192.168.0.86:5000
+**API Version**: 1.1.0
+
+### Summary
+
+Vollständiges lokales Logging-System für Sensor- und Lampen-Daten:
+- SQLite-Datenbank unter `/opt/grow-pi/data/growpi.db`
+- Automatisches Logging alle 60 Sekunden (konfigurierbar)
+- REST-API für Datenabfrage (letzte 24h, filterbar)
+- Vorbereitet für spätere Server-Synchronisation
+
+### Neue Features
+
+#### 1. Datenbank-Module (`grow_pi/database/`)
+- **models.py**: Dataclasses für `SensorReading`, `LampStateLog`, `SystemEvent`
+- **db.py**: Thread-safe SQLite Connection Manager mit WAL-Mode
+- **logger.py**: Background DataLogger Service mit konfigurierbaren Intervallen
+
+#### 2. Datenbank-Schema
+```sql
+-- Sensor-Messwerte
+sensor_readings (id, sensor_type, value, unit, created_at, synced_at)
+
+-- Lampen-Zustandsprotokoll
+lamp_state_log (id, channel, name, intensity, source, curve_time, created_at, synced_at)
+
+-- System-Events
+system_events (id, event_type, severity, message, details, created_at)
+```
+
+#### 3. Logging-Strategien
+| Datentyp | Trigger | Intervall |
+|----------|---------|-----------|
+| Sensor | Periodisch | 60s |
+| Lampen | Periodisch + Bei Änderung | 60s |
+| Events | Bei Ereignis | - |
+
+**Lampen-Sources**: `startup`, `shutdown`, `api`, `curve`, `manual`, `override`, `periodic`
+
+#### 4. Neue API-Endpoints
+| Endpoint | Beschreibung |
+|----------|--------------|
+| `GET /api/logs/sensors?type=temperature&hours=24` | Sensor-Historie |
+| `GET /api/logs/lamps?channel=1&hours=24` | Lampen-Historie |
+| `GET /api/logs/events?severity=error` | System-Events |
+| `GET /api/logs/stats` | Logging-Statistiken |
+| `GET /api/health` | Health-Check inkl. Logging-Status |
+
+#### 5. Deduplication
+- Identische Lampen-Logs werden innerhalb von 5 Sekunden nicht doppelt gespeichert
+- Verhindert Spam bei schnellen Slider-Bewegungen
+
+### Neue Dateien
+
+```
+pi-controller/grow_pi/database/
+├── __init__.py           # Module exports
+├── models.py             # Dataclasses (SensorReading, LampStateLog, SystemEvent)
+├── db.py                 # SQLite Database Manager
+└── logger.py             # DataLogger Background Service
+
+docs/
+└── SPEC_LOCAL_DATABASE.md  # Vollständige Datenbank-Spezifikation
+```
+
+### API Response Beispiele
+
+**GET /api/logs/stats**
+```json
+{
+  "success": true,
+  "running": true,
+  "sensor_interval": 60,
+  "lamp_interval": 60,
+  "database": {
+    "sensor_readings": 4,
+    "lamp_state_logs": 12,
+    "system_events": 3,
+    "database_size_mb": 0.0
+  }
+}
+```
+
+**GET /api/logs/lamps?channel=1&limit=2**
+```json
+{
+  "logs": [
+    {"channel": 1, "name": "Far Red", "intensity": 50, "source": "api", "created_at": "..."},
+    {"channel": 1, "name": "Far Red", "intensity": 0, "source": "startup", "created_at": "..."}
+  ]
+}
+```
+
+### Design für Server-Synchronisation
+
+- **UUID Primary Keys**: Konfliktfreie Synchronisation
+- **synced_at Feld**: NULL = pending, Timestamp = synced
+- **Identische Feldnamen**: Kompatibel mit PostgreSQL-Server-Schema
+- **Retention Policy**: 30 Tage lokale Speicherung (konfigurierbar)
+
+### Bekannte Eigenschaften
+
+- Datenbank wächst ca. 600 KB/Tag (bei 60s Intervall)
+- Automatische Cleanup-Funktion für alte Daten verfügbar
+- WAL-Mode für bessere Performance bei parallelen Zugriffen
+
+---
+
 ## [2025-12-05 v2] - DHT22 Sensor Integration Complete
 
 **Status**: Production-Ready mit echten Sensordaten

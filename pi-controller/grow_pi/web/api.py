@@ -1,12 +1,15 @@
 #!/usr/bin/env python3
 """
 GrowPi Flask REST API
-Provides HTTP endpoints for lamp control and sensor reading.
+Provides HTTP endpoints for lamp control, sensor reading, and data logging.
 
 Endpoints:
     GET  /api/status      - Get all lamp values and temperature
     POST /api/lamp/<ch>   - Set lamp intensity (1-4)
     GET  /api/temperature - Get current temperature/humidity
+    GET  /api/logs/sensors - Get sensor history
+    GET  /api/logs/lamps   - Get lamp state history
+    GET  /api/logs/stats   - Get logging statistics
     GET  /               - Serve frontend HTML
 """
 
@@ -15,6 +18,7 @@ from flask_cors import CORS
 import logging
 import os
 import sys
+import atexit
 from typing import Dict, Tuple, Optional
 from dataclasses import dataclass
 from datetime import datetime
@@ -32,6 +36,15 @@ try:
     DHT_AVAILABLE = True
 except ImportError:
     logging.warning("adafruit_dht not available - sensor will return mock data")
+
+# Try to import database module
+DB_AVAILABLE = False
+try:
+    from database import get_database, get_logger, DataLogger
+    from database.models import SensorType
+    DB_AVAILABLE = True
+except ImportError:
+    logging.warning("Database module not available - logging disabled")
 
 
 # ============================================================================
@@ -74,7 +87,7 @@ def load_lamp_channels():
 load_lamp_channels()
 
 # API Configuration
-API_VERSION = "1.0.0"
+API_VERSION = "1.1.0"  # Bumped for logging feature
 API_PORT = 5000
 API_HOST = "0.0.0.0"
 
@@ -121,6 +134,16 @@ if DHT_AVAILABLE:
         logger.info("DHT22 Sensor initialized on GPIO-4")
     except Exception as e:
         logger.error(f"Failed to initialize DHT22: {e}")
+
+# Initialize DataLogger
+data_logger: Optional[DataLogger] = None
+if DB_AVAILABLE:
+    try:
+        db = get_database()
+        data_logger = get_logger(db=db, sensor_interval=60, lamp_interval=60)
+        logger.info("DataLogger initialized successfully")
+    except Exception as e:
+        logger.error(f"Failed to initialize DataLogger: {e}")
 
 
 # ============================================================================
@@ -181,6 +204,56 @@ def read_dht22() -> Tuple[Optional[float], Optional[float]]:
     return (None, None)
 
 
+def get_lamp_states() -> Dict[int, Dict]:
+    """Get current lamp states for logging."""
+    states = {}
+    if pwm_controller:
+        current = pwm_controller.get_current_state()
+        for channel_id, config in LAMP_CHANNELS.items():
+            states[channel_id] = {
+                'name': config.name,
+                'intensity': current.get(channel_id, 0)
+            }
+    return states
+
+
+# ============================================================================
+# DataLogger Setup
+# ============================================================================
+
+def start_data_logger():
+    """Start the data logger with sensor and lamp readers."""
+    global data_logger
+    if data_logger:
+        # Set up readers
+        data_logger.set_sensor_reader(read_dht22)
+        data_logger.set_lamp_reader(get_lamp_states)
+
+        # Log startup states
+        data_logger.log_startup_states(get_lamp_states())
+
+        # Start background logging
+        data_logger.start()
+        logger.info("DataLogger started")
+
+
+def stop_data_logger():
+    """Stop the data logger gracefully."""
+    global data_logger
+    if data_logger:
+        # Log shutdown states
+        channels = list(LAMP_CHANNELS.keys())
+        names = {ch: cfg.name for ch, cfg in LAMP_CHANNELS.items()}
+        data_logger.log_shutdown_states(channels, names)
+
+        data_logger.stop()
+        logger.info("DataLogger stopped")
+
+
+# Register shutdown handler
+atexit.register(stop_data_logger)
+
+
 # ============================================================================
 # API Routes
 # ============================================================================
@@ -218,7 +291,8 @@ def get_status():
             "temperature": temp,
             "humidity": humidity,
             "timestamp": datetime.now().isoformat(),
-            "version": API_VERSION
+            "version": API_VERSION,
+            "logging_enabled": data_logger is not None and data_logger._running
         }))
 
     except Exception as e:
@@ -261,6 +335,15 @@ def set_lamp(channel: int):
         pwm_controller.set_intensity(channel, intensity)
         logger.info(f"Set lamp {channel} ({LAMP_CHANNELS[channel].name}) to {intensity}%")
 
+        # Log the change
+        if data_logger:
+            data_logger.log_lamp_change(
+                channel=channel,
+                name=LAMP_CHANNELS[channel].name,
+                intensity=intensity,
+                source='api'
+            )
+
         return jsonify(create_response(True, {
             "channel": channel,
             "name": LAMP_CHANNELS[channel].name,
@@ -293,6 +376,110 @@ def get_temperature():
         return jsonify(create_response(False, error=str(e))), 500
 
 
+# ============================================================================
+# Logging API Routes
+# ============================================================================
+
+@app.route('/api/logs/sensors', methods=['GET'])
+def get_sensor_logs():
+    """Get sensor reading history"""
+    if not DB_AVAILABLE or not data_logger:
+        return jsonify(create_response(False, error="Logging not available")), 503
+
+    try:
+        sensor_type = request.args.get('type')
+        hours = int(request.args.get('hours', 24))
+        limit = int(request.args.get('limit', 1000))
+
+        db = get_database()
+        readings = db.get_sensor_readings(sensor_type=sensor_type, hours=hours, limit=limit)
+
+        return jsonify(create_response(True, {
+            "readings": [r.to_dict() for r in readings],
+            "count": len(readings),
+            "hours": hours
+        }))
+
+    except Exception as e:
+        logger.error(f"Error in get_sensor_logs: {e}")
+        return jsonify(create_response(False, error=str(e))), 500
+
+
+@app.route('/api/logs/lamps', methods=['GET'])
+def get_lamp_logs():
+    """Get lamp state history"""
+    if not DB_AVAILABLE or not data_logger:
+        return jsonify(create_response(False, error="Logging not available")), 503
+
+    try:
+        channel = request.args.get('channel', type=int)
+        hours = int(request.args.get('hours', 24))
+        limit = int(request.args.get('limit', 1000))
+
+        db = get_database()
+        logs = db.get_lamp_state_log(channel=channel, hours=hours, limit=limit)
+
+        return jsonify(create_response(True, {
+            "logs": [l.to_dict() for l in logs],
+            "count": len(logs),
+            "hours": hours
+        }))
+
+    except Exception as e:
+        logger.error(f"Error in get_lamp_logs: {e}")
+        return jsonify(create_response(False, error=str(e))), 500
+
+
+@app.route('/api/logs/events', methods=['GET'])
+def get_event_logs():
+    """Get system event history"""
+    if not DB_AVAILABLE or not data_logger:
+        return jsonify(create_response(False, error="Logging not available")), 503
+
+    try:
+        event_type = request.args.get('type')
+        severity = request.args.get('severity')
+        hours = int(request.args.get('hours', 24))
+        limit = int(request.args.get('limit', 100))
+
+        db = get_database()
+        events = db.get_system_events(
+            event_type=event_type,
+            severity=severity,
+            hours=hours,
+            limit=limit
+        )
+
+        return jsonify(create_response(True, {
+            "events": [e.to_dict() for e in events],
+            "count": len(events),
+            "hours": hours
+        }))
+
+    except Exception as e:
+        logger.error(f"Error in get_event_logs: {e}")
+        return jsonify(create_response(False, error=str(e))), 500
+
+
+@app.route('/api/logs/stats', methods=['GET'])
+def get_log_stats():
+    """Get logging statistics"""
+    if not DB_AVAILABLE or not data_logger:
+        return jsonify(create_response(False, error="Logging not available")), 503
+
+    try:
+        status = data_logger.get_status()
+        return jsonify(create_response(True, status))
+
+    except Exception as e:
+        logger.error(f"Error in get_log_stats: {e}")
+        return jsonify(create_response(False, error=str(e))), 500
+
+
+# ============================================================================
+# Health & Info
+# ============================================================================
+
 @app.route('/api/health', methods=['GET'])
 def health_check():
     """Health check endpoint"""
@@ -300,7 +487,9 @@ def health_check():
         "status": "healthy",
         "version": API_VERSION,
         "pwm_available": pwm_controller is not None,
-        "sensor_available": dht_sensor is not None or not DHT_AVAILABLE
+        "sensor_available": dht_sensor is not None or not DHT_AVAILABLE,
+        "logging_available": DB_AVAILABLE and data_logger is not None,
+        "logging_running": data_logger._running if data_logger else False
     })
 
 
@@ -328,6 +517,10 @@ def run_server(host: str = API_HOST, port: int = API_PORT, debug: bool = False):
     logger.info(f"Server: http://{host}:{port}")
     logger.info(f"PWM Controller: {'Available' if pwm_controller else 'Not available'}")
     logger.info(f"DHT22 Sensor: {'Available' if dht_sensor else 'Mock mode'}")
+    logger.info(f"DataLogger: {'Available' if data_logger else 'Not available'}")
+
+    # Start data logger
+    start_data_logger()
 
     app.run(host=host, port=port, debug=debug, threaded=True)
 
