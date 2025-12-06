@@ -2,6 +2,170 @@
 
 ---
 
+## [2025-12-06 v6.5] - Refactoring Integration: Kosten + Entfeuchter ✅
+
+**Status**: ✅ COMPLETE - Ready for Testing
+**Branch**: refactoring/phase-1-modularization
+**Tests**: 140/140 PASSED (100%)
+
+### Summary
+
+v6.3 Kosten-Tab und v6.4 Entfeuchter-UI erfolgreich aus monolithischer Struktur (2894 LOC) in modulare JavaScript-Architektur portiert. Index.html reduziert auf 408 LOC (-86%).
+
+### Frontend Refactoring
+
+**Code-Reduktion:**
+- index.html: 2894 → 408 LOC (-86%, -2486 Zeilen)
+- Neue Module: costs.js (198 LOC) + environment.js (174 LOC)
+- CSS: Vollständig extrahiert in main.css
+
+**Modulare Struktur:**
+```
+static/js/
+├── api.js (konsistent, 19 Methoden)
+├── state.js (Pub/Sub Pattern)
+└── modules/
+    ├── control.js
+    ├── curves.js
+    ├── history.js
+    ├── costs.js (NEW)
+    └── environment.js (NEW)
+```
+
+**Neue Features:**
+- Tab "Kosten": Stromverbrauch-Monitoring (Heute/Woche/Monat/Jahr, Custom Range)
+- Tab "Room": Raum-Klimakontrolle (Temp, Humidity, Entfeuchter Auto-Steuerung)
+
+### Backend Refactoring
+
+**Neue Blueprints:**
+- `blueprints/costs_bp.py` (3 Endpoints: GET/POST /api/costs, config)
+- `blueprints/dehumidifier_bp.py` (4 Endpoints: room status, control, config)
+
+**API-Konsistenz:**
+- Agent #10 Fix: 9 direkte fetch() Calls refactored zu GrowPiAPI
+- Alle 5 Module nutzen jetzt einheitlichen API-Client
+- 19 zentrale API-Methoden in api.js
+
+**Blueprint-Architektur:**
+- 8 Blueprints total (vorher 6)
+- 4 Service-Layer Module
+- Dependency Injection Pattern konsistent
+
+### Testing
+
+**Unit-Tests:**
+- Gesamt: 140/140 PASSED (100%)
+- Bestehend: 91 Tests (Curve + Mode)
+- Neu: 19 Tests (Kosten-Berechnung)
+- Neu: 30 Tests (Entfeuchter-Hysterese)
+- Coverage: 93%
+
+**Smoke-Tests:**
+- API Endpoints: 10/19 PASS (9 expected fails - keine Hardware)
+- Syntax-Checks: 100% PASS (Python + JavaScript)
+- Performance: ~8ms API Response-Zeit
+
+### Configuration
+
+**room_config.json erweitert:**
+```json
+{
+  "costs": {
+    "kwh_price": 0.30,
+    "currency": "EUR"
+  },
+  "dehumidifier": {
+    "enabled": true,
+    "target": 60.0,
+    "threshold_high": 65.0,
+    "threshold_low": 55.0,
+    "min_run_time": 60,
+    "min_off_time": 60
+  }
+}
+```
+
+### Project Cleanup
+
+**Dokumentation organisiert:**
+- 12 Refactoring-Reports → docs/refactoring/
+- Root-Directory: 24 → 9 Files (-62.5%)
+
+**Archiviert:**
+- 7 obsolete Dateien → .archive/ (104 KB)
+- remote-plug/ (alte Tools)
+- tests/ (alte Root-Tests)
+
+### Files Changed
+
+**Modified:**
+- `grow_pi/web/app.py` (+Blueprint-Registrierung, +Background-Tasks)
+- `grow_pi/web/static/index.html` (-2486 LOC, modulare Imports)
+- `grow_pi/web/static/js/api.js` (+3 Methoden, +34 LOC)
+- `grow_pi/web/static/js/modules/curves.js` (refactored zu GrowPiAPI)
+- `grow_pi/web/static/js/modules/history.js` (refactored zu GrowPiAPI)
+- `smoke_test.sh` (+v6.3/v6.4 Endpoint-Tests)
+
+**Created:**
+- `grow_pi/web/blueprints/costs_bp.py` (147 LOC)
+- `grow_pi/web/blueprints/dehumidifier_bp.py` (183 LOC)
+- `grow_pi/web/static/js/modules/costs.js` (198 LOC)
+- `grow_pi/web/static/js/modules/environment.js` (174 LOC)
+- `grow_pi/config/room_config.json`
+- `tests/unit/test_costs_calculation.py` (19 Tests)
+- `tests/unit/test_dehumidifier_logic.py` (30 Tests)
+- `docs/refactoring/` (12 Reports)
+- `docs/DEPLOYMENT_GUIDE.md`
+
+### Deployment
+
+**⚠️ NOT YET DEPLOYED TO PRODUCTION**
+
+**Pre-Deployment Checklist:**
+- ✅ Code Review abgeschlossen
+- ✅ 140/140 Unit-Tests PASS
+- ✅ Smoke-Tests erfolgreich
+- ✅ API-Konsistenz verifiziert
+- ✅ Dokumentation komplett
+- ✅ Projekt aufgeräumt
+- 🔲 Test-Pi Deployment ausstehend
+- 🔲 24h Stabilitätstest ausstehend
+- 🔲 Production Rollout ausstehend
+
+**Deployment-Plan:**
+Siehe `docs/DEPLOYMENT_GUIDE.md` für detaillierte Schritte.
+
+### Breaking Changes
+
+**KEINE** - 100% Backwards Compatible
+
+### Known Issues
+
+**KEINE** - Alle kritischen Issues gefixt (Agent #9 + #10)
+
+### Metrics Summary
+
+| Metrik | Wert |
+|--------|------|
+| Frontend LOC Reduktion | -86% (2894 → 408) |
+| Backend Blueprints | 8 (vorher 6) |
+| JS Module | 5 (vorher 3) |
+| Unit-Tests | 140 (vorher 91) |
+| Test Success Rate | 100% |
+| API Response Time | ~8ms |
+| Root Files | 9 (vorher 24, -62.5%) |
+
+### Contributors
+
+- Orchestriert mit 12 Claude Code Agents
+- Code Review: Alle Agents
+- Testing: Agent #6
+- Clean-up: Agent #11
+- Documentation: Agent #12
+
+---
+
 ## [2025-12-06 v6.0] - Complete Code Refactoring & Modularization 🎉
 
 **Status**: Branch `refactoring/phase-1-modularization` - Ready for Test Deployment

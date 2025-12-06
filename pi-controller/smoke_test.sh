@@ -86,6 +86,21 @@ test_endpoint "GET" "/api/logs/plugs?hours=1&limit=10" "Get plug logs"
 test_endpoint "GET" "/api/logs/stats" "Get log statistics"
 echo ""
 
+echo "=== Costs Endpoints (v6.3) ==="
+test_endpoint "GET" "/api/costs?period=today" "Get costs today"
+test_endpoint "GET" "/api/costs?period=week" "Get costs this week"
+test_endpoint "GET" "/api/costs?period=month" "Get costs this month"
+test_endpoint "GET" "/api/costs/config" "Get kWh price config"
+# Nicht testen: POST /api/costs/config (würde Config ändern)
+echo ""
+
+echo "=== Dehumidifier Endpoints (v6.4) ==="
+test_endpoint "GET" "/api/dehumidifier/status" "Get dehumidifier status"
+test_endpoint "GET" "/api/dehumidifier/config" "Get dehumidifier config"
+# Nicht testen: POST /api/dehumidifier/toggle (würde Dehumidifier schalten)
+# Nicht testen: POST /api/dehumidifier/config (würde Config ändern)
+echo ""
+
 echo "=========================================="
 echo "Test Results:"
 echo "=========================================="

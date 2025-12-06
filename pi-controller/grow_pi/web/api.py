@@ -830,6 +830,168 @@ def set_mode():
 
 
 # ============================================================================
+# Camera API Routes
+# ============================================================================
+
+# Try to import camera service
+CAMERA_AVAILABLE = False
+camera_service = None
+try:
+    try:
+        from ..utils.camera import get_camera_service
+    except ImportError:
+        from grow_pi.utils.camera import get_camera_service
+    CAMERA_AVAILABLE = True
+except ImportError as e:
+    logging.warning(f"CameraService not available: {e}")
+
+
+def _get_camera():
+    """Get or initialize camera service."""
+    global camera_service
+    if CAMERA_AVAILABLE and camera_service is None:
+        camera_service = get_camera_service()
+    return camera_service
+
+
+@app.route('/api/camera/snapshot', methods=['GET'])
+def get_camera_snapshot():
+    """Get a JPEG snapshot from the camera"""
+    camera = _get_camera()
+    if not camera or not camera.is_available:
+        return jsonify(create_response(False, error="Camera not available")), 503
+
+    try:
+        jpeg_data = camera.capture_snapshot()
+        if jpeg_data is None:
+            return jsonify(create_response(False, error="Failed to capture image")), 500
+
+        from flask import Response
+        return Response(
+            jpeg_data,
+            mimetype='image/jpeg',
+            headers={
+                'Cache-Control': 'no-cache, no-store, must-revalidate',
+                'Pragma': 'no-cache',
+                'Expires': '0'
+            }
+        )
+
+    except Exception as e:
+        logger.error(f"Error in get_camera_snapshot: {e}")
+        return jsonify(create_response(False, error=str(e))), 500
+
+
+@app.route('/api/camera/status', methods=['GET'])
+def get_camera_status():
+    """Get camera status and availability"""
+    camera = _get_camera()
+
+    try:
+        if camera:
+            status = camera.get_status()
+        else:
+            status = {
+                'available': False,
+                'opencv_available': False,
+                'error': 'Camera service not initialized'
+            }
+
+        return jsonify(create_response(True, status))
+
+    except Exception as e:
+        logger.error(f"Error in get_camera_status: {e}")
+        return jsonify(create_response(False, error=str(e))), 500
+
+
+@app.route('/api/camera/config', methods=['POST'])
+def update_camera_config():
+    """Update camera configuration"""
+    camera = _get_camera()
+    if not camera:
+        return jsonify(create_response(False, error="Camera not available")), 503
+
+    if not request.is_json:
+        return jsonify(create_response(False, error="Request must be JSON")), 400
+
+    try:
+        data = request.get_json()
+        status = camera.update_config(**data)
+
+        return jsonify(create_response(True, {
+            "message": "Camera configuration updated",
+            "status": status
+        }))
+
+    except Exception as e:
+        logger.error(f"Error in update_camera_config: {e}")
+        return jsonify(create_response(False, error=str(e))), 500
+
+
+@app.route('/api/camera/timelapse/config', methods=['GET'])
+def get_timelapse_config():
+    """Get timelapse configuration"""
+    camera = _get_camera()
+    if not camera:
+        return jsonify(create_response(False, error="Camera not available")), 503
+
+    try:
+        from dataclasses import asdict
+        return jsonify(create_response(True, {
+            "config": asdict(camera.timelapse_config)
+        }))
+
+    except Exception as e:
+        logger.error(f"Error in get_timelapse_config: {e}")
+        return jsonify(create_response(False, error=str(e))), 500
+
+
+@app.route('/api/camera/timelapse/config', methods=['POST'])
+def update_timelapse_config():
+    """Update timelapse configuration"""
+    camera = _get_camera()
+    if not camera:
+        return jsonify(create_response(False, error="Camera not available")), 503
+
+    if not request.is_json:
+        return jsonify(create_response(False, error="Request must be JSON")), 400
+
+    try:
+        data = request.get_json()
+        config = camera.update_timelapse_config(**data)
+
+        return jsonify(create_response(True, {
+            "message": "Timelapse configuration updated",
+            "config": config
+        }))
+
+    except Exception as e:
+        logger.error(f"Error in update_timelapse_config: {e}")
+        return jsonify(create_response(False, error=str(e))), 500
+
+
+@app.route('/api/camera/timelapse/images', methods=['GET'])
+def get_timelapse_images():
+    """Get list of timelapse images"""
+    camera = _get_camera()
+    if not camera:
+        return jsonify(create_response(False, error="Camera not available")), 503
+
+    try:
+        limit = int(request.args.get('limit', 50))
+        images = camera.get_timelapse_images(limit)
+
+        return jsonify(create_response(True, {
+            "images": images,
+            "count": len(images)
+        }))
+
+    except Exception as e:
+        logger.error(f"Error in get_timelapse_images: {e}")
+        return jsonify(create_response(False, error=str(e))), 500
+
+
+# ============================================================================
 # Health & Info
 # ============================================================================
 

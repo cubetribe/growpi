@@ -16,6 +16,8 @@
  * - Preview generation for 24h (96 bars at 15-min resolution)
  */
 
+import { GrowPiAPI } from '../api.js';
+
 // ============================================================================
 // MODULE STATE
 // ============================================================================
@@ -125,13 +127,11 @@ export function initCurvesTab() {
  */
 export async function fetchCurves() {
     try {
-        const [curvesRes, previewRes] = await Promise.all([
-            fetch("/api/curves"),
-            fetch("/api/curves/preview"),
+        // Use GrowPiAPI instead of direct fetch()
+        const [curvesJson, previewJson] = await Promise.all([
+            GrowPiAPI.getCurves(),
+            GrowPiAPI.getCurvePreview(),
         ]);
-
-        const curvesJson = await curvesRes.json();
-        const previewJson = await previewRes.json();
 
         if (curvesJson.success) {
             curvesData = {};
@@ -490,19 +490,14 @@ export async function saveCurves() {
     btnSaveCurves.textContent = "Speichern...";
 
     try {
+        // Use GrowPiAPI instead of direct fetch()
         for (const [ch, data] of Object.entries(curvesData)) {
-            const response = await fetch(`/api/curves/${ch}`, {
-                method: "PUT",
-                headers: {
-                    "Content-Type": "application/json",
-                },
-                body: JSON.stringify({
-                    curve: data.curve,
-                    enabled: data.enabled,
-                }),
+            const response = await GrowPiAPI.updateCurve(ch, {
+                curve: data.curve,
+                enabled: data.enabled,
             });
 
-            if (!response.ok) {
+            if (!response.success) {
                 throw new Error(`Kanal ${ch} fehlgeschlagen`);
             }
         }

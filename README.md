@@ -12,6 +12,8 @@ GrowPi ist eine moderne Web-Anwendung, die Daten von einem Raspberry Pi sammelt 
 - 🌐 **Web-Dashboard**: Vollständiges Next.js Dashboard mit Dark Theme (http://growpi.nm-forum.de)
 - 💡 **Beleuchtungssteuerung**: 5-Kanal PWM Lampen mit Kurven-Editor
 - 📊 **Sensor-Visualisierung**: Echtzeit-Charts für Temperatur, Luftfeuchtigkeit, Bodenwerte
+- 💰 **Stromkosten-Monitoring**: Verbrauchsüberwacht (Heute/Woche/Monat/Jahr, Custom Range)
+- 🌡️ **Automatische Raum-Klimakontrolle**: Temperatur, Luftfeuchtigkeit, Entfeuchter Auto-Steuerung
 - 🔐 **Authentifizierung**: JWT-basierte Anmeldung mit Row-Level Security
 - 🌍 **Mehrsprachig**: Deutsch / Englisch
 - 📱 **Responsive**: Mobile-optimiert mit Slide-out Sidebar
@@ -117,6 +119,33 @@ npm run dev
 ```bash
 ssh admin@192.168.0.86
 # Weitere Befehle folgen
+```
+
+### Quick Start Guide
+Für detaillierte Deployment-Anweisungen siehe [docs/DEPLOYMENT_GUIDE.md](docs/DEPLOYMENT_GUIDE.md)
+
+### Testing
+
+**Unit Tests:**
+```bash
+cd pi-controller
+source venv/bin/activate
+pytest tests/ -v --cov=grow_pi
+# Expected: 140/140 tests PASSED (93% coverage)
+```
+
+**Smoke Tests:**
+```bash
+cd pi-controller
+./smoke_test.sh
+# Tests API endpoints with curl
+```
+
+**Test Environment:**
+```bash
+cd pi-controller/test_environment
+python run_local.py
+# Runs local Flask server with mock hardware
 ```
 
 ## Hardware Testing & Development

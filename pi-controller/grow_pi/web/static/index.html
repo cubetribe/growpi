@@ -25,13 +25,27 @@
 
             <div class="tabs">
                 <button class="tab-btn active" data-tab="control">
-                    Steuerung
+                    Start
                 </button>
+                <button class="tab-btn" data-tab="room">Room</button>
+                <button class="tab-btn" data-tab="costs">Kosten</button>
                 <button class="tab-btn" data-tab="curves">Kurven</button>
                 <button class="tab-btn" data-tab="history">Verlauf</button>
             </div>
 
             <div id="tab-control" class="tab-content active">
+                <!-- Camera Livestream -->
+                <section class="section camera-section" id="cameraContainer">
+                    <div class="camera-header">
+                        <h2 class="section-title">Live-Kamera</h2>
+                        <span class="camera-status" id="cameraStatus">Verbinde...</span>
+                    </div>
+                    <div class="camera-wrapper">
+                        <img id="cameraImage" class="camera-image" alt="Livestream" style="display: none;">
+                        <div id="cameraError" class="camera-error">Kamera lädt...</div>
+                    </div>
+                </section>
+
                 <div class="mode-section">
                     <div class="mode-switch">
                         <button
@@ -129,6 +143,121 @@
                             value="0"
                             data-channel="4"
                         >
+                    </div>
+                </section>
+            </div>
+
+            <div id="tab-room" class="tab-content">
+                <section class="section">
+                    <div class="temp-grid">
+                        <div class="temp-card">
+                            <div class="temp-label">Temperatur</div>
+                            <div class="temp-value" id="roomTempValue">
+                                --<span class="temp-unit">°C</span>
+                            </div>
+                        </div>
+                        <div class="temp-card">
+                            <div class="temp-label">Luftfeuchtigkeit</div>
+                            <div class="temp-value" id="roomHumidityValue">
+                                --<span class="temp-unit">%</span>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <section class="section">
+                    <h2 class="section-title">Entfeuchter</h2>
+
+                    <div class="dehumidifier-status" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+                        <div>
+                            <span style="color: #888;">Status:</span>
+                            <span id="dehumidifierStatus" style="font-weight: 600; margin-left: 8px;">--</span>
+                        </div>
+                        <div class="mode-switch" style="width: auto;">
+                            <button class="mode-option" id="dehumidifierOff" style="padding: 8px 16px;">AUS</button>
+                            <button class="mode-option" id="dehumidifierOn" style="padding: 8px 16px;">AN</button>
+                        </div>
+                    </div>
+
+                    <div class="dehumidifier-auto" style="display: flex; align-items: center; gap: 12px; padding: 12px; background: rgba(255,255,255,0.03); border-radius: 8px; margin-bottom: 16px;">
+                        <div class="curve-toggle" id="dehumidifierAutoToggle"></div>
+                        <span>Automatik (Hysterese)</span>
+                    </div>
+
+                    <div class="config-form">
+                        <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px;">
+                            <div>
+                                <label style="display: block; font-size: 12px; color: #888; margin-bottom: 4px;">Sollwert (%)</label>
+                                <input type="number" id="targetHumidity" min="30" max="90" step="1" value="60" style="width: 100%; padding: 10px; border: 1px solid #333; border-radius: 8px; background: rgba(0,0,0,0.3); color: white; font-size: 16px; text-align: center;">
+                            </div>
+                            <div>
+                                <label style="display: block; font-size: 12px; color: #888; margin-bottom: 4px;">AN wenn > (%)</label>
+                                <input type="number" id="thresholdHigh" min="30" max="95" step="1" value="65" style="width: 100%; padding: 10px; border: 1px solid #333; border-radius: 8px; background: rgba(0,0,0,0.3); color: white; font-size: 16px; text-align: center;">
+                            </div>
+                            <div>
+                                <label style="display: block; font-size: 12px; color: #888; margin-bottom: 4px;">AUS wenn < (%)</label>
+                                <input type="number" id="thresholdLow" min="20" max="85" step="1" value="55" style="width: 100%; padding: 10px; border: 1px solid #333; border-radius: 8px; background: rgba(0,0,0,0.3); color: white; font-size: 16px; text-align: center;">
+                            </div>
+                        </div>
+                        <button class="btn-save" id="btnSaveRoomConfig" style="margin-top: 16px;">
+                            Einstellungen speichern
+                        </button>
+                    </div>
+                </section>
+            </div>
+
+            <div id="tab-costs" class="tab-content">
+                <section class="section">
+                    <h2 class="section-title">Stromkosten</h2>
+
+                    <!-- Period Selection -->
+                    <div style="display: flex; gap: 8px; margin-bottom: 12px; flex-wrap: wrap;">
+                        <button class="cost-period-btn active" data-period="today">Heute</button>
+                        <button class="cost-period-btn" data-period="week">7 Tage</button>
+                        <button class="cost-period-btn" data-period="this_month">Diesen Monat</button>
+                        <button class="cost-period-btn" data-period="this_year">Dieses Jahr</button>
+                    </div>
+
+                    <!-- Custom Date Range -->
+                    <div style="display: flex; gap: 12px; margin-bottom: 16px; flex-wrap: wrap; align-items: center; padding: 12px; background: rgba(255,255,255,0.03); border-radius: 8px;">
+                        <span style="font-size: 13px; color: #888;">Zeitraum:</span>
+                        <input type="date" id="costDateFrom" style="padding: 6px 10px; background: rgba(255,255,255,0.1); border: 1px solid #333; border-radius: 6px; color: #fff; font-size: 13px;">
+                        <span style="color: #666;">bis</span>
+                        <input type="date" id="costDateTo" style="padding: 6px 10px; background: rgba(255,255,255,0.1); border: 1px solid #333; border-radius: 6px; color: #fff; font-size: 13px;">
+                        <button id="btnApplyDateRange" class="btn" style="padding: 6px 14px; font-size: 12px;">Anwenden</button>
+                    </div>
+
+                    <!-- Period Label -->
+                    <div id="costPeriodLabel" style="font-size: 13px; color: #888; margin-bottom: 16px; font-style: italic;"></div>
+
+                    <!-- kWh Price Config -->
+                    <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 20px; padding: 12px; background: rgba(255,255,255,0.03); border-radius: 8px;">
+                        <label style="font-size: 14px; color: #888;">kWh-Preis:</label>
+                        <input type="number" id="kwhPriceInput" step="0.01" min="0" value="0.30"
+                               style="width: 80px; padding: 8px; background: rgba(255,255,255,0.1); border: 1px solid #333; border-radius: 6px; color: #fff; font-size: 14px;">
+                        <span style="color: #888;">EUR</span>
+                        <button id="btnSaveKwhPrice" class="btn" style="padding: 8px 16px; font-size: 12px;">Speichern</button>
+                    </div>
+
+                    <!-- Devices List -->
+                    <div id="costDevicesList" style="display: flex; flex-direction: column; gap: 12px;">
+                        <!-- Devices will be populated here -->
+                        <div style="text-align: center; color: #666; padding: 20px;">Lade Daten...</div>
+                    </div>
+
+                    <!-- Total Summary -->
+                    <div style="margin-top: 20px; padding: 16px; background: linear-gradient(135deg, rgba(17,255,85,0.1), rgba(17,255,85,0.05)); border: 1px solid rgba(17,255,85,0.3); border-radius: 12px;">
+                        <div style="display: flex; justify-content: space-between; align-items: center;">
+                            <div>
+                                <div style="font-size: 12px; color: #888; margin-bottom: 4px;">GESAMT</div>
+                                <div style="font-size: 14px; color: #aaa;">
+                                    <span id="totalKwh">0.00</span> kWh
+                                </div>
+                            </div>
+                            <div style="text-align: right;">
+                                <div style="font-size: 24px; font-weight: 700; color: #11ff55;" id="totalCost">0.00 EUR</div>
+                            </div>
+                        </div>
                     </div>
                 </section>
             </div>
@@ -265,6 +394,8 @@
             import { initControlTab } from './js/modules/control.js';
             import { initCurvesTab } from './js/modules/curves.js';
             import { HistoryModule } from './js/modules/history.js';
+            import { initEnvironmentTab } from './js/modules/environment.js';
+            import { initCostsTab } from './js/modules/costs.js';
             import { showError, showSuccess, setupTabs } from './js/utils.js';
 
             // Expose utils to window for modules that rely on them (legacy support)
@@ -274,6 +405,8 @@
             document.addEventListener('DOMContentLoaded', () => {
                 // Initialize Modules
                 initControlTab();
+                initEnvironmentTab();
+                initCostsTab();
                 initCurvesTab();
 
                 const historyModule = new HistoryModule();

@@ -78,6 +78,9 @@ def create_app(config: Optional[dict] = None) -> Flask:
     # Initialize mode manager
     _initialize_mode_manager(app)
 
+    # Initialize dehumidifier controller
+    _initialize_dehumidifier_controller(app)
+
     # Initialize dependencies module AFTER all services (for blueprint access)
     _initialize_dependencies(app)
 
@@ -154,6 +157,14 @@ def create_app(config: Optional[dict] = None) -> Flask:
                 logger.info("PWM Controller cleanup initiated")
             except Exception as e:
                 logger.error(f"Error cleaning up PWM Controller: {e}")
+
+        # Stop dehumidifier controller
+        if hasattr(app, 'dehumidifier_controller') and app.dehumidifier_controller:
+            try:
+                app.dehumidifier_controller.stop()
+                logger.info("DehumidifierController stopped")
+            except Exception as e:
+                logger.error(f"Error stopping DehumidifierController: {e}")
 
     logger.info(f"GrowPi Web API v{app.config['API_VERSION']} initialized successfully")
 
@@ -296,6 +307,33 @@ def _initialize_mode_manager(app: Flask) -> None:
         logger.warning(f"ModeManager not available: {e}")
 
 
+def _initialize_dehumidifier_controller(app: Flask) -> None:
+    """
+    Initialize dehumidifier controller for automatic humidity control.
+
+    Args:
+        app: Flask application instance
+    """
+    app.dehumidifier_controller = None
+    app.dehumidifier_available = False
+
+    try:
+        try:
+            from ..utils.dehumidifier_controller import get_dehumidifier_controller
+        except ImportError:
+            from grow_pi.utils.dehumidifier_controller import get_dehumidifier_controller
+
+        app.dehumidifier_available = True
+
+        try:
+            app.dehumidifier_controller = get_dehumidifier_controller()
+            logger.info("DehumidifierController initialized successfully")
+        except Exception as e:
+            logger.error(f"Failed to initialize DehumidifierController: {e}")
+    except ImportError as e:
+        logger.warning(f"DehumidifierController not available: {e}")
+
+
 def _initialize_dependencies(app: Flask) -> None:
     """
     Initialize the dependencies module with all app singletons.
@@ -343,6 +381,12 @@ def _register_blueprints(app: Flask) -> None:
             mode_bp, init_mode_blueprint
         )
         from .blueprints.curves_bp import curves_bp, init_blueprint as init_curves_blueprint
+        from .blueprints.costs_bp import costs_bp
+        from .blueprints.dehumidifier_bp import (
+            dehumidifier_bp,
+            set_dehumidifier_controller,
+            set_humidity_reader
+        )
 
         # Get lamp channels configuration
         from .services.lamp_config import get_lamp_channels
@@ -378,6 +422,25 @@ def _register_blueprints(app: Flask) -> None:
         )
         logger.info("Curves blueprint initialized")
 
+        # Dehumidifier Blueprint (requires dehumidifier controller + humidity reader)
+        # Initialize dehumidifier controller if available
+        if hasattr(app, 'dehumidifier_controller') and app.dehumidifier_controller:
+            set_dehumidifier_controller(app.dehumidifier_controller)
+
+            # Set humidity reader function
+            def humidity_reader():
+                """Read humidity from DHT22 sensor"""
+                if app.dht_sensor is None:
+                    import random
+                    return 60.0 + random.uniform(-5, 5)
+
+                from .blueprints.temperature_bp import read_dht22 as bp_read_dht22
+                _, humidity = bp_read_dht22()
+                return humidity
+
+            set_humidity_reader(humidity_reader)
+            logger.info("Dehumidifier blueprint initialized")
+
         # Register all blueprints
         app.register_blueprint(status_bp)
         app.register_blueprint(temperature_bp)
@@ -385,6 +448,8 @@ def _register_blueprints(app: Flask) -> None:
         app.register_blueprint(lamps_bp)
         app.register_blueprint(mode_bp)
         app.register_blueprint(curves_bp)
+        app.register_blueprint(costs_bp)
+        app.register_blueprint(dehumidifier_bp)
 
         logger.info("All blueprints registered successfully")
 
@@ -419,6 +484,7 @@ def run_server(app: Flask = None, host: str = None, port: int = None, debug: boo
     logger.info(f"DataLogger: {'Available' if app.data_logger else 'Not available'}")
     logger.info(f"CurveController: {'Available' if app.curve_controller else 'Not available'}")
     logger.info(f"ModeManager: {'Available' if app.mode_manager else 'Not available'}")
+    logger.info(f"DehumidifierController: {'Available' if hasattr(app, 'dehumidifier_controller') and app.dehumidifier_controller else 'Not available'}")
 
     # Start data logger
     if app.data_logger:
@@ -458,6 +524,15 @@ def run_server(app: Flask = None, host: str = None, port: int = None, debug: boo
             logger.info("DataLogger started")
         except Exception as e:
             logger.error(f"Failed to start DataLogger: {e}")
+
+    # Start dehumidifier controller
+    if hasattr(app, 'dehumidifier_controller') and app.dehumidifier_controller:
+        try:
+            # Start automatic control loop (checks every 10 seconds)
+            app.dehumidifier_controller.start(check_interval=10)
+            logger.info("DehumidifierController started (check_interval: 10s)")
+        except Exception as e:
+            logger.error(f"Failed to start DehumidifierController: {e}")
 
     # Run the application
     app.run(
