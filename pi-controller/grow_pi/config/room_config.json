@@ -6,7 +6,10 @@
     "threshold_low": 55.0,
     "device_id": "bfc705014c6241667avzn8",
     "min_run_time": 60,
-    "min_off_time": 60
+    "min_off_time": 60,
+    "schedule_enabled": false,
+    "schedule_start_time": "19:45",
+    "schedule_duration_minutes": 30
   },
   "costs": {
     "kwh_price": 0.30,

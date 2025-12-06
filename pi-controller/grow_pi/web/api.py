@@ -959,7 +959,10 @@ def update_room_config():
             threshold_high=data.get('threshold_high'),
             threshold_low=data.get('threshold_low'),
             min_run_time=data.get('min_run_time'),
-            min_off_time=data.get('min_off_time')
+            min_off_time=data.get('min_off_time'),
+            schedule_enabled=data.get('schedule_enabled'),
+            schedule_start_time=data.get('schedule_start_time'),
+            schedule_duration_minutes=data.get('schedule_duration_minutes')
         )
 
         logger.info(f"Room config updated: {updated}")

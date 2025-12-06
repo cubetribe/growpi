@@ -33,6 +33,11 @@ class DehumidifierConfig:
     min_run_time: int = 60  # Minimum seconds to run before turning off
     min_off_time: int = 60  # Minimum seconds off before turning on again
 
+    # Zeitfenster-Override (präventiv vor Lampen-Aus)
+    schedule_enabled: bool = False  # Zeitfenster aktiviert?
+    schedule_start_time: str = "19:45"  # Start-Zeit (HH:MM)
+    schedule_duration_minutes: int = 30  # Dauer in Minuten
+
 
 class DehumidifierController:
     """
@@ -108,9 +113,12 @@ class DehumidifierController:
                             threshold_low=cfg.get('threshold_low', 55.0),
                             device_id=cfg.get('device_id', self.config.device_id),
                             min_run_time=cfg.get('min_run_time', 60),
-                            min_off_time=cfg.get('min_off_time', 60)
+                            min_off_time=cfg.get('min_off_time', 60),
+                            schedule_enabled=cfg.get('schedule_enabled', False),
+                            schedule_start_time=cfg.get('schedule_start_time', '19:45'),
+                            schedule_duration_minutes=cfg.get('schedule_duration_minutes', 30)
                         )
-                        logger.info(f"Loaded dehumidifier config: target={self.config.target}%")
+                        logger.info(f"Loaded dehumidifier config: target={self.config.target}%, schedule={'ON' if self.config.schedule_enabled else 'OFF'}")
         except Exception as e:
             logger.error(f"Error loading config: {e}")
 
@@ -144,7 +152,10 @@ class DehumidifierController:
         threshold_high: Optional[float] = None,
         threshold_low: Optional[float] = None,
         min_run_time: Optional[int] = None,
-        min_off_time: Optional[int] = None
+        min_off_time: Optional[int] = None,
+        schedule_enabled: Optional[bool] = None,
+        schedule_start_time: Optional[str] = None,
+        schedule_duration_minutes: Optional[int] = None
     ) -> dict:
         """
         Update configuration.
@@ -156,6 +167,9 @@ class DehumidifierController:
             threshold_low: Turn OFF threshold
             min_run_time: Minimum run time in seconds
             min_off_time: Minimum off time in seconds
+            schedule_enabled: Enable/disable schedule window
+            schedule_start_time: Schedule start time (HH:MM)
+            schedule_duration_minutes: Schedule duration in minutes
 
         Returns:
             Updated config dict
@@ -173,6 +187,12 @@ class DehumidifierController:
                 self.config.min_run_time = int(min_run_time)
             if min_off_time is not None:
                 self.config.min_off_time = int(min_off_time)
+            if schedule_enabled is not None:
+                self.config.schedule_enabled = schedule_enabled
+            if schedule_start_time is not None:
+                self.config.schedule_start_time = schedule_start_time
+            if schedule_duration_minutes is not None:
+                self.config.schedule_duration_minutes = int(schedule_duration_minutes)
 
             self._save_config()
             return self.get_config()
@@ -189,6 +209,42 @@ class DehumidifierController:
             except Exception as e:
                 logger.error(f"Error reading humidity: {e}")
         return None
+
+    def _is_in_schedule_window(self) -> bool:
+        """
+        Check if current time is within the scheduled time window.
+
+        Returns:
+            True if schedule is enabled AND current time is within window
+        """
+        if not self.config.schedule_enabled:
+            return False
+
+        from datetime import datetime, time as dt_time, timedelta
+
+        now = datetime.now()
+        current_time = now.time()
+
+        # Parse start time
+        try:
+            start_hour, start_minute = map(int, self.config.schedule_start_time.split(':'))
+            start_time = dt_time(start_hour, start_minute)
+        except Exception as e:
+            logger.error(f"Invalid schedule_start_time format: {e}")
+            return False
+
+        # Calculate end time
+        start_datetime = datetime.combine(now.date(), start_time)
+        end_datetime = start_datetime + timedelta(minutes=self.config.schedule_duration_minutes)
+        end_time = end_datetime.time()
+
+        # Handle midnight wraparound
+        if end_datetime.date() > now.date():
+            # Window crosses midnight
+            return current_time >= start_time or current_time <= end_time
+        else:
+            # Normal window within same day
+            return start_time <= current_time <= end_time
 
     def switch_on(self) -> bool:
         """Manually turn dehumidifier ON."""
@@ -219,21 +275,28 @@ class DehumidifierController:
         Get current status.
 
         Returns:
-            Dict with is_on, humidity, config, etc.
+            Dict with is_on, humidity, config, in_schedule, etc.
         """
         humidity = self.get_current_humidity()
+        in_schedule = self._is_in_schedule_window()
+
         return {
             'is_on': self._is_on,
             'humidity': humidity,
             'enabled': self.config.enabled,
             'config': self.get_config(),
             'tuya_available': self._tuya.is_available if self._tuya else False,
-            'running': self._running
+            'running': self._running,
+            'in_schedule_window': in_schedule  # Neuer Status für UI
         }
 
     def check_and_control(self) -> Optional[bool]:
         """
         Check humidity and control dehumidifier.
+
+        Logic:
+        1. If in schedule window -> ALWAYS ON (Override)
+        2. If not in schedule window -> Normal hysteresis control
 
         Returns:
             True if turned ON, False if turned OFF, None if no change
@@ -251,8 +314,20 @@ class DehumidifierController:
 
         now = time.time()
         time_since_switch = now - self._last_switch_time
+        in_schedule = self._is_in_schedule_window()
 
         with self._lock:
+            # PRIORITY 1: Schedule Window Override
+            if in_schedule:
+                # During schedule window, always turn ON (ignoring hysteresis)
+                if not self._is_on:
+                    logger.info(f"Schedule active [{self.config.schedule_start_time} for {self.config.schedule_duration_minutes}min] - turning ON")
+                    if self.switch_on():
+                        return True
+                # If already ON during schedule, keep it ON
+                return None
+
+            # PRIORITY 2: Normal Hysteresis Control (outside schedule window)
             # Check if we should turn ON
             if not self._is_on and humidity > self.config.threshold_high:
                 # Respect minimum off time
