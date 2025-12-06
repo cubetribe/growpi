@@ -1,15 +1,58 @@
 # GrowPi Project Changelog
 
-## [2025-12-05 v5] - Mode Management & Stale Cache Fix
+### [2025-12-05 v5.1] - Singleton Fix (Gemini)
 
-**Status**: In Progress - Mode-Switching Rework
-**Platform**: Raspberry Pi 3B+ (growpi @ 192.168.0.86)
-**Web Interface**: http://192.168.0.86:5000
-**API Version**: 1.2.1
+**Status**: Production-Ready **Platform**: Raspberry Pi 3B+ (growpi @
+192.168.0.86) **Author**: Gemini
+
+#### Summary
+
+Fixed the critical architecture issue where `api.py` and `main.py` created
+separate `PWMController` instances due to inconsistent import paths.
+
+#### Changes
+
+- **api.py**: Removed `sys.path` manipulation and switched to relative imports
+  (`from ..lamps.pwm_controller ...`).
+- This ensures both the API and the Main Loop use the exact same Singleton
+  instance.
+- API status now correctly reflects the physical lamp state.
+
+---
+
+## [2025-12-06 v5.2] - System Hardening (Gemini)
+
+**Status**: Production-Ready **Platform**: Raspberry Pi 3B+ (growpi @
+192.168.0.86)
 
 ### Summary
 
-Komplette Überarbeitung der Mode-Umschaltung zwischen "Zeitsteuerung" (auto) und "Manuell":
+System-Härtung für den produktiven Einsatz:
+
+- **Backup**: Tägliches Backup von Config und Datenbank
+- **Watchdog**: Automatischer Reboot bei System-Freeze
+- **API Client**: Vorbereitung für Server-Anbindung
+
+### Changes
+
+- **Backup Script**: `scripts/backup.sh` (Daily Cron @ 03:00)
+- **Watchdog**: Hardware Watchdog aktiviert (`dtparam=watchdog=on`)
+- **API Client**: `api/client.py` Skeleton erstellt
+- **Docs**: `SPEC_RASPBERRY_PI.md` aktualisiert
+
+---
+
+## [2025-12-05 v5.1] - Singleton Fix (Gemini)
+
+**Status**: In Progress - Mode-Switching Rework **Platform**: Raspberry Pi 3B+
+(growpi @ 192.168.0.86) **Web Interface**: http://192.168.0.86:5000 **API
+Version**: 1.2.1
+
+### Summary
+
+Komplette Überarbeitung der Mode-Umschaltung zwischen "Zeitsteuerung" (auto) und
+"Manuell":
+
 - Neuer zentraler ModeManager als Single Source of Truth
 - Fix für "Stale Cache" Problem beim Mode-Wechsel
 - Deaktivierung des separaten growpi-web.service
@@ -17,17 +60,23 @@ Komplette Überarbeitung der Mode-Umschaltung zwischen "Zeitsteuerung" (auto) un
 
 ### Problemanalyse
 
-**Symptom**: Beim Wechsel von "Manuell" zu "Zeitsteuerung" gingen alle Lampen aus statt auf Kurven-Werte.
+**Symptom**: Beim Wechsel von "Manuell" zu "Zeitsteuerung" gingen alle Lampen
+aus statt auf Kurven-Werte.
 
 **Root Causes**:
-1. **Stale Cache**: `self.last_intensities` in main.py behielt alte Werte, sodass bei erneutem "auto" Mode keine Updates gesendet wurden
-2. **Zwei PWMController**: api.py und main.py hatten separate Instanzen wegen inkonsistenter Python-Imports
-3. **Separater Service**: `growpi-web.service` lief parallel zu `grow-pi.service` und kämpfte um Port 5000
+
+1. **Stale Cache**: `self.last_intensities` in main.py behielt alte Werte,
+   sodass bei erneutem "auto" Mode keine Updates gesendet wurden
+2. **Zwei PWMController**: api.py und main.py hatten separate Instanzen wegen
+   inkonsistenter Python-Imports
+3. **Separater Service**: `growpi-web.service` lief parallel zu
+   `grow-pi.service` und kämpfte um Port 5000
 4. **Mode nur im RAM**: Modus wurde nicht persistiert, ging bei Restart verloren
 
 ### Neue Features
 
 #### 1. ModeManager (`utils/mode_manager.py`)
+
 ```python
 # Singleton Pattern für zentrales Mode-Management
 mode_manager = get_mode_manager()
@@ -36,12 +85,14 @@ current = mode_manager.get_mode()
 ```
 
 **Features**:
+
 - Thread-safe mit Lock
 - Persistiert in `/tmp/growpi_mode.txt`
 - Nach Reboot automatisch "auto" (Sicherheit für Pflanzen)
 - Callback-System für Mode-Änderungen
 
 #### 2. Cache-Clearing beim Mode-Wechsel
+
 ```python
 # In main.py run() loop:
 if current_mode == "auto" and last_known_mode != "auto":
@@ -51,8 +102,10 @@ if current_mode == "auto" and last_known_mode != "auto":
 ```
 
 #### 3. Service-Konsolidierung
+
 - `growpi-web.service` deaktiviert (`sudo systemctl disable growpi-web.service`)
-- Nur noch `grow-pi.service` läuft (startet main.py, das intern die Web-API startet)
+- Nur noch `grow-pi.service` läuft (startet main.py, das intern die Web-API
+  startet)
 
 ### Neue/Geänderte Dateien
 
@@ -75,33 +128,41 @@ pi-controller/grow_pi/
 ### API-Änderungen
 
 **GET/POST /api/mode** - Nutzt jetzt ModeManager:
+
 ```json
 // POST /api/mode {"mode": "auto"}
 {
   "success": true,
   "mode": "auto",
-  "applied_intensities": {"1": 15, "2": 22, "3": 43, "4": 0}
+  "applied_intensities": { "1": 15, "2": 22, "3": 43, "4": 0 }
 }
 ```
 
 ### Bekannte Einschränkungen
 
-**Verbleibendes Problem**: Python-Import-System erstellt zwei PWMController-Instanzen:
+**Verbleibendes Problem**: Python-Import-System erstellt zwei
+PWMController-Instanzen:
+
 - `lamps.pwm_controller` (von api.py via sys.path)
 - `grow_pi.lamps.pwm_controller` (von main.py via relative import)
 
-Das Singleton-Pattern greift nicht bei unterschiedlichen Modul-Pfaden. Die physischen Lampen werden korrekt gesteuert (main.py), aber die API zeigt möglicherweise falsche Werte an.
+Das Singleton-Pattern greift nicht bei unterschiedlichen Modul-Pfaden. Die
+physischen Lampen werden korrekt gesteuert (main.py), aber die API zeigt
+möglicherweise falsche Werte an.
 
-**Workaround**: Die main.py Loop ist authoritative für PWM-Werte. Die API-Anzeige kann abweichen.
+**Workaround**: Die main.py Loop ist authoritative für PWM-Werte. Die
+API-Anzeige kann abweichen.
 
 ### Systemd Service-Konfiguration
 
 **Aktiv**:
+
 ```
 grow-pi.service - Startet main.py (enthält Web-API)
 ```
 
 **Deaktiviert**:
+
 ```
 growpi-web.service - War separater API-Prozess (Konflikt!)
 ```
@@ -118,13 +179,14 @@ growpi-web.service - War separater API-Prozess (Konflikt!)
 ## [2025-12-05 v4] - Per-Channel Lighting Curves
 
 **Status**: Production-Ready mit individuellem Kurven-Editor pro Lampe
-**Platform**: Raspberry Pi 3B+ (growpi @ 192.168.0.86)
-**Web Interface**: http://192.168.0.86:5000
-**API Version**: 1.2.0
+**Platform**: Raspberry Pi 3B+ (growpi @ 192.168.0.86) **Web Interface**:
+http://192.168.0.86:5000 **API Version**: 1.2.0
 
 ### Summary
 
-Individuelle Lichtkurven pro Kanal für realistische Sonnenauf-/untergangs-Sequenzen:
+Individuelle Lichtkurven pro Kanal für realistische
+Sonnenauf-/untergangs-Sequenzen:
+
 - Jede Lampe hat eigene Zeit-/Intensitäts-Kurve
 - Standard-Sunrise: Far Red → Cool White → Warm White (gestaffelt)
 - UV bleibt permanent auf 0%
@@ -135,25 +197,29 @@ Individuelle Lichtkurven pro Kanal für realistische Sonnenauf-/untergangs-Seque
 #### 1. Per-Channel Kurven-System
 
 **Default Sunrise Sequence (max 50%)**:
-| Kanal | Lampe | Start | Peak (50%) |
-|-------|-------|-------|------------|
-| 1 | Far Red | 05:00 | 06:00 |
-| 3 | Cool White | 05:15 | 06:15 |
-| 2 | Warm White | 05:30 | 06:30 |
-| 4 | UV | - | 0% immer |
+
+| Kanal | Lampe      | Start | Peak (50%) |
+| ----- | ---------- | ----- | ---------- |
+| 1     | Far Red    | 05:00 | 06:00      |
+| 3     | Cool White | 05:15 | 06:15      |
+| 2     | Warm White | 05:30 | 06:30      |
+| 4     | UV         | -     | 0% immer   |
 
 **Sunset (umgekehrte Reihenfolge)**:
+
 - Warm White fällt zuerst (20:00)
 - Cool White folgt (20:15)
 - Far Red zuletzt (20:30)
 
 #### 2. Datenbank-Erweiterung
+
 ```sql
 -- Neue Tabelle für Kurven
 lamp_curves (id, channel, name, enabled, curve, created_at, updated_at, synced_at)
 ```
 
 #### 3. CurveController (`utils/curve_controller.py`)
+
 - `CurveController` Klasse für Multi-Kanal Interpolation
 - `get_current_intensities()` - Alle Kanäle gleichzeitig
 - `get_intensity(channel)` - Einzelner Kanal
@@ -161,15 +227,17 @@ lamp_curves (id, channel, name, enabled, curve, created_at, updated_at, synced_a
 - Lineare Interpolation mit Mitternachts-Wraparound
 
 #### 4. Neue API-Endpoints
-| Endpoint | Methode | Beschreibung |
-|----------|---------|--------------|
-| `/api/curves` | GET | Alle Kurven abrufen |
-| `/api/curves/<channel>` | GET | Kurve für Kanal |
-| `/api/curves/<channel>` | PUT | Kurve aktualisieren |
-| `/api/curves/preview` | GET | 24h Vorschau aller Kanäle |
-| `/api/curves/intensities` | GET | Aktuelle interpolierte Werte |
+
+| Endpoint                  | Methode | Beschreibung                 |
+| ------------------------- | ------- | ---------------------------- |
+| `/api/curves`             | GET     | Alle Kurven abrufen          |
+| `/api/curves/<channel>`   | GET     | Kurve für Kanal              |
+| `/api/curves/<channel>`   | PUT     | Kurve aktualisieren          |
+| `/api/curves/preview`     | GET     | 24h Vorschau aller Kanäle    |
+| `/api/curves/intensities` | GET     | Aktuelle interpolierte Werte |
 
 #### 5. Web-UI Kurven-Editor
+
 - Tabs: "Steuerung" und "Kurven"
 - Pro Kanal: Enable/Disable Toggle, Zeit/Intensitäts-Punkte
 - Live 24h-Vorschau Chart
@@ -194,6 +262,7 @@ pi-controller/grow_pi/
 ### API Response Beispiele
 
 **GET /api/curves**
+
 ```json
 {
   "success": true,
@@ -203,8 +272,8 @@ pi-controller/grow_pi/
       "name": "Far Red",
       "enabled": true,
       "curve": [
-        {"time": "05:00", "intensity": 0},
-        {"time": "06:00", "intensity": 50}
+        { "time": "05:00", "intensity": 0 },
+        { "time": "06:00", "intensity": 50 }
       ],
       "current_intensity": 45
     }
@@ -213,12 +282,21 @@ pi-controller/grow_pi/
 ```
 
 **GET /api/curves/preview**
+
 ```json
 {
   "success": true,
   "preview": [
-    {"hour": 0, "time": "00:00", "intensities": {1: 0, 2: 0, 3: 0, 4: 0}},
-    {"hour": 6, "time": "06:00", "intensities": {1: 50, 2: 25, 3: 38, 4: 0}}
+    {
+      "hour": 0,
+      "time": "00:00",
+      "intensities": { "1": 0, "2": 0, "3": 0, "4": 0 }
+    },
+    {
+      "hour": 6,
+      "time": "06:00",
+      "intensities": { "1": 50, "2": 25, "3": 38, "4": 0 }
+    }
   ]
 }
 ```
@@ -232,14 +310,14 @@ Default-Kurven werden initialisiert wenn keine existieren.
 
 ## [2025-12-05 v3] - SQLite Logging System Complete
 
-**Status**: Production-Ready mit vollständigem Daten-Logging
-**Platform**: Raspberry Pi 3B+ (growpi @ 192.168.0.86)
-**Web Interface**: http://192.168.0.86:5000
-**API Version**: 1.1.0
+**Status**: Production-Ready mit vollständigem Daten-Logging **Platform**:
+Raspberry Pi 3B+ (growpi @ 192.168.0.86) **Web Interface**:
+http://192.168.0.86:5000 **API Version**: 1.1.0
 
 ### Summary
 
 Vollständiges lokales Logging-System für Sensor- und Lampen-Daten:
+
 - SQLite-Datenbank unter `/opt/grow-pi/data/growpi.db`
 - Automatisches Logging alle 60 Sekunden (konfigurierbar)
 - REST-API für Datenabfrage (letzte 24h, filterbar)
@@ -248,11 +326,13 @@ Vollständiges lokales Logging-System für Sensor- und Lampen-Daten:
 ### Neue Features
 
 #### 1. Datenbank-Module (`grow_pi/database/`)
+
 - **models.py**: Dataclasses für `SensorReading`, `LampStateLog`, `SystemEvent`
 - **db.py**: Thread-safe SQLite Connection Manager mit WAL-Mode
 - **logger.py**: Background DataLogger Service mit konfigurierbaren Intervallen
 
 #### 2. Datenbank-Schema
+
 ```sql
 -- Sensor-Messwerte
 sensor_readings (id, sensor_type, value, unit, created_at, synced_at)
@@ -265,25 +345,30 @@ system_events (id, event_type, severity, message, details, created_at)
 ```
 
 #### 3. Logging-Strategien
-| Datentyp | Trigger | Intervall |
-|----------|---------|-----------|
-| Sensor | Periodisch | 60s |
-| Lampen | Periodisch + Bei Änderung | 60s |
-| Events | Bei Ereignis | - |
 
-**Lampen-Sources**: `startup`, `shutdown`, `api`, `curve`, `manual`, `override`, `periodic`
+| Datentyp | Trigger                   | Intervall |
+| -------- | ------------------------- | --------- |
+| Sensor   | Periodisch                | 60s       |
+| Lampen   | Periodisch + Bei Änderung | 60s       |
+| Events   | Bei Ereignis              | -         |
+
+**Lampen-Sources**: `startup`, `shutdown`, `api`, `curve`, `manual`, `override`,
+`periodic`
 
 #### 4. Neue API-Endpoints
-| Endpoint | Beschreibung |
-|----------|--------------|
-| `GET /api/logs/sensors?type=temperature&hours=24` | Sensor-Historie |
-| `GET /api/logs/lamps?channel=1&hours=24` | Lampen-Historie |
-| `GET /api/logs/events?severity=error` | System-Events |
-| `GET /api/logs/stats` | Logging-Statistiken |
-| `GET /api/health` | Health-Check inkl. Logging-Status |
+
+| Endpoint                                          | Beschreibung                      |
+| ------------------------------------------------- | --------------------------------- |
+| `GET /api/logs/sensors?type=temperature&hours=24` | Sensor-Historie                   |
+| `GET /api/logs/lamps?channel=1&hours=24`          | Lampen-Historie                   |
+| `GET /api/logs/events?severity=error`             | System-Events                     |
+| `GET /api/logs/stats`                             | Logging-Statistiken               |
+| `GET /api/health`                                 | Health-Check inkl. Logging-Status |
 
 #### 5. Deduplication
-- Identische Lampen-Logs werden innerhalb von 5 Sekunden nicht doppelt gespeichert
+
+- Identische Lampen-Logs werden innerhalb von 5 Sekunden nicht doppelt
+  gespeichert
 - Verhindert Spam bei schnellen Slider-Bewegungen
 
 ### Neue Dateien
@@ -302,6 +387,7 @@ docs/
 ### API Response Beispiele
 
 **GET /api/logs/stats**
+
 ```json
 {
   "success": true,
@@ -318,11 +404,24 @@ docs/
 ```
 
 **GET /api/logs/lamps?channel=1&limit=2**
+
 ```json
 {
   "logs": [
-    {"channel": 1, "name": "Far Red", "intensity": 50, "source": "api", "created_at": "..."},
-    {"channel": 1, "name": "Far Red", "intensity": 0, "source": "startup", "created_at": "..."}
+    {
+      "channel": 1,
+      "name": "Far Red",
+      "intensity": 50,
+      "source": "api",
+      "created_at": "..."
+    },
+    {
+      "channel": 1,
+      "name": "Far Red",
+      "intensity": 0,
+      "source": "startup",
+      "created_at": "..."
+    }
   ]
 }
 ```
@@ -344,13 +443,13 @@ docs/
 
 ## [2025-12-05 v2] - DHT22 Sensor Integration Complete
 
-**Status**: Production-Ready mit echten Sensordaten
-**Platform**: Raspberry Pi 3B+ (growpi @ 192.168.0.86)
-**Web Interface**: http://192.168.0.86:5000
+**Status**: Production-Ready mit echten Sensordaten **Platform**: Raspberry Pi
+3B+ (growpi @ 192.168.0.86) **Web Interface**: http://192.168.0.86:5000
 
 ### Summary
 
 DHT22 Temperatur- und Luftfeuchtigkeit-Sensor vollständig integriert:
+
 - Echte Sensor-Werte statt Mock-Daten
 - Robuste Retry-Logik mit Caching
 - API liefert Temperatur und Luftfeuchtigkeit in Echtzeit
@@ -358,15 +457,18 @@ DHT22 Temperatur- und Luftfeuchtigkeit-Sensor vollständig integriert:
 ### DHT22 Sensor-Integration
 
 #### Hardware-Konfiguration (3-Pin)
-| DHT22 Pin | Funktion | Raspberry Pi |
-|-----------|----------|--------------|
-| 1 | VCC | Pin 1 (3.3V) |
-| 2 | DATA | Pin 7 (GPIO-4) |
-| 3 | GND | Pin 6 (GND) |
 
-**Hinweis**: Der DHT22 hat 3 Pins (nicht 4). Die Pinbelegung ist unverändert zu früheren Dokumentationen.
+| DHT22 Pin | Funktion | Raspberry Pi   |
+| --------- | -------- | -------------- |
+| 1         | VCC      | Pin 1 (3.3V)   |
+| 2         | DATA     | Pin 7 (GPIO-4) |
+| 3         | GND      | Pin 6 (GND)    |
+
+**Hinweis**: Der DHT22 hat 3 Pins (nicht 4). Die Pinbelegung ist unverändert zu
+früheren Dokumentationen.
 
 #### Installierte Pakete
+
 ```bash
 # Python-Bibliotheken (im venv)
 adafruit-circuitpython-dht==4.0.10
@@ -378,11 +480,15 @@ gpiod
 ```
 
 #### API-Verbesserungen
-- **Caching**: Sensor-Werte werden 3 Sekunden gecacht (DHT22 braucht min. 2s zwischen Messungen)
+
+- **Caching**: Sensor-Werte werden 3 Sekunden gecacht (DHT22 braucht min. 2s
+  zwischen Messungen)
 - **Retry-Logik**: Bis zu 3 Versuche bei Lesefehlern
-- **Fallback**: Letzte bekannte Werte werden zurückgegeben wenn Sensor temporär nicht lesbar
+- **Fallback**: Letzte bekannte Werte werden zurückgegeben wenn Sensor temporär
+  nicht lesbar
 
 #### Verifizierte Werte
+
 ```json
 {
   "temperature": 22.6,
@@ -414,7 +520,8 @@ sudo systemctl restart growpi-web
 
 ### Bekannte Eigenschaften
 
-- DHT22 liefert manchmal beim ersten Leseversuch Fehler ("Checksum did not validate") - das ist normal
+- DHT22 liefert manchmal beim ersten Leseversuch Fehler ("Checksum did not
+  validate") - das ist normal
 - Minimum 2 Sekunden zwischen Messungen erforderlich
 - Bei schnellen API-Aufrufen werden gecachte Werte zurückgegeben
 
@@ -422,13 +529,13 @@ sudo systemctl restart growpi-web
 
 ## [2025-12-05] - MVP Complete: Web Interface & Final Pin Configuration
 
-**Status**: Production-Ready
-**Platform**: Raspberry Pi 3B+ (growpi @ 192.168.0.86)
-**Web Interface**: http://192.168.0.86:5000
+**Status**: Production-Ready **Platform**: Raspberry Pi 3B+ (growpi @
+192.168.0.86) **Web Interface**: http://192.168.0.86:5000
 
 ### Summary
 
 Vollständiges MVP mit Web-Interface für Smartphone-Steuerung:
+
 - Web-App auf Port 5000 für 4 Lampenkanäle
 - Sonnenkurven-Modus mit automatischer Tageszeit-Interpolation
 - Temperatur/Luftfeuchtigkeit Anzeige (DHT22)
@@ -436,25 +543,29 @@ Vollständiges MVP mit Web-Interface für Smartphone-Steuerung:
 
 ### Finale Pin-Konfiguration (ACTIVE)
 
-| Kanal | Name | GPIO | Pin | Farbe (UI) |
-|-------|------|------|-----|------------|
-| 1 | Far Red | 16 | 36 | #ff4444 |
-| 2 | Warm White | 13 | 33 | #ffbb44 |
-| 3 | Cool White | 12 | 32 | #88ddff |
-| 4 | UV | 18 | 12 | #cc66ff |
+| Kanal | Name       | GPIO | Pin | Farbe (UI) |
+| ----- | ---------- | ---- | --- | ---------- |
+| 1     | Far Red    | 16   | 36  | #ff4444    |
+| 2     | Warm White | 13   | 33  | #ffbb44    |
+| 3     | Cool White | 12   | 32  | #88ddff    |
+| 4     | UV         | 18   | 12  | #cc66ff    |
 
-**Hinweis**: GPIO 13 (Pin 33) war initial defekt/instabil, wurde durch Umkonfiguration behoben.
+**Hinweis**: GPIO 13 (Pin 33) war initial defekt/instabil, wurde durch
+Umkonfiguration behoben.
 
 ### Neue Features
 
 #### 1. Sonnenkurven-Modus (Level 4)
+
 - Automatische Intensitätssteuerung basierend auf Tageszeit
-- Kurve: 05:00-08:00 Sonnenaufgang (10%→60%), 08:00-20:00 Tag (60%), 20:00-23:00 Sonnenuntergang (60%→10%), 23:00-05:00 Nacht (0%)
+- Kurve: 05:00-08:00 Sonnenaufgang (10%→60%), 08:00-20:00 Tag (60%), 20:00-23:00
+  Sonnenuntergang (60%→10%), 23:00-05:00 Nacht (0%)
 - Linear-Interpolation zwischen Kurvenpunkten
 - `--mode curve` (default) oder `--mode fixed`
 - `--preview` zeigt 24h Kurven-Vorschau
 
 #### 2. Web-Interface (Flask API)
+
 - Mobile-optimiertes Dark-Theme UI
 - 4 Slider für Lampensteuerung (Far Red, Warm White, Cool White, UV)
 - Temperatur & Luftfeuchtigkeit Anzeige
@@ -463,6 +574,7 @@ Vollständiges MVP mit Web-Interface für Smartphone-Steuerung:
 - REST API: GET /api/status, POST /api/lamp/<channel>, GET /api/temperature
 
 #### 3. Dynamische Konfiguration
+
 - API lädt Kanäle aus config.yaml
 - Keine hardcodierten GPIO-Pins mehr in api.py
 - Fallback-Konfiguration bei Ladefehler
@@ -519,18 +631,20 @@ python -m grow_pi.main --mode fixed
 
 ## [2025-12-04 v2] - MVP Level 1: Pi Auto-Start Controller
 
-**Status**: Superseded by 2025-12-05
-**Platform**: Raspberry Pi 3B+ (growpi @ 192.168.0.86)
+**Status**: Superseded by 2025-12-05 **Platform**: Raspberry Pi 3B+ (growpi @
+192.168.0.86)
 
 ### Summary
 
 Erster funktionierender MVP des Pi-Controllers:
+
 - ✅ Pi startet automatisch → Lampen gehen auf konfigurierte Werte
 - ✅ PWM-Kanäle funktionieren
 - ✅ Live-Änderung der Intensität via Config + Service-Restart
 - ✅ systemd Services für pigpiod und grow-pi
 
-**Hinweis**: Pin-Konfiguration wurde in v2025-12-05 finalisiert (4 Kanäle statt 5).
+**Hinweis**: Pin-Konfiguration wurde in v2025-12-05 finalisiert (4 Kanäle statt
+5).
 
 ### Implementierte Dateien
 
@@ -555,18 +669,21 @@ pi-controller/
 ### Architektur-Entscheidungen
 
 **PWMController Features:**
+
 - Nutzt pigpio Daemon für Hardware-PWM
 - Simulation-Mode wenn pigpio nicht verfügbar (Entwicklung auf Mac)
 - PWM Range 0-100 für direkte Prozent-Steuerung
 - Graceful Cleanup (Lampen aus bei Stop)
 
 **Config System:**
+
 - YAML-basiert mit Dataclasses
 - Auto-Detection: `./config/config.yaml` oder `/opt/grow-pi/config/config.yaml`
 - Environment Variable Override: `GROWPI_CONFIG`
 - Erweiterbar für zukünftige Features (Server, Sensors, Offline)
 
 **Service Setup:**
+
 - `pigpiod.service` - PWM Daemon (manuell erstellt, da nicht in Debian Trixie)
 - `grow-pi.service` - Hauptcontroller (Requires pigpiod)
 - Auto-Restart bei Fehler (RestartSec=10)
@@ -615,14 +732,15 @@ python -m grow_pi.main --test
 
 ### PWM Kanal-Belegung (VERALTET - siehe 2025-12-05)
 
-**ACHTUNG**: Diese Konfiguration wurde ersetzt. Aktuelle Konfiguration siehe oben.
+**ACHTUNG**: Diese Konfiguration wurde ersetzt. Aktuelle Konfiguration siehe
+oben.
 
-| Kanal | Farbe       | GPIO | Pin | Status |
-|-------|-------------|------|-----|--------|
-| 1     | Far Red     | 16   | 36  | ✅ Final |
-| 2     | Warm White  | 13   | 33  | ✅ Final |
-| 3     | Cool White  | 12   | 32  | ✅ Final |
-| 4     | UV          | 18   | 12  | ✅ Final |
+| Kanal | Farbe      | GPIO | Pin | Status   |
+| ----- | ---------- | ---- | --- | -------- |
+| 1     | Far Red    | 16   | 36  | ✅ Final |
+| 2     | Warm White | 13   | 33  | ✅ Final |
+| 3     | Cool White | 12   | 32  | ✅ Final |
+| 4     | UV         | 18   | 12  | ✅ Final |
 
 ### Getestete Szenarien
 
@@ -633,15 +751,15 @@ python -m grow_pi.main --test
 
 ### Erweiterungs-Roadmap
 
-| Level | Feature | Status | Beschreibung |
-|-------|---------|--------|--------------|
-| 1 | Feste Lampenwerte | ✅ DONE | Pi startet → Lampen auf Config-Wert |
-| 2 | Logging | ⏳ | File-Logging, Log-Rotation |
-| 3 | DHT22 Sensor | ⏳ | Temperatur/Luftfeuchtigkeit auslesen |
-| 4 | Kurven-Interpolation | ⏳ | Zeitbasierte Lichtsteuerung |
-| 5 | API-Client | ⏳ | Server-Kommunikation (Heartbeat, Readings) |
-| 6 | Offline-Modus | ⏳ | Buffering, Cache, Fallback |
-| 7 | RS485-Sensoren | ⏳ | Bodensensoren via Modbus |
+| Level | Feature              | Status  | Beschreibung                               |
+| ----- | -------------------- | ------- | ------------------------------------------ |
+| 1     | Feste Lampenwerte    | ✅ DONE | Pi startet → Lampen auf Config-Wert        |
+| 2     | Logging              | ⏳      | File-Logging, Log-Rotation                 |
+| 3     | DHT22 Sensor         | ⏳      | Temperatur/Luftfeuchtigkeit auslesen       |
+| 4     | Kurven-Interpolation | ⏳      | Zeitbasierte Lichtsteuerung                |
+| 5     | API-Client           | ⏳      | Server-Kommunikation (Heartbeat, Readings) |
+| 6     | Offline-Modus        | ⏳      | Buffering, Cache, Fallback                 |
+| 7     | RS485-Sensoren       | ⏳      | Bodensensoren via Modbus                   |
 
 ### Bekannte Einschränkungen (MVP)
 
@@ -654,14 +772,14 @@ python -m grow_pi.main --test
 
 ## [2025-12-04] - Raspberry Pi Hardware Integration - Phase 2 ✅
 
-**Status**: Hardware Testing Phase Complete
-**Platform**: Raspberry Pi 3B+ (growpi @ 192.168.0.86)
-**OS**: Raspberry Pi OS (Debian, Linux 6.12.47+rpt-rpi-v8 aarch64)
-**Python**: 3.13.5
+**Status**: Hardware Testing Phase Complete **Platform**: Raspberry Pi 3B+
+(growpi @ 192.168.0.86) **OS**: Raspberry Pi OS (Debian, Linux
+6.12.47+rpt-rpi-v8 aarch64) **Python**: 3.13.5
 
 ### Summary
 
 Successfully verified hardware components on Raspberry Pi 3B+:
+
 - ✅ DHT22 temperature/humidity sensor (GPIO-4)
 - ✅ PWM signal generation (GPIO-18)
 - ✅ Complete pin documentation created
@@ -672,29 +790,36 @@ Successfully verified hardware components on Raspberry Pi 3B+:
 ### Hardware Verification - DHT22 Temperature & Humidity Sensor
 
 #### 1. Sensor Connection Verified ✅
-**Hardware**: DHT22 sensor connected to GPIO-4 (as specified in SPEC_RASPBERRY_PI.md)
+
+**Hardware**: DHT22 sensor connected to GPIO-4 (as specified in
+SPEC_RASPBERRY_PI.md)
 
 **Test Results**:
+
 - ✅ Sensor successfully detected and initialized
 - ✅ Stable readings obtained
 - ✅ No hardware errors or timeouts
 
 **Measured Values**:
+
 ```
 Temperatur: 21.0°C
 Luftfeuchtigkeit: 64.0%
 ```
 
 #### 2. Python Library Installation ✅
+
 **Library**: `adafruit-circuitpython-dht` 4.0.10
 
 **Reason for Library Choice**:
+
 - Original `Adafruit_DHT` library is deprecated
 - Does not compile with Python 3.13+
 - `adafruit-circuitpython-dht` is the modern replacement
 - Full compatibility with current Raspberry Pi OS
 
 **Dependencies Installed**:
+
 ```
 adafruit-circuitpython-dht==4.0.10
 Adafruit-Blinka==8.68.0
@@ -703,9 +828,11 @@ Adafruit-PureIO==1.1.11
 ```
 
 #### 3. Test Implementation ✅
+
 **Script**: `/tmp/test_dht22.py`
 
 **Code Pattern** (matches SPEC_RASPBERRY_PI.md structure):
+
 ```python
 import board
 import adafruit_dht
@@ -718,6 +845,7 @@ humidity = dhtDevice.humidity        # %
 ```
 
 **Test Results** (5 consecutive readings):
+
 ```
 Messung 1: 22.7°C, 59.2% (initial warmup)
 Messung 2: 21.0°C, 64.0% (stabilized)
@@ -727,27 +855,32 @@ Messung 5: 21.0°C, 64.1% (stable)
 ```
 
 **Observations**:
+
 - First reading shows slight deviation (sensor warmup)
 - Subsequent readings stable within ±0.1% tolerance
 - No CRC errors or communication failures
 - 2-second polling interval works reliably
 
 #### 4. PWM Test - GPIO-18 (Pin 12) ✅
+
 **Hardware**: PWM signal generation verified on GPIO-18
 
 **Test Configuration**:
+
 - Pin: GPIO-18 (Physical Pin 12)
 - Ground: Pin 9 (GND) for test
 - Frequency: 1000 Hz (1 kHz)
 - Duty Cycle: 0% → 25% → 50% → 75% → 100% → 75% → 50% → 25% → 0%
 
 **Test Results**:
+
 - ✅ PWM signal successfully generated
 - ✅ All duty cycles working correctly
 - ✅ No signal degradation or jitter
 - ✅ GPIO cleanup successful
 
 **Code Pattern**:
+
 ```python
 import RPi.GPIO as GPIO
 
@@ -761,20 +894,24 @@ pwm.ChangeDutyCycle(50)  # 50% brightness
 ```
 
 **Hardware Configuration Confirmed**:
+
 - GPIO-18 → Lamp Channel 3 (Warm White) per SPEC
 - Ready for MOSFET driver integration
 - Hardware PWM1 Channel 0 verified
 
 #### 5. pigpio Installation & Advanced PWM Testing ✅
+
 **Library**: pigpio (Hardware PWM Library)
 
 **Installation Challenge**:
+
 - pigpio not available in Debian Trixie repository
 - Installed from source: https://github.com/joan2937/pigpio
 - Compilation successful on Raspberry Pi 3B+ (ARM)
 - Daemon `pigpiod` installed and configured
 
 **Installation Commands**:
+
 ```bash
 cd /tmp
 wget https://github.com/joan2937/pigpio/archive/master.zip
@@ -787,6 +924,7 @@ sudo make install
 **Test Scripts Created**:
 
 **a) Smooth PWM Ramping Test** (`tests/pwm_test_basic.py`):
+
 - Continuous cycle: 0% → 50% → 0% over 10 seconds
 - 50 interpolation steps for smooth transitions
 - Multiple lamp channels support (simplified to single channel)
@@ -794,6 +932,7 @@ sudo make install
 - Test Results: ✅ Smooth fade in/out working perfectly
 
 **b) Fixed Intensity Script** (`tests/pwm_set_fixed.py`):
+
 - Command-line intensity control: `python3 pwm_set_fixed.py <0-100>`
 - Runs continuously until Ctrl+C
 - Clean GPIO cleanup on exit
@@ -801,12 +940,14 @@ sudo make install
 - Production Use: Set to 40% and running stable
 
 **Current PWM Status**:
+
 - GPIO-18 running at **40% intensity** (constant)
 - pigpiod daemon running as background service
 - PWM frequency: 1000 Hz
 - Lamp connected and verified visually
 
 **Code Pattern (pigpio)**:
+
 ```python
 import pigpio
 
@@ -817,6 +958,7 @@ pi.set_PWM_dutycycle(18, 40)    # 40% intensity
 ```
 
 **Advantages of pigpio over RPi.GPIO**:
+
 - True hardware PWM (no software jitter)
 - More accurate timing
 - Better for LED control
@@ -824,9 +966,11 @@ pi.set_PWM_dutycycle(18, 40)    # 40% intensity
 - Remote GPIO access capability
 
 #### 6. Hardware Pin Documentation ✅
+
 **File**: `docs/HARDWARE_PINOUT.md`
 
 **New comprehensive hardware reference created**:
+
 - Complete 40-pin GPIO layout (visual 2-row representation)
 - Color-coded pin diagram (🟢 DHT22, 🔴 PWM tested, 🟡 PWM planned)
 - Clear distinction between physical pins [1-40] and GPIO numbers
@@ -839,6 +983,7 @@ pi.set_PWM_dutycycle(18, 40)    # 40% intensity
 - Hardware PWM controller explanation (2 controllers × 2 channels)
 
 **Pin Assignments Verified**:
+
 - DHT22: Pin 1 (3.3V), Pin 7 (GPIO-4), Pin 6 (GND)
 - PWM Kanal 3: Pin 12 (GPIO-18) ✅ Tested
 - PWM Kanal 1: Pin 32 (GPIO-12) - Planned
@@ -847,6 +992,7 @@ pi.set_PWM_dutycycle(18, 40)    # 40% intensity
 - PWM Kanal 5: Pin 40 (GPIO-21) - Planned (Software PWM)
 
 **Documentation Improvements**:
+
 - Pin layout now shows actual physical orientation (USB ports at bottom)
 - Left/right columns clearly separated (odd/even pins)
 - Emoji color coding for quick visual reference
@@ -856,6 +1002,7 @@ pi.set_PWM_dutycycle(18, 40)    # 40% intensity
 #### 7. Next Steps for Full Integration 📋
 
 **Completed Tasks**:
+
 - [x] Implement DHT22Sensor test (GPIO-4 verified)
 - [x] Verify PWM output on GPIO-18
 - [x] Install pigpio library from source
@@ -863,19 +1010,24 @@ pi.set_PWM_dutycycle(18, 40)    # 40% intensity
 - [x] Document complete pin layout
 
 **Immediate Tasks**:
-- [ ] Update controller to use `adafruit_circuitpython_dht` instead of deprecated library
+
+- [ ] Update controller to use `adafruit_circuitpython_dht` instead of
+      deprecated library
 - [ ] Test remaining PWM channels (GPIO 12, 13, 19, 21)
 - [ ] Integrate pigpio into main controller service
 - [ ] Test RS485 soil sensors (if hardware available)
 - [ ] Build complete controller service with systemd
 
 **Architecture Alignment**:
+
 - Hardware config matches `docs/SPEC_RASPBERRY_PI.md` Section 2.3
 - GPIO-4 assignment confirmed for DHT22
 - Ready for SensorManager implementation (Section 5.1)
 
 **Files to Update for Production**:
-- `grow_pi/sensors/dht22.py` - Replace Adafruit_DHT with adafruit_circuitpython_dht
+
+- `grow_pi/sensors/dht22.py` - Replace Adafruit_DHT with
+  adafruit_circuitpython_dht
 - `grow_pi/config/config.yaml` - Verify DHT22 GPIO pin = 4
 - `requirements.txt` - Update to modern library
 
@@ -883,16 +1035,15 @@ pi.set_PWM_dutycycle(18, 40)    # 40% intensity
 
 ## [2025-12-03 v2] - Production-Ready Polish & Bug Fixes ✅
 
-**Status**: Deployed to http://growpi.nm-forum.de
-**Build**: Success
-**Tests**: All passing
-**Ready for**: Customer Presentation
+**Status**: Deployed to http://growpi.nm-forum.de **Build**: Success **Tests**:
+All passing **Ready for**: Customer Presentation
 
 ### Critical Fixes & Improvements
 
 #### 1. Lighting Curve Editor - Full Functionality ✅
-**Problem**: Inputs were read-only, users couldn't edit curves
-**Solution**:
+
+**Problem**: Inputs were read-only, users couldn't edit curves **Solution**:
+
 - Removed `readOnly` attributes from time and intensity inputs
 - Implemented full state management with `editedLamps` state
 - Added PUT endpoint in `/api/lighting/route.ts` for saving curves
@@ -904,12 +1055,15 @@ pi.set_PWM_dutycycle(18, 40)    # 40% intensity
 - Full error handling with toast notifications
 
 **Files Modified**:
+
 - `app/(dashboard)/lighting/page.tsx` - Complete rewrite with edit functionality
 - `app/api/lighting/route.ts` - Added PUT handler for curve updates
 
 #### 2. Lighting Override - Real Functionality ✅
+
 **Problem**: All On/All Off buttons only returned success without doing anything
 **Solution**:
+
 - Implemented actual database updates in override route
 - Updates all lamp curves to single point at current time
 - Sets intensity to 100 (All On) or 0 (All Off)
@@ -918,11 +1072,13 @@ pi.set_PWM_dutycycle(18, 40)    # 40% intensity
 - Full error handling with try/catch and user feedback
 
 **Files Modified**:
+
 - `app/api/lighting/override/route.ts` - Complete implementation
 
 #### 3. Mobile Responsive Sidebar ✅
-**Problem**: Sidebar was fixed width, no mobile menu
-**Solution**:
+
+**Problem**: Sidebar was fixed width, no mobile menu **Solution**:
+
 - Added hamburger menu button (fixed, top-left, z-50)
 - Implemented mobile overlay (dimmed background)
 - Sidebar slides in/out with translate-x animation
@@ -932,38 +1088,46 @@ pi.set_PWM_dutycycle(18, 40)    # 40% intensity
 - Layout adjusted for hamburger button (pt-16 on mobile)
 
 **Files Modified**:
+
 - `components/layout/Sidebar.tsx` - Mobile menu implementation
 - `app/(dashboard)/layout.tsx` - Padding adjustment for mobile
 
 #### 4. Translations & Validation ✅
-**Problem**: Hardcoded strings and missing validation
-**Solution**:
-- Added missing translations: `noLamps`, `saving`, `intervalError`, `validationError`
+
+**Problem**: Hardcoded strings and missing validation **Solution**:
+
+- Added missing translations: `noLamps`, `saving`, `intervalError`,
+  `validationError`
 - Added input validation to settings form (5-3600 seconds range)
 - Toast error messages use translations
 - All hardcoded strings now use translation keys
 
 **Files Modified**:
+
 - `lib/i18n.ts` - Extended German and English translations
 - `app/(dashboard)/settings/page.tsx` - Added validation logic
 
 #### 5. TypeScript Type Safety ✅
-**Problem**: Multiple `any` types reducing type safety
-**Solution**:
+
+**Problem**: Multiple `any` types reducing type safety **Solution**:
+
 - Replaced `any` in settings route with proper interface
 - Added explicit types for `mappedData` object
 
 **Files Modified**:
+
 - `app/api/settings/route.ts` - Proper TypeScript interfaces
 
 #### 6. Cleanup ✅
-**Problem**: Dead Supabase code still present
-**Solution**:
+
+**Problem**: Dead Supabase code still present **Solution**:
+
 - Removed `lib/supabase.ts` file
 - Removed `@supabase/supabase-js` from package.json
 - Verified no remaining Supabase imports
 
 **Files Modified**:
+
 - Deleted: `lib/supabase.ts`
 - `package.json` - Removed Supabase dependency
 
@@ -983,6 +1147,7 @@ Route (app)                              Size     First Load JS
 **Bundle Size**: First Load JS shared by all: 79.4 kB ✅
 
 ### Testing Completed ✅
+
 - [x] TypeScript compilation passes
 - [x] Next.js build succeeds
 - [x] No console errors during build
@@ -993,31 +1158,40 @@ Route (app)                              Size     First Load JS
 ## [2025-12-03 v1] - Major Refactoring & Deployment
 
 ### Project Overview
-Greenhouse control system for Raspberry Pi with web interface, deployed to VPS at growpi.nm-forum.de
+
+Greenhouse control system for Raspberry Pi with web interface, deployed to VPS
+at growpi.nm-forum.de
 
 ### Completed Tasks
 
 #### 1. Database Migration: Supabase → PostgreSQL + Prisma
-**Problem**: Original frontend was built for Supabase, needed complete refactoring for self-hosted solution
+
+**Problem**: Original frontend was built for Supabase, needed complete
+refactoring for self-hosted solution
 
 **Actions**:
+
 - Installed PostgreSQL 16 on VPS (5.182.17.148)
 - Created database `growpi` with user `growpi_user`
 - Configured remote access (pg_hba.conf, postgresql.conf)
 - Created complete Prisma schema with 10 models:
-  - User, Zone, Settings, Sensor, SensorReading, Lamp, LightingCurve, LightingOverride, AlertConfig, PiConnection
+  - User, Zone, Settings, Sensor, SensorReading, Lamp, LightingCurve,
+    LightingOverride, AlertConfig, PiConnection
 - Generated seed data: 2,592 sensor readings (24 hours of data)
 
 **Files Changed**:
+
 - `frontend/prisma/schema.prisma` - Complete database schema
 - `frontend/prisma/seed.ts` - Demo data generation
 - `frontend/lib/prisma.ts` - Prisma client singleton
 - `frontend/.env` - Database connection string
 
 #### 2. API Routes Refactoring (8 routes)
+
 **Problem**: All routes used Supabase client, needed conversion to Prisma ORM
 
 **Routes Refactored**:
+
 1. `app/api/auth/login/route.ts` - JWT authentication with Prisma user lookup
 2. `app/api/readings/route.ts` - Sensor data queries with aggregation
 3. `app/api/lighting/route.ts` - Lamp status and curves
@@ -1028,6 +1202,7 @@ Greenhouse control system for Raspberry Pi with web interface, deployed to VPS a
 8. `app/(dashboard)/layout.tsx` - Server Component auth check
 
 **Key Pattern**: All routes now follow:
+
 ```typescript
 const session = await getSession();
 const zone = await prisma.zone.findFirst({ where: { userId: session.id } });
@@ -1035,16 +1210,20 @@ const zone = await prisma.zone.findFirst({ where: { userId: session.id } });
 ```
 
 #### 3. VPS Deployment Configuration
+
 **Infrastructure**:
+
 - VPS: Ubuntu 24.04 at 5.182.17.148
 - Domain: growpi.nm-forum.de
 - Node.js: v20.18.1
 - PM2: Process manager with ecosystem.config.js
 - NGINX: Reverse proxy on port 80 → localhost:3001
 
-**Critical Constraint**: Server hosts multiple websites - NGINX config must not disrupt existing sites
+**Critical Constraint**: Server hosts multiple websites - NGINX config must not
+disrupt existing sites
 
 **Files Created on VPS**:
+
 - `/var/www/growpi/` - Application directory
 - `/var/www/growpi/ecosystem.config.js` - PM2 configuration
 - `/etc/nginx/sites-available/growpi` - NGINX config
@@ -1053,26 +1232,33 @@ const zone = await prisma.zone.findFirst({ where: { userId: session.id } });
 **Port Resolution**: Changed from 3000 to 3001 (Docker occupied 3000)
 
 #### 4. Authentication Fixes
+
 **Problem 1**: Login redirect loop (307 infinite redirects)
+
 - **Root Cause**: Cookie `secure: true` but site uses HTTP
 - **Fix**: Changed `lib/auth.ts:59` to `secure: false`
 
 **Files Modified**:
+
 - `frontend/lib/auth.ts` - Cookie security configuration
 
 #### 5. Settings API Field Mapping
-**Problem**: Frontend sends snake_case (`demo_mode`) but Prisma uses camelCase (`demoMode`)
+
+**Problem**: Frontend sends snake_case (`demo_mode`) but Prisma uses camelCase
+(`demoMode`)
+
 - **Symptom**: 500 error when toggling demo mode
 - **Error**: "Unknown argument `demo_mode`. Did you mean `demoMode`?"
 
 **Fix**: Added bidirectional field mapping in `app/api/settings/route.ts`:
+
 ```typescript
 // POST: snake_case → camelCase
 const mappedData: any = {};
-if ('demo_mode' in body) mappedData.demoMode = body.demo_mode;
-if ('sensor_interval' in body) mappedData.sensorInterval = body.sensor_interval;
-if ('language' in body) mappedData.language = body.language;
-if ('theme' in body) mappedData.theme = body.theme;
+if ("demo_mode" in body) mappedData.demoMode = body.demo_mode;
+if ("sensor_interval" in body) mappedData.sensorInterval = body.sensor_interval;
+if ("language" in body) mappedData.language = body.language;
+if ("theme" in body) mappedData.theme = body.theme;
 
 // GET: camelCase → snake_case
 return NextResponse.json({
@@ -1084,18 +1270,22 @@ return NextResponse.json({
 ```
 
 **Files Modified**:
+
 - `frontend/app/api/settings/route.ts` - Field mapping logic
 
 #### 6. Theme System Implementation
+
 **Problem**: Dark/Light mode toggle didn't exist in UI
 
 **Solution**: Complete theme system from scratch
+
 - Added theme state management
 - Created Moon/Sun icon toggle UI
 - Implemented document.documentElement class manipulation
 - Saved theme preference to database
 
 **Files Modified**:
+
 - `frontend/app/(dashboard)/settings/page.tsx`:
   - Added `theme` state (`'dark' | 'light'`)
   - Added useEffect to apply theme classes
@@ -1103,26 +1293,31 @@ return NextResponse.json({
   - Integrated with settings save API
 
 **Code Added**:
+
 ```typescript
-const [theme, setTheme] = useState<'dark' | 'light'>('dark');
+const [theme, setTheme] = useState<"dark" | "light">("dark");
 
 useEffect(() => {
-  if (theme === 'light') {
-    document.documentElement.classList.add('light');
-    document.documentElement.classList.remove('dark');
+  if (theme === "light") {
+    document.documentElement.classList.add("light");
+    document.documentElement.classList.remove("dark");
   } else {
-    document.documentElement.classList.add('dark');
-    document.documentElement.classList.remove('light');
+    document.documentElement.classList.add("dark");
+    document.documentElement.classList.remove("light");
   }
 }, [theme]);
 ```
 
 #### 7. React Hydration Errors Fixed
+
 **Problem**: Console flooded with "Minified React error #425, #418, #423"
-- **Root Cause**: `useState<Date>(new Date())` creates different timestamps on server vs client
+
+- **Root Cause**: `useState<Date>(new Date())` creates different timestamps on
+  server vs client
 - **Impact**: Hydration mismatch between SSR and client
 
 **Solution**: Mounted state pattern
+
 ```typescript
 // Before (WRONG):
 const [lastReading, setLastReading] = useState<Date>(new Date());
@@ -1141,26 +1336,33 @@ if (!mounted) {
 }
 
 // Safe rendering:
-{lastReading ? lastReading.toLocaleTimeString() : '--:--:--'}
+{
+  lastReading ? lastReading.toLocaleTimeString() : "--:--:--";
+}
 ```
 
 **Files Modified**:
+
 - `frontend/app/(dashboard)/dashboard/page.tsx` - Hydration fix pattern
 
 #### 8. Favicon Creation
+
 **Problem**: Missing favicon (404 error)
 
 **Solution**: Created professional SVG favicon
+
 - Green leaf design with gradient
 - Matches GrowPi branding
 - SVG format for scalability
 
 **Files Created**:
+
 - `frontend/public/favicon.svg` - Vector leaf icon with veins
 
 ### Current Status ✅
 
 #### ✅ Working Features
+
 - [x] User authentication (login/logout)
 - [x] Dashboard with sensor data display
 - [x] Real-time data fetching (5s interval)
@@ -1176,6 +1378,7 @@ if (!mounted) {
 - [x] Favicon
 
 #### ✅ Fixed Issues
+
 - [x] Login redirect loop (cookie security)
 - [x] Settings 500 error (field mapping)
 - [x] React hydration errors (mounted state)
@@ -1185,6 +1388,7 @@ if (!mounted) {
 - [x] Favicon 404 (SVG created)
 
 #### 📊 Deployment Metrics
+
 - Database: PostgreSQL 16 with 2,592 sensor readings
 - Build: Successful (Next.js production build)
 - PM2 Status: Online (restart count: 4, uptime: stable)
@@ -1194,16 +1398,19 @@ if (!mounted) {
 ### Outstanding Issues & Next Steps
 
 #### 🔍 Needs User Testing
+
 1. **Theme Toggle** - Just deployed, awaiting user confirmation
 2. **Hydration Errors** - Fix deployed, needs console verification
 3. **Favicon Display** - Needs browser refresh test
 
 #### ⚠️ Known Limitations
+
 1. **HTTP only** - No HTTPS certificate yet (cookie `secure: false`)
 2. **Demo data only** - No real Raspberry Pi connection yet
 3. **No real-time updates** - Polling only (no WebSocket)
 
 #### 🎯 Future Enhancements (Not Yet Requested)
+
 - [ ] HTTPS/SSL certificate setup
 - [ ] Raspberry Pi sensor integration (actual hardware)
 - [ ] WebSocket for real-time updates
@@ -1249,23 +1456,27 @@ VPS (5.182.17.148):
 ### Technical Decisions
 
 #### Why Prisma over Raw SQL?
+
 - Type safety with TypeScript
 - Automatic migrations
 - Clear schema documentation
 - Built-in connection pooling
 
 #### Why PM2 over systemd?
+
 - Easy process management
 - Built-in log rotation
 - Cluster mode support
 - Ecosystem configuration
 
 #### Why Port 3001?
+
 - Port 3000 occupied by Docker
 - Avoids conflict with other services
 - NGINX handles external port 80
 
 ### Dependencies Added
+
 ```json
 {
   "@prisma/client": "^5.x",
@@ -1276,6 +1487,7 @@ VPS (5.182.17.148):
 ```
 
 ### Environment Variables Required
+
 ```bash
 DATABASE_URL="postgresql://growpi_user:password@localhost:5432/growpi"
 JWT_SECRET="growpi_jwt_secret_production_2025_change_me"
@@ -1284,6 +1496,7 @@ NODE_ENV="production"
 ```
 
 ### Deployment Commands
+
 ```bash
 # Local build & deploy
 npm run build
@@ -1297,8 +1510,10 @@ pm2 restart growpi
 ```
 
 ### User Feedback Highlights
+
 - "Warum bist du heute so faul?" → Prompted complete theme system implementation
-- "Keine Quick Fix oder so, das muss eine professionelle Lösung sein" → Drove proper architectural decisions
+- "Keine Quick Fix oder so, das muss eine professionelle Lösung sein" → Drove
+  proper architectural decisions
 - "Ich muss die beim Kunden zeigen" → Production-ready requirement confirmed
 
 ---

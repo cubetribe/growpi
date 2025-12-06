@@ -1,0 +1,112 @@
+// Grow-Pi Database Schema
+// Based on the Supabase SQL migration
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  username  String   @unique
+  password  String
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  zones     Zone[]
+
+  @@map("users")
+}
+
+model Zone {
+  id             String          @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name           String
+  userId         String          @map("user_id") @db.Uuid
+  createdAt      DateTime        @default(now()) @map("created_at") @db.Timestamptz(6)
+  user           User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  lampChannels   LampChannel[]
+  sensors        Sensor[]
+  alertConfigs   AlertConfig[]
+  settings       Settings?
+  piConnections  PiConnection[]
+
+  @@map("zones")
+}
+
+model LampChannel {
+  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  zoneId    String   @map("zone_id") @db.Uuid
+  name      String
+  channel   Int      @db.Integer
+  curve     Json     @default("[]")
+  updatedAt DateTime @default(now()) @map("updated_at") @db.Timestamptz(6)
+  zone      Zone     @relation(fields: [zoneId], references: [id], onDelete: Cascade)
+
+  @@unique([zoneId, channel])
+  @@map("lamp_channels")
+}
+
+model Sensor {
+  id             String          @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  zoneId         String          @map("zone_id") @db.Uuid
+  name           String
+  type           String
+  createdAt      DateTime        @default(now()) @map("created_at") @db.Timestamptz(6)
+  zone           Zone            @relation(fields: [zoneId], references: [id], onDelete: Cascade)
+  sensorReadings SensorReading[]
+
+  @@unique([zoneId, type])
+  @@map("sensors")
+}
+
+model SensorReading {
+  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  sensorId  String   @map("sensor_id") @db.Uuid
+  value     Float    @db.DoublePrecision
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  sensor    Sensor   @relation(fields: [sensorId], references: [id], onDelete: Cascade)
+
+  @@index([sensorId, createdAt(sort: Desc)], name: "idx_sensor_readings_sensor_id_created_at")
+  @@map("sensor_readings")
+}
+
+model AlertConfig {
+  id         String  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  zoneId     String  @map("zone_id") @db.Uuid
+  sensorType String  @map("sensor_type")
+  minValue   Float?  @map("min_value") @db.DoublePrecision
+  maxValue   Float?  @map("max_value") @db.DoublePrecision
+  emailAlert Boolean @default(true) @map("email_alert")
+  pushAlert  Boolean @default(true) @map("push_alert")
+  enabled    Boolean @default(true)
+  zone       Zone    @relation(fields: [zoneId], references: [id], onDelete: Cascade)
+
+  @@unique([zoneId, sensorType])
+  @@map("alert_configs")
+}
+
+model Settings {
+  id             String  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  zoneId         String  @unique @map("zone_id") @db.Uuid
+  sensorInterval Int     @default(60) @map("sensor_interval") @db.Integer
+  demoMode       Boolean @default(true) @map("demo_mode")
+  language       String  @default("de")
+  theme          String  @default("dark")
+  zone           Zone    @relation(fields: [zoneId], references: [id], onDelete: Cascade)
+
+  @@map("settings")
+}
+
+model PiConnection {
+  id            String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  zoneId        String    @map("zone_id") @db.Uuid
+  apiKey        String    @unique @map("api_key")
+  lastHeartbeat DateTime? @map("last_heartbeat") @db.Timestamptz(6)
+  status        String    @default("offline")
+  createdAt     DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  zone          Zone      @relation(fields: [zoneId], references: [id], onDelete: Cascade)
+
+  @@map("pi_connections")
+}

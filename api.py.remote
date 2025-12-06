@@ -51,12 +51,8 @@ except ImportError:
 # Try to import database module
 DB_AVAILABLE = False
 try:
-    try:
-        from ..database import get_database, get_logger, DataLogger
-        from ..database.models import SensorType
-    except ImportError:
-        from grow_pi.database import get_database, get_logger, DataLogger
-        from grow_pi.database.models import SensorType
+    from database import get_database, get_logger, DataLogger
+    from database.models import SensorType
     DB_AVAILABLE = True
 except ImportError:
     logging.warning("Database module not available - logging disabled")
@@ -65,10 +61,7 @@ except ImportError:
 CURVE_AVAILABLE = False
 curve_controller_module = None
 try:
-    try:
-        from ..utils.curve_controller import CurveController, get_curve_controller
-    except ImportError:
-        from grow_pi.utils.curve_controller import CurveController, get_curve_controller
+    from utils.curve_controller import CurveController, get_curve_controller
     CURVE_AVAILABLE = True
 except ImportError as e:
     logging.warning(f"CurveController not available - curve features disabled: {e}")
@@ -109,11 +102,7 @@ def load_lamp_channels():
     """Load lamp channels from config file"""
     global LAMP_CHANNELS
     try:
-        try:
-            from ..config import load_config
-        except ImportError:
-            from grow_pi.config import load_config
-            
+        from config import load_config
         config = load_config()
         # Colors: Far Red, Warm White, Cool White, UV
         colors = ["#ff4444", "#ffbb44", "#88ddff", "#cc66ff"]
@@ -183,7 +172,7 @@ if DHT_AVAILABLE:
         logger.error(f"Failed to initialize DHT22: {e}")
 
 # Initialize DataLogger
-data_logger: Optional['DataLogger'] = None
+data_logger: Optional[DataLogger] = None
 if DB_AVAILABLE:
     try:
         db = get_database()
@@ -193,7 +182,7 @@ if DB_AVAILABLE:
         logger.error(f"Failed to initialize DataLogger: {e}")
 
 # Initialize CurveController
-curve_controller: Optional['CurveController'] = None
+curve_controller: Optional[CurveController] = None
 if CURVE_AVAILABLE and DB_AVAILABLE:
     try:
         channels = {ch: cfg.name for ch, cfg in LAMP_CHANNELS.items()}
@@ -327,14 +316,6 @@ atexit.register(stop_data_logger)
 @app.route('/')
 def serve_frontend():
     """Serve the frontend HTML"""
-    return send_from_directory(STATIC_DIR, 'index.html')
-
-
-@app.route('/<path:path>')
-def serve_static(path):
-    """Serve static files or fallback to index.html for SPA routing"""
-    if os.path.exists(os.path.join(STATIC_DIR, path)):
-        return send_from_directory(STATIC_DIR, path)
     return send_from_directory(STATIC_DIR, 'index.html')
 
 

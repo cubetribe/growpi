@@ -243,22 +243,22 @@ lamps:
     channels:
         - channel: 1
           name: "Far Red"
-          gpio_pin: 16  # Pin 36
+          gpio_pin: 16 # Pin 36
           pwm_frequency: 1000
 
         - channel: 2
           name: "Warm White"
-          gpio_pin: 13  # Pin 33
+          gpio_pin: 13 # Pin 33
           pwm_frequency: 1000
 
         - channel: 3
           name: "Cool White"
-          gpio_pin: 12  # Pin 32
+          gpio_pin: 12 # Pin 32
           pwm_frequency: 1000
 
         - channel: 4
           name: "UV"
-          gpio_pin: 18  # Pin 12
+          gpio_pin: 18 # Pin 12
           pwm_frequency: 1000
 
 # Offline Mode
@@ -294,7 +294,30 @@ GROW_PI_LOG_LEVEL=DEBUG
 
 ---
 
-## 5. Core Components
+## 5. System Hardening (Added 2025-12-06)
+
+### 5.1 Backup Strategy
+
+- **Script**: `/home/admin/pi-controller/scripts/backup.sh`
+- **Schedule**: Daily at 03:00 (via Cron)
+- **Content**:
+  - `/opt/grow-pi/config/config.yaml`
+  - `/opt/grow-pi/data/growpi.db`
+- **Location**: `/home/admin/backups/YYYY-MM-DD/`
+- **Retention**: 30 days
+
+### 5.2 Hardware Watchdog
+
+- **Daemon**: `watchdog` service
+- **Hardware**: BCM2835 Watchdog Timer (`dtparam=watchdog=on`)
+- **Monitoring**:
+  - System Load (max 24)
+  - Service Health (systemd)
+- **Action**: Auto-reboot on system freeze
+
+---
+
+## 6. Core Components
 
 ### 5.1 Sensor Manager
 
