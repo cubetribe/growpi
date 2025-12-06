@@ -3,8 +3,11 @@
 Professional greenhouse automation and monitoring platform powered by Raspberry Pi.
 
 **Live Demo**: http://growpi.nm-forum.de
-**Version**: v6.8.0 (2025-12-06)
+**Version**: v6.8.1 (2025-12-06)
 **Status**: Production-Ready
+
+> **Note**: This repository contains the **Raspberry Pi backend** (pi-controller).
+> The **Next.js Web Frontend** has been moved to: [cubetribe/growpi_web_public](https://github.com/cubetribe/growpi_web_public)
 
 ---
 
@@ -217,22 +220,27 @@ See [CHANGELOG.md](CHANGELOG.md) for complete history.
 
 ```
 GrowPi/
-├── pi-controller/          # Backend Python code
+├── pi-controller/          # Raspberry Pi Backend
 │   ├── grow_pi/
 │   │   ├── controllers/    # Hardware controllers
-│   │   ├── web/           # Flask app + blueprints
-│   │   └── utils/         # Utilities
-│   ├── tests/             # Unit tests (140 tests)
-│   └── smoke_test.sh      # API smoke tests
-├── frontend/              # Next.js dashboard (VPS)
-├── docs/                  # Documentation
-│   ├── refactoring/      # Refactoring reports
+│   │   ├── database/       # SQLite + migrations
+│   │   ├── web/            # Flask app + blueprints
+│   │   │   ├── blueprints/ # API endpoints
+│   │   │   └── static/     # Embedded web UI
+│   │   └── utils/          # Utilities
+│   ├── tests/              # Unit tests (140 tests)
+│   └── smoke_test.sh       # API smoke tests
+├── docs/                   # Documentation
 │   ├── ARCHITECTURE.md
+│   ├── ROADMAP.md
 │   └── DEPLOYMENT_GUIDE.md
-├── agents/               # Agent reports
-├── CHANGELOG.md          # Version history
-└── CLAUDE.md             # Claude Code instructions
+├── agents/                 # AI Agent reports
+├── CHANGELOG.md            # Version history
+└── CLAUDE.md               # Claude Code instructions
 ```
+
+> **Frontend**: The Next.js web dashboard is in a separate repository:
+> [cubetribe/growpi_web_public](https://github.com/cubetribe/growpi_web_public)
 
 ---
 
@@ -268,19 +276,19 @@ GrowPi/
 
 ## Tech Stack
 
-### Frontend (VPS Dashboard)
-- **Framework**: Next.js 13.5.1 (App Router)
-- **Language**: TypeScript (strict mode)
-- **Database**: PostgreSQL (Prisma ORM)
-- **UI**: shadcn/ui + TailwindCSS
-- **Charts**: Recharts
-
-### Backend (Raspberry Pi)
+### Backend (Raspberry Pi) - This Repository
 - **Runtime**: Python 3.13
 - **Framework**: Flask + Blueprints
 - **GPIO**: pigpio (hardware PWM)
 - **Sensors**: adafruit-circuitpython-dht
 - **Database**: SQLite (local logging)
+
+### Frontend (Separate Repository)
+- **Repository**: [cubetribe/growpi_web_public](https://github.com/cubetribe/growpi_web_public)
+- **Framework**: Next.js 13.5.1 (App Router)
+- **Language**: TypeScript (strict mode)
+- **Database**: PostgreSQL (Prisma ORM)
+- **UI**: shadcn/ui + TailwindCSS
 
 ---
 
@@ -306,4 +314,4 @@ Orchestrated with Claude Code (17 parallel agents for v6.5 refactoring)
 ---
 
 **Last Updated**: 2025-12-06
-**Version**: v6.8.0
+**Version**: v6.8.1

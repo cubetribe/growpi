@@ -2,6 +2,37 @@
 
 ---
 
+## v6.8.1 (2025-12-06) - Repository Cleanup
+
+**🗂️ Repository Reorganization**
+
+### Frontend Extracted to Separate Repository
+- **New Repository**: [cubetribe/growpi_web_public](https://github.com/cubetribe/growpi_web_public)
+- Removed `frontend/` directory from this repository
+- This repo now focuses exclusively on **Raspberry Pi backend**
+
+### Why This Change?
+- Clearer separation of concerns (Pi backend vs. VPS frontend)
+- Avoid confusion between two frontend implementations:
+  - `pi-controller/grow_pi/web/static/` - Embedded Pi Web UI (Flask-served)
+  - `frontend/` (now separate repo) - Next.js dashboard for VPS deployment
+- Easier deployment and maintenance
+
+### Repository Structure After Cleanup
+```
+GrowPi/ (this repo)
+├── pi-controller/     # Raspberry Pi backend + embedded web UI
+├── docs/              # Documentation
+├── agents/            # AI agent reports
+└── CHANGELOG.md
+```
+
+### Known Issue
+- `/api/curves/*` endpoints returning 503 (CurveController not initializing)
+- Debugging in progress
+
+---
+
 ## v6.8.0 (2025-12-06) - Feature Pack: Usability & Automation
 
 **🎯 Features Implemented (4 parallel agents)**
