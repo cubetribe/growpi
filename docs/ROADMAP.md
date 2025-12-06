@@ -1,7 +1,7 @@
 # GrowPi Roadmap - Geplante Features
 
-**Letzte Aktualisierung**: 2025-12-05
-**Status**: Planning Phase
+**Letzte Aktualisierung**: 2025-12-06
+**Status**: Phase 2 abgeschlossen, Phase 1 in Arbeit
 **Platform**: Raspberry Pi 3B+ @ 192.168.0.86
 
 ---
@@ -12,248 +12,160 @@ Dieses Dokument definiert geplante Funktionen für das GrowPi-System in priorisi
 
 ---
 
-## Phase 1: Kosten-Monitoring & Energie-Tracking
+## Phase 2: Schaltbare Geräte & Automatisierung ✅ ABGESCHLOSSEN
+
+### Feature 2.1: Tuya Smart Plug Integration ✅
+
+**Status**: FERTIG (2025-12-06)
+
+**Implementiert**:
+- TuyaCloudService für Smart Plug Steuerung via Cloud API
+- Unterstützung für WiFi und BLE Steckdosen
+- 6 Geräte verbunden (Main Light, Wohnzimmer, Mittags Sonne, FR main, ANTELA, Pumpe)
+
+**Dateien**:
+- `utils/tuya_cloud.py` - Tuya Cloud API Service
+
+### Feature 2.2: Entfeuchter-Automatik ✅
+
+**Status**: FERTIG (2025-12-06)
+
+**Implementiert**:
+- Neue "Room" Seite im Web-Interface
+- Live Temperatur & Luftfeuchtigkeit vom DHT22
+- Hysterese-Logik: AN wenn > threshold_high, AUS wenn < threshold_low
+- Konfigurierbar: Sollwert, oberer/unterer Schwellwert
+- Minimale Lauf-/Auszeit zum Kompressorschutz
+- Manuell AN/AUS + Automatik-Toggle
+- Manuelle Buttons deaktiviert bei Automatik-Modus
+- Startup-Sync: Echter Steckdosen-Status wird beim Start von Cloud abgefragt
+
+**Dateien**:
+- `utils/dehumidifier_controller.py` - Hysterese Controller
+- `config/room_config.json` - Konfiguration
+- `web/api.py` - Room API Endpoints
+- `web/static/index.html` - Room Tab UI
+
+**Default-Konfiguration**:
+```json
+{
+  "dehumidifier": {
+    "enabled": true,
+    "target": 60.0,
+    "threshold_high": 65.0,
+    "threshold_low": 55.0,
+    "device_id": "bfc705014c6241667avzn8",
+    "min_run_time": 60,
+    "min_off_time": 60
+  }
+}
+```
+
+---
+
+## Phase 1: Kosten-Monitoring & Energie-Tracking 🔄 IN ARBEIT
 
 ### Feature 1.1: Stromverbrauch-Messung & Kosten-Anzeige
 
 **Ziel**: Energiekosten transparent darstellen und Verbrauch analysieren
 
+#### Datenquellen
+
+**Bereits verfügbar**:
+- Tuya Smart Plugs liefern Power-Daten (Watt, Volt, Ampere)
+- `TuyaCloudService.get_device_status()` gibt `cur_power`, `cur_voltage`, `cur_current` zurück
+- Daten werden bereits in `plug_logs` Tabelle gespeichert
+
+**Bestehende Datenbank-Tabelle** (`database/db.py`):
+```sql
+plug_logs (
+    id TEXT PRIMARY KEY,
+    timestamp DATETIME,
+    plug_id TEXT,
+    plug_name TEXT,
+    switch_state INTEGER,
+    power REAL,      -- Watt
+    voltage REAL,    -- Volt
+    current REAL,    -- Ampere
+    synced_at DATETIME
+)
+```
+
 #### Anforderungen
 
-**Messung**:
-- Stromverbrauch in Watt/kWh erfassen
-- Timestamp-basierte Speicherung in SQLite
-- Kontinuierliche Messung mit konfigurierbarem Intervall
-
 **Kostenberechnung**:
-- Kilowattstunden-Preis (€/kWh) konfigurierbar
-- Automatische Berechnung:
-  - Tageskosten
-  - Monatskosten
-  - Jahreskosten
-- Historische Kosten-Trends
+- kWh-Preis (€/kWh) konfigurierbar in Settings
+- Berechnung aus Watt-Messungen über Zeit
+- Aggregation: Heute, Diese Woche, Dieser Monat, Dieses Jahr
 
 **UI/UX**:
-- Integration in bestehende Statistik-Seite (Web-Interface)
-- Kosten-Anzeige unter Sensor-Verlaufs-Charts
-- Eingabefeld für kWh-Preis in Settings
-- Kosten-Breakdown: Heute / Dieser Monat / Dieses Jahr
+- Neuer Tab "Kosten" oder Integration in "Verlauf"
+- Kosten-Übersicht mit Breakdown pro Gerät
+- Historische Trends als Chart
+- Settings: kWh-Preis Eingabe
 
 #### Technische Umsetzung
 
 **Datenbank-Erweiterung**:
 ```sql
-CREATE TABLE power_readings (
-    id INTEGER PRIMARY KEY,
-    timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
-    watt REAL,              -- Aktuelle Leistung in Watt
-    kwh_cumulative REAL     -- Kumulierte kWh seit Start
-);
+-- Neue Settings-Spalte
+ALTER TABLE settings ADD COLUMN kwh_price REAL DEFAULT 0.30;
 
-CREATE TABLE settings (
-    -- Bestehende Felder...
-    kwh_price REAL DEFAULT 0.30  -- €/kWh (default: 30 Cent)
-);
+-- Aggregations-View (optional)
+CREATE VIEW daily_power_consumption AS
+SELECT
+    date(timestamp) as date,
+    plug_name,
+    SUM(power * 60 / 3600 / 1000) as kwh  -- Watt → kWh (60s Intervall)
+FROM plug_logs
+GROUP BY date(timestamp), plug_name;
 ```
 
-**API-Endpunkte**:
-- `GET /api/power/current` - Aktueller Verbrauch (W)
-- `GET /api/power/history?range=24h` - Verlauf
-- `GET /api/power/costs?period=day|month|year` - Kosten-Aggregation
-- `POST /api/settings/kwh_price` - Preis aktualisieren
+**Neue API-Endpunkte**:
+- `GET /api/costs/summary` - Kosten-Übersicht (Tag/Woche/Monat/Jahr)
+- `GET /api/costs/history?range=7d` - Historische Kosten
+- `GET /api/costs/by-device` - Kosten pro Gerät
+- `GET /api/settings/kwh_price` - Preis lesen
+- `POST /api/settings/kwh_price` - Preis setzen
+
+**Berechnungslogik**:
+```python
+def calculate_kwh(power_readings: List[PlugLog], interval_seconds: int = 60) -> float:
+    """
+    Berechnet kWh aus Watt-Messungen.
+
+    Formel: kWh = Σ(Watt × Intervall_in_Stunden)
+    Bei 60s Intervall: kWh = Σ(Watt × (60/3600)) = Σ(Watt / 60)
+    """
+    total_kwh = 0
+    for reading in power_readings:
+        watt_hours = reading.power * (interval_seconds / 3600)
+        total_kwh += watt_hours / 1000  # Wh → kWh
+    return total_kwh
+
+def calculate_cost(kwh: float, price_per_kwh: float) -> float:
+    """Berechnet Kosten in Euro."""
+    return kwh * price_per_kwh
+```
 
 **Frontend**:
-- Neue Komponente: `PowerCostWidget`
-- Kosten-Chart mit Recharts (Balkendiagramm)
-- Settings-Formular für kWh-Preis
+- Kosten-Widget mit Tabs: Heute | Woche | Monat | Jahr
+- Balkendiagramm (Recharts) mit täglichen Kosten
+- Tortendiagramm für Kosten-Verteilung pro Gerät
+- Settings: Eingabefeld für kWh-Preis (Default: 0.30 €)
 
 #### Akzeptanzkriterien
 
-- [ ] Stromverbrauch wird sekündlich gemessen und gespeichert
 - [ ] kWh-Preis kann in Settings gespeichert werden
-- [ ] Tageskosten werden korrekt berechnet (00:00 - 23:59)
-- [ ] Monatskosten summieren alle Tage des aktuellen Monats
-- [ ] Jahreskosten summieren alle Monate des aktuellen Jahres
-- [ ] Kosten-Widget zeigt Echtzeit-Updates (Auto-Refresh)
-- [ ] Historische Kosten können als Chart angezeigt werden
+- [ ] Tageskosten werden korrekt aus plug_logs berechnet
+- [ ] Wochenkosten aggregieren 7 Tage
+- [ ] Monatskosten aggregieren alle Tage des aktuellen Monats
+- [ ] Kosten pro Gerät werden separat angezeigt
+- [ ] Historische Kosten als Chart (letzte 30 Tage)
+- [ ] Auto-Refresh alle 60 Sekunden
 
 #### Priorität
 **HOCH** - User-Request, klarer Business-Value
-
----
-
-## Phase 2: Schaltbare Geräte & Automatisierung
-
-### Feature 2.1: Bluetooth-Schalter Integration
-
-**Ziel**: Schaltbare Geräte (z.B. Entfeuchter) automatisch steuern
-
-#### Anforderungen
-
-**Hardware**:
-- Bluetooth-fähiger Schalter (bereits vorhanden & getestet)
-- Steuerung via Raspberry Pi Bluetooth
-- Ein/Aus-Schaltung (nicht PWM)
-
-**Geräte-Typen**:
-- **Entfeuchtungsanlage** (Priorität 1)
-- Weitere Geräte später erweiterbar (Heizung, Lüftung, etc.)
-
-#### Feature 2.2: Entfeuchter-Automatik
-
-**Ziel**: Automatische Feuchtigkeitsregelung mit Hysterese-Logik
-
-#### Konfiguration
-
-**Soll-Wert & Toleranzen**:
-```yaml
-dehumidifier:
-  enabled: true
-  bluetooth_mac: "XX:XX:XX:XX:XX:XX"
-  control_mode: "auto"  # auto | manual | off
-
-  # Feuchtigkeits-Steuerung
-  target_humidity: 60.0      # Soll-Wert in %
-  start_threshold: 5.0       # Hysterese obere Grenze (+5%)
-  stop_threshold: 2.0        # Hysterese untere Grenze (-2%)
-
-  # Beispiel:
-  # target = 60%
-  # Einschalten bei: 60% + 5% = 65%
-  # Ausschalten bei: 60% - 2% = 58%
-```
-
-**Logik-Regeln**:
-1. **Einschalten**: Wenn `current_humidity > (target + start_threshold)`
-2. **Ausschalten**: Wenn `current_humidity < (target - stop_threshold)`
-3. **Hysterese**: Verhindert häufiges An/Aus-Schalten
-4. **Min-Laufzeit**: Optional, z.B. mindestens 5 Minuten laufen
-
-**UI/UX**:
-- Neuer Tab im Web-Interface: "Automatisierung"
-- Entfeuchter-Karte mit:
-  - Ein/Aus Toggle (manuell)
-  - Auto-Modus Toggle
-  - Soll-Wert Slider (40-80%)
-  - Start-Schwelle Slider (1-10%)
-  - Stop-Schwelle Slider (1-10%)
-  - Aktueller Status: "Aus" | "Läuft" | "Wartet"
-  - Laufzeit-Historie (heute, diese Woche)
-
-#### Technische Umsetzung
-
-**Datenbank-Erweiterung**:
-```sql
-CREATE TABLE switchable_devices (
-    id INTEGER PRIMARY KEY,
-    name TEXT,                      -- "Entfeuchter"
-    type TEXT,                      -- "dehumidifier"
-    bluetooth_mac TEXT,
-    enabled BOOLEAN DEFAULT 1
-);
-
-CREATE TABLE device_automation_config (
-    id INTEGER PRIMARY KEY,
-    device_id INTEGER,
-    control_mode TEXT,              -- "auto" | "manual" | "off"
-    target_value REAL,              -- Soll-Wert (z.B. 60% Luftfeuchtigkeit)
-    start_threshold REAL,           -- Einschalt-Schwelle (+5%)
-    stop_threshold REAL,            -- Ausschalt-Schwelle (-2%)
-    FOREIGN KEY (device_id) REFERENCES switchable_devices(id)
-);
-
-CREATE TABLE device_states (
-    id INTEGER PRIMARY KEY,
-    timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
-    device_id INTEGER,
-    state TEXT,                     -- "on" | "off"
-    trigger_reason TEXT,            -- "manual" | "auto_humidity_high" | "auto_humidity_low"
-    FOREIGN KEY (device_id) REFERENCES switchable_devices(id)
-);
-```
-
-**Python Controller**:
-```python
-# grow_pi/devices/bluetooth_switch.py
-class BluetoothSwitch:
-    def __init__(self, mac_address: str):
-        self.mac = mac_address
-
-    def turn_on(self) -> bool:
-        # Bluetooth-Befehl senden
-        pass
-
-    def turn_off(self) -> bool:
-        # Bluetooth-Befehl senden
-        pass
-
-    def get_state(self) -> bool:
-        # Status abfragen
-        pass
-
-# grow_pi/automation/dehumidifier_controller.py
-class DehumidifierController:
-    def __init__(self, config, switch, sensor):
-        self.config = config
-        self.switch = switch
-        self.sensor = sensor
-        self.last_state = False
-        self.last_change_time = None
-
-    def update(self):
-        """Wird jede Sekunde aufgerufen"""
-        if self.config.control_mode != "auto":
-            return
-
-        current_humidity = self.sensor.get_humidity()
-        target = self.config.target_value
-
-        # Hysterese-Logik
-        if current_humidity > (target + self.config.start_threshold):
-            if not self.last_state:
-                self.switch.turn_on()
-                self.log_state_change("on", "auto_humidity_high")
-
-        elif current_humidity < (target - self.config.stop_threshold):
-            if self.last_state:
-                self.switch.turn_off()
-                self.log_state_change("off", "auto_humidity_low")
-```
-
-**API-Endpunkte**:
-- `GET /api/devices` - Liste schaltbarer Geräte
-- `POST /api/devices/<id>/toggle` - Manuell ein/aus
-- `GET /api/devices/<id>/config` - Automation-Config
-- `POST /api/devices/<id>/config` - Config aktualisieren
-- `GET /api/devices/<id>/history?hours=24` - Schalt-Historie
-
-**Integration in main.py**:
-```python
-# In grow_pi/main.py run() loop
-dehumidifier_controller = DehumidifierController(...)
-
-while True:
-    # ... bestehende Logik ...
-
-    # Automatisierung aktualisieren (jede Sekunde)
-    dehumidifier_controller.update()
-
-    time.sleep(1)
-```
-
-#### Akzeptanzkriterien
-
-- [ ] Bluetooth-Schalter kann manuell ein-/ausgeschaltet werden (API)
-- [ ] Soll-Wert für Luftfeuchtigkeit kann gespeichert werden
-- [ ] Start-Schwelle und Stop-Schwelle sind konfigurierbar
-- [ ] Auto-Modus schaltet Entfeuchter basierend auf Hysterese
-- [ ] Mindestens 1 Minute zwischen Schaltvorgängen (Schutz)
-- [ ] Schalt-Historie wird in Datenbank gespeichert
-- [ ] Web-UI zeigt aktuellen Status und Konfiguration
-- [ ] Trigger-Grund wird geloggt (manual vs. auto)
-
-#### Priorität
-**MITTEL-HOCH** - Hardware vorhanden, klarer Use-Case
 
 ---
 
@@ -266,66 +178,45 @@ while True:
 - **Feature 3.3**: Sensor-basierte Trigger (z.B. Heizung bei <18°C)
 - **Feature 3.4**: Push-Benachrichtigungen (Telegram/Email)
 - **Feature 3.5**: VPD-Optimierung (Vapor Pressure Deficit)
+- **Feature 3.6**: Bewässerungssteuerung (Pumpe nach Zeitplan/Bodenfeuchtigkeit)
 
 ---
 
 ## Implementierungs-Reihenfolge
 
-### Vorgeschlagene Reihenfolge
+### Abgeschlossen ✅
 
-1. **Phase 1.1**: Kosten-Monitoring (1-2 Tage)
-   - Stromverbrauch-Messung
+1. **Phase 2.1**: Tuya Smart Plug Integration ✅
+2. **Phase 2.2**: Entfeuchter-Automatik ✅
+
+### Aktuell 🔄
+
+3. **Phase 1.1**: Kosten-Monitoring
    - kWh-Preis-Konfiguration
-   - Kosten-Anzeige im Dashboard
+   - Kosten-Berechnung aus plug_logs
+   - Kosten-Tab im Web-Interface
 
-2. **Phase 2.1**: Bluetooth-Schalter (1 Tag)
-   - Python Bluetooth-Integration
-   - Manuelles Ein/Aus via API
-   - Status-Anzeige
+### Geplant 📋
 
-3. **Phase 2.2**: Entfeuchter-Automatik (2-3 Tage)
-   - Hysterese-Logik
-   - Auto-Modus Konfiguration
-   - UI für Soll-Wert & Schwellen
-
-4. **Testing & Optimierung** (1-2 Tage)
-   - Reale Lasttests mit Entfeuchter
-   - Hysterese-Parameter optimieren
-   - Kosten-Berechnung validieren
-
-**Geschätzte Gesamtdauer**: 5-8 Arbeitstage
+4. **Phase 3.x**: Erweiterte Automatisierung
+   - Nach Bedarf priorisieren
 
 ---
 
 ## Offene Fragen
 
 1. **Stromverbrauch-Messung**:
-   - Welcher Sensor wird verwendet? (z.B. Shelly Plug, PZEM-004T)
-   - Ist der Sensor bereits vorhanden?
-   - Wo wird gemessen? (Gesamtstrom oder pro Gerät?)
+   - ✅ **Quelle**: Tuya Smart Plugs mit Power-Monitoring
+   - ✅ **Speicherung**: plug_logs Tabelle (60s Intervall)
+   - Frage: Alle Plugs messen Power oder nur bestimmte?
 
-2. **Bluetooth-Schalter**:
-   - ✅ **Modell**: Tuya-Smart Bluetooth Steckdosen
-   - ✅ **Python-Code**: Bereits im Projekt integriert
-   - ✅ **Status**: Getestet und funktionsfähig
+2. **Kosten-Berechnung**:
+   - Default kWh-Preis: 0.30 € (ca. deutscher Durchschnitt)
+   - Soll es verschiedene Tarife geben (Tag/Nacht)?
 
-3. **Entfeuchter**:
-   - Max. Schaltfrequenz? (z.B. max. 6x/Stunde)
-   - Min. Laufzeit pro Zyklus?
-   - Leistungsaufnahme für Kosten-Tracking?
-
-4. **UI-Platzierung**:
-   - Neuer Tab "Automatisierung" oder Integration in bestehendes Dashboard?
-   - Mobil-optimiert wie bisheriges Interface?
-
----
-
-## Nächste Schritte
-
-1. **Klärung offener Fragen** (siehe oben)
-2. **Hardware-Spezifikation dokumentieren**
-3. **Phase 1.1 starten**: Kosten-Monitoring
-4. **Prototyp für Bluetooth-Schalter testen**
+3. **UI-Platzierung**:
+   - Neuer Tab "Kosten" oder in "Verlauf" integrieren?
+   - Separate Mobile-Ansicht nötig?
 
 ---
 
@@ -333,5 +224,5 @@ while True:
 
 | Datum | Änderung | Autor |
 |-------|----------|-------|
+| 2025-12-06 | Phase 2 (Entfeuchter) abgeschlossen, Roadmap aktualisiert | Dennis + Claude |
 | 2025-12-05 | Initial Draft - Phase 1 & 2 definiert | Dennis + Claude |
-

@@ -1,0 +1,23 @@
+{
+  "dehumidifier": {
+    "enabled": true,
+    "target": 60.0,
+    "threshold_high": 65.0,
+    "threshold_low": 55.0,
+    "device_id": "bfc705014c6241667avzn8",
+    "min_run_time": 60,
+    "min_off_time": 60
+  },
+  "costs": {
+    "kwh_price": 0.30,
+    "currency": "EUR"
+  },
+  "devices": {
+    "bf36487f67d7bb8fc18buj": "Main Light",
+    "bfcf3ba95588e232b08mg6": "Wohnzimmer",
+    "bfbbc4e059a6ae812csbyq": "Mittags Sonne",
+    "bfc332c0bf2f53a5cc23uz": "FR main",
+    "bfc705014c6241667avzn8": "Entfeuchter",
+    "bfad1a5081fa6a2342j7ye": "Pumpe"
+  }
+}

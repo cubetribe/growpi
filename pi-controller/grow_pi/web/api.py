@@ -15,13 +15,14 @@ Endpoints:
 
 from flask import Flask, jsonify, request, send_from_directory
 from flask_cors import CORS
+import json
 import logging
 import os
 import sys
 import atexit
 from typing import Dict, Tuple, Optional
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timedelta
 
 # Add parent directory for imports
 # Add parent directory for imports
@@ -303,6 +304,17 @@ def start_data_logger():
         logger.info("DataLogger started")
 
 
+def start_dehumidifier_controller():
+    """Start the dehumidifier controller with automatic humidity control."""
+    controller = _get_dehumidifier()
+    if controller:
+        # Start automatic control loop (checks every 10 seconds)
+        controller.start(check_interval=10)
+        logger.info("DehumidifierController started (check_interval: 10s)")
+    else:
+        logger.warning("DehumidifierController not available - skipping startup")
+
+
 def stop_data_logger():
     """Stop the data logger gracefully."""
     global data_logger
@@ -316,8 +328,17 @@ def stop_data_logger():
         logger.info("DataLogger stopped")
 
 
-# Register shutdown handler
+def stop_dehumidifier_controller():
+    """Stop the dehumidifier controller gracefully."""
+    controller = _get_dehumidifier()
+    if controller:
+        controller.stop()
+        logger.info("DehumidifierController stopped")
+
+
+# Register shutdown handlers
 atexit.register(stop_data_logger)
+atexit.register(stop_dehumidifier_controller)
 
 
 # ============================================================================
@@ -848,6 +869,370 @@ def health_check():
 
 
 # ============================================================================
+# Room API Routes (Dehumidifier Control)
+# ============================================================================
+
+# Try to import dehumidifier controller
+DEHUMIDIFIER_AVAILABLE = False
+dehumidifier_controller = None
+try:
+    try:
+        from ..utils.dehumidifier_controller import get_dehumidifier_controller
+    except ImportError:
+        from grow_pi.utils.dehumidifier_controller import get_dehumidifier_controller
+    DEHUMIDIFIER_AVAILABLE = True
+except ImportError as e:
+    logging.warning(f"DehumidifierController not available: {e}")
+
+
+def _get_dehumidifier():
+    """Get or initialize dehumidifier controller with humidity reader."""
+    global dehumidifier_controller
+    if DEHUMIDIFIER_AVAILABLE and dehumidifier_controller is None:
+        dehumidifier_controller = get_dehumidifier_controller()
+        # Set humidity reader
+        def humidity_reader():
+            _, humidity = read_dht22()
+            return humidity
+        dehumidifier_controller.set_humidity_reader(humidity_reader)
+    return dehumidifier_controller
+
+
+@app.route('/api/room', methods=['GET'])
+def get_room_status():
+    """Get room status including temperature, humidity, and dehumidifier state"""
+    try:
+        temp, humidity = read_dht22()
+
+        response_data = {
+            "temperature": temp,
+            "humidity": humidity,
+            "timestamp": datetime.now().isoformat()
+        }
+
+        # Add dehumidifier status if available
+        controller = _get_dehumidifier()
+        if controller:
+            response_data["dehumidifier"] = controller.get_status()
+        else:
+            response_data["dehumidifier"] = {"available": False}
+
+        return jsonify(create_response(True, response_data))
+
+    except Exception as e:
+        logger.error(f"Error in get_room_status: {e}")
+        return jsonify(create_response(False, error=str(e))), 500
+
+
+@app.route('/api/room/config', methods=['GET'])
+def get_room_config():
+    """Get room/dehumidifier configuration"""
+    controller = _get_dehumidifier()
+    if not controller:
+        return jsonify(create_response(False, error="Dehumidifier not available")), 503
+
+    try:
+        return jsonify(create_response(True, {
+            "config": controller.get_config()
+        }))
+    except Exception as e:
+        logger.error(f"Error in get_room_config: {e}")
+        return jsonify(create_response(False, error=str(e))), 500
+
+
+@app.route('/api/room/config', methods=['POST'])
+def update_room_config():
+    """Update dehumidifier configuration"""
+    controller = _get_dehumidifier()
+    if not controller:
+        return jsonify(create_response(False, error="Dehumidifier not available")), 503
+
+    if not request.is_json:
+        return jsonify(create_response(False, error="Request must be JSON")), 400
+
+    try:
+        data = request.get_json()
+
+        updated = controller.update_config(
+            enabled=data.get('enabled'),
+            target=data.get('target'),
+            threshold_high=data.get('threshold_high'),
+            threshold_low=data.get('threshold_low'),
+            min_run_time=data.get('min_run_time'),
+            min_off_time=data.get('min_off_time')
+        )
+
+        logger.info(f"Room config updated: {updated}")
+
+        # If auto mode was just enabled, immediately run check_and_control
+        # This ensures the dehumidifier state matches the current humidity
+        control_result = None
+        if data.get('enabled') is True:
+            control_result = controller.check_and_control()
+            if control_result is not None:
+                logger.info(f"Auto-control triggered: {'ON' if control_result else 'OFF'}")
+
+        return jsonify(create_response(True, {
+            "config": updated,
+            "message": "Configuration updated",
+            "auto_control_applied": control_result
+        }))
+
+    except Exception as e:
+        logger.error(f"Error in update_room_config: {e}")
+        return jsonify(create_response(False, error=str(e))), 500
+
+
+@app.route('/api/room/dehumidifier', methods=['POST'])
+def control_dehumidifier():
+    """Manually control dehumidifier (on/off)"""
+    controller = _get_dehumidifier()
+    if not controller:
+        return jsonify(create_response(False, error="Dehumidifier not available")), 503
+
+    if not request.is_json:
+        return jsonify(create_response(False, error="Request must be JSON")), 400
+
+    try:
+        data = request.get_json()
+        action = data.get('action')
+
+        if action == 'on':
+            success = controller.switch_on()
+            message = "Dehumidifier turned ON" if success else "Failed to turn ON"
+        elif action == 'off':
+            success = controller.switch_off()
+            message = "Dehumidifier turned OFF" if success else "Failed to turn OFF"
+        else:
+            return jsonify(create_response(False, error="Action must be 'on' or 'off'")), 400
+
+        return jsonify(create_response(success, {
+            "action": action,
+            "message": message,
+            "status": controller.get_status()
+        }))
+
+    except Exception as e:
+        logger.error(f"Error in control_dehumidifier: {e}")
+        return jsonify(create_response(False, error=str(e))), 500
+
+
+# ============================================================================
+# Costs API
+# ============================================================================
+
+# Load config helper for costs
+def _load_costs_config():
+    """Load costs config from room_config.json"""
+    # Use absolute path resolution for reliability
+    config_file = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'config', 'room_config.json')
+    config_file = os.path.abspath(config_file)
+    try:
+        if os.path.exists(config_file):
+            with open(config_file, 'r') as f:
+                data = json.load(f)
+                devices = data.get('devices', {})
+                return {
+                    'kwh_price': data.get('costs', {}).get('kwh_price', 0.30),
+                    'currency': data.get('costs', {}).get('currency', 'EUR'),
+                    'devices': devices
+                }
+        else:
+            logger.warning(f"Costs config file not found at: {config_file}")
+    except Exception as e:
+        logger.error(f"Error loading costs config from {config_file}: {e}")
+    return {'kwh_price': 0.30, 'currency': 'EUR', 'devices': {}}
+
+
+def _save_costs_config(kwh_price: float):
+    """Save kWh price to config"""
+    config_file = os.path.join(os.path.dirname(__file__), '..', 'config', 'room_config.json')
+    try:
+        data = {}
+        if os.path.exists(config_file):
+            with open(config_file, 'r') as f:
+                data = json.load(f)
+
+        if 'costs' not in data:
+            data['costs'] = {}
+        data['costs']['kwh_price'] = kwh_price
+
+        with open(config_file, 'w') as f:
+            json.dump(data, f, indent=2)
+        return True
+    except Exception as e:
+        logger.error(f"Error saving costs config: {e}")
+        return False
+
+
+@app.route('/api/costs', methods=['GET'])
+def get_costs():
+    """Get power costs summary for all devices
+
+    Query Parameters:
+        period: today, week, month, year, this_month, this_year, custom
+        from: Start date (YYYY-MM-DD) for custom range
+        to: End date (YYYY-MM-DD) for custom range
+    """
+    try:
+        # Get time range from query params
+        period = request.args.get('period', 'today')
+        date_from = request.args.get('from')
+        date_to = request.args.get('to')
+
+        # Calculate time range
+        now = datetime.now()
+        start_time = None
+        end_time = now
+        period_label = period
+
+        if date_from and date_to:
+            # Custom date range
+            try:
+                start_time = datetime.strptime(date_from, '%Y-%m-%d')
+                end_time = datetime.strptime(date_to, '%Y-%m-%d').replace(hour=23, minute=59, second=59)
+                period_label = f"{date_from} bis {date_to}"
+            except ValueError:
+                return jsonify(create_response(False, error="Invalid date format. Use YYYY-MM-DD")), 400
+        elif period == 'today':
+            start_time = now.replace(hour=0, minute=0, second=0, microsecond=0)
+        elif period == 'week':
+            start_time = now - timedelta(days=7)
+        elif period == 'month':
+            start_time = now - timedelta(days=30)
+        elif period == 'this_month':
+            # First day of current month
+            start_time = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+            period_label = f"Dieser Monat ({start_time.strftime('%B %Y')})"
+        elif period == 'this_year':
+            # First day of current year
+            start_time = now.replace(month=1, day=1, hour=0, minute=0, second=0, microsecond=0)
+            period_label = f"Dieses Jahr ({now.year})"
+        elif period == 'year':
+            start_time = now - timedelta(days=365)
+        else:
+            start_time = now - timedelta(days=1)
+
+        # Calculate hours for database query
+        hours = int((end_time - start_time).total_seconds() / 3600) + 1
+
+        # Load config
+        config = _load_costs_config()
+        kwh_price = config['kwh_price']
+        device_names = config['devices']
+
+        # Get plug logs from database
+        if db:
+            logs = db.get_plug_logs(hours=int(hours), limit=100000)
+        else:
+            logs = []
+
+        # Calculate costs per device
+        # Group logs by device_id
+        device_power = {}  # device_id -> list of power readings
+        for log in logs:
+            # PlugLog is a dataclass, access attributes directly
+            device_id = log.device_id
+            if device_id not in device_power:
+                device_power[device_id] = []
+            device_power[device_id].append(log.power or 0)
+
+        # Calculate kWh and costs for each device
+        # Assuming 60 second intervals between readings
+        interval_hours = 60 / 3600  # 60 seconds in hours
+        devices = []
+        total_kwh = 0
+        total_cost = 0
+
+        for device_id, power_readings in device_power.items():
+            # Sum up energy consumption
+            # kWh = sum(Watt * hours)
+            kwh = sum(p * interval_hours for p in power_readings) / 1000
+            cost = kwh * kwh_price
+
+            total_kwh += kwh
+            total_cost += cost
+
+            # Get current power (latest reading)
+            current_power = power_readings[0] if power_readings else 0
+
+            devices.append({
+                'device_id': device_id,
+                'name': device_names.get(device_id, device_id[:8] + '...'),
+                'current_power': current_power,
+                'kwh': round(kwh, 4),
+                'cost': round(cost, 4),
+                'readings_count': len(power_readings)
+            })
+
+        # Sort by cost (highest first)
+        devices.sort(key=lambda x: x['cost'], reverse=True)
+
+        return jsonify(create_response(True, {
+            'period': period,
+            'period_label': period_label,
+            'date_from': start_time.strftime('%Y-%m-%d') if start_time else None,
+            'date_to': end_time.strftime('%Y-%m-%d'),
+            'kwh_price': kwh_price,
+            'currency': config['currency'],
+            'devices': devices,
+            'total_kwh': round(total_kwh, 4),
+            'total_cost': round(total_cost, 4),
+            'timestamp': now.isoformat()
+        }))
+
+    except Exception as e:
+        logger.error(f"Error in get_costs: {e}")
+        return jsonify(create_response(False, error=str(e))), 500
+
+
+@app.route('/api/costs/config', methods=['GET'])
+def get_costs_config():
+    """Get costs configuration (kWh price)"""
+    try:
+        config = _load_costs_config()
+        return jsonify(create_response(True, {
+            'kwh_price': config['kwh_price'],
+            'currency': config['currency'],
+            'devices': config['devices']
+        }))
+    except Exception as e:
+        logger.error(f"Error in get_costs_config: {e}")
+        return jsonify(create_response(False, error=str(e))), 500
+
+
+@app.route('/api/costs/config', methods=['POST'])
+def update_costs_config():
+    """Update kWh price"""
+    if not request.is_json:
+        return jsonify(create_response(False, error="Request must be JSON")), 400
+
+    try:
+        data = request.get_json()
+        kwh_price = data.get('kwh_price')
+
+        if kwh_price is None:
+            return jsonify(create_response(False, error="kwh_price is required")), 400
+
+        kwh_price = float(kwh_price)
+        if kwh_price < 0:
+            return jsonify(create_response(False, error="kwh_price must be positive")), 400
+
+        if _save_costs_config(kwh_price):
+            logger.info(f"kWh price updated to {kwh_price}")
+            return jsonify(create_response(True, {
+                'kwh_price': kwh_price,
+                'message': 'Configuration saved'
+            }))
+        else:
+            return jsonify(create_response(False, error="Failed to save configuration")), 500
+
+    except Exception as e:
+        logger.error(f"Error in update_costs_config: {e}")
+        return jsonify(create_response(False, error=str(e))), 500
+
+
+# ============================================================================
 # Error Handlers
 # ============================================================================
 
@@ -875,6 +1260,9 @@ def run_server(host: str = API_HOST, port: int = API_PORT, debug: bool = False):
 
     # Start data logger
     start_data_logger()
+
+    # Start dehumidifier controller
+    start_dehumidifier_controller()
 
     app.run(host=host, port=port, debug=debug, threaded=True)
 

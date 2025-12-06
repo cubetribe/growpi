@@ -52,7 +52,7 @@ except ImportError:
 # Try to import web API
 WEB_API_AVAILABLE = False
 try:
-    from .web.api import app, run_server, start_data_logger
+    from .web.api import app, run_server, start_data_logger, start_dehumidifier_controller
     WEB_API_AVAILABLE = True
 except ImportError:
     pass
@@ -189,6 +189,8 @@ class GrowPiController:
             try:
                 # Start data logger first
                 start_data_logger()
+                # Start dehumidifier controller
+                start_dehumidifier_controller()
                 # Run Flask (without debug, threaded)
                 app.run(host='0.0.0.0', port=5000, debug=False, threaded=True, use_reloader=False)
             except Exception as e:

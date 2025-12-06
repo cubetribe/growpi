@@ -1,252 +1,211 @@
-# GrowPi - Raspberry Pi Web-Konfiguration
+# GrowPi - Raspberry Pi Gewächshaus-Steuerung
 
-Web-basiertes Dashboard zur Überwachung und Steuerung eines Raspberry Pi Systems.
+Professionelles Gewächshaus-Management-System mit Echtzeit-Überwachung, automatischer Entfeuchtung und Stromkosten-Tracking.
 
 ## Projektübersicht
 
-GrowPi ist eine moderne Web-Anwendung, die Daten von einem Raspberry Pi sammelt und in einer übersichtlichen Landing-Page darstellt. Das System besteht aus einem Backend (läuft auf dem Raspberry Pi) und einem Frontend zur Visualisierung der Daten.
+GrowPi ist ein vollständiges Gewächshaus-Kontrollsystem bestehend aus:
+- **Pi-Controller**: Python-basierter Daemon auf Raspberry Pi
+- **Web-Interface**: Mobile-optimiertes Dashboard unter http://192.168.0.86:5000
+- **Smart Home Integration**: Tuya Cloud API für 6 Smart Plugs
 
 ## Features
 
-### ✅ Implementiert
-- 🌐 **Web-Dashboard**: Vollständiges Next.js Dashboard mit Dark Theme (http://growpi.nm-forum.de)
-- 💡 **Beleuchtungssteuerung**: 5-Kanal PWM Lampen mit Kurven-Editor
-- 📊 **Sensor-Visualisierung**: Echtzeit-Charts für Temperatur, Luftfeuchtigkeit, Bodenwerte
-- 🔐 **Authentifizierung**: JWT-basierte Anmeldung mit Row-Level Security
-- 🌍 **Mehrsprachig**: Deutsch / Englisch
-- 📱 **Responsive**: Mobile-optimiert mit Slide-out Sidebar
-- 🌡️ **DHT22 Sensor**: Hardware-verifiziert auf GPIO-4 (21.0°C, 64% RH)
+### ✅ Produktiv (Live auf Pi)
 
-### 🚧 In Entwicklung
-- 🔌 **RS485 Bodensensoren**: pH, EC, NPK, Bodenfeuchte
-- 🎛️ **PWM Lampen-Hardware**: 5 LED-Kanäle über GPIO
-- 🤖 **Pi Controller Service**: Python-basierter Daemon für Sensorabfrage
-- 📡 **API-Integration**: Pi ↔ VPS Kommunikation
+| Feature | Beschreibung | Status |
+|---------|--------------|--------|
+| 💡 **4-Kanal PWM Beleuchtung** | Far Red, Warm White, Cool White, UV mit Sonnenkurven | ✅ |
+| 🌡️ **DHT22 Sensor** | Echtzeit Temperatur & Luftfeuchtigkeit | ✅ |
+| 💨 **Entfeuchter-Automatik** | Hysterese-Steuerung (10s Check-Intervall) via Tuya Smart Plug | ✅ |
+| 🔌 **6 Smart Plugs** | Tuya Cloud Integration mit Power Monitoring | ✅ |
+| 💰 **Stromkosten-Tracking** | kWh-Berechnung pro Gerät mit konfigurierbarem Preis | ✅ |
+| 📊 **Datenbank-Logging** | SQLite mit Sensor-, Lampen- und Plug-Logs | ✅ |
+| 📱 **Web-Interface** | Mobile-optimiertes Dark-Theme Dashboard | ✅ |
 
 ### 📋 Geplant
-- 📈 **Historische Daten**: Langzeit-Datenarchivierung
-- 🔔 **Alert-System**: E-Mail/Push bei Schwellwertüberschreitung
-- 📸 **Kamera-Integration**: Zeitraffer-Aufnahmen
-- 💧 **Bewässerungssteuerung**: Automatische Ventilsteuerung
+- 📈 VPD-Optimierung (Vapor Pressure Deficit)
+- 💧 Bewässerungssteuerung (Pumpe nach Zeitplan)
+- 🔔 Push-Benachrichtigungen
+- 📸 Kamera-Integration
 
-## Tech Stack
+## Hardware
 
-### Frontend (Production)
-- **Framework**: Next.js 13.5.1 (App Router)
-- **Language**: TypeScript (strict mode)
-- **Database**: Supabase (PostgreSQL)
-- **UI**: shadcn/ui (Radix) + TailwindCSS
-- **Charts**: Recharts
-- **Auth**: JWT in HTTP-only cookies
-- **Deployed**: http://growpi.nm-forum.de
-
-### Backend / Hardware (Raspberry Pi)
-- **Python**: 3.13.5
-- **Hardware**: Raspberry Pi 4 Model B
-- **OS**: Raspberry Pi OS (Debian, Linux 6.12.47 aarch64)
-- **GPIO Control**: pigpio for hardware PWM
-- **Sensors**: adafruit-circuitpython-dht 4.0.10
-- **Communication**: HTTPS REST API polling
-
-### Raspberry Pi Hardware
-- **Model**: Raspberry Pi 3B+
+### Raspberry Pi 3B+
 - **Hostname**: growpi
 - **IP**: 192.168.0.86
-- **SSH**: Port 22 (admin user)
-- **Hardware Status**:
-  - ✅ DHT22 Sensor (GPIO-4, Pin 7) - Verified
-  - ✅ PWM GPIO-18 (Pin 12) - Verified
-  - ⏳ PWM GPIO-12,13,19,21 - Pending
-  - ⏳ RS485 Sensors - Pending
+- **OS**: Raspberry Pi OS (Debian)
+- **Python**: 3.13
 
-**📌 [Vollständige Pin-Belegung](docs/HARDWARE_PINOUT.md)** ← Detaillierte Hardware-Dokumentation
+### GPIO-Belegung
 
-## Projekt-Struktur
+| Kanal | Name | GPIO | Pin | Funktion |
+|-------|------|------|-----|----------|
+| 1 | Far Red | 16 | 36 | PWM Lampe |
+| 2 | Warm White | 13 | 33 | PWM Lampe |
+| 3 | Cool White | 12 | 32 | PWM Lampe |
+| 4 | UV | 18 | 12 | PWM Lampe |
+| - | DHT22 | 4 | 7 | Temp/Humidity |
 
-```
-GrowPi/
-├── frontend/          # React Frontend
-├── backend/           # Backend API (auf Raspberry Pi)
-├── docs/              # Dokumentation
-├── .env               # Umgebungsvariablen (NICHT committen!)
-└── README.md          # Diese Datei
-```
+### Smart Plugs (Tuya Cloud)
 
-## Setup
+| Name | Device ID | Funktion |
+|------|-----------|----------|
+| Main Light | bf36487f... | Haupt-Grow-Light |
+| Entfeuchter | bfc70501... | Automatische Entfeuchtung |
+| Wohnzimmer | bfcf3ba9... | Zusatzlicht |
+| Mittags Sonne | bfbbc4e0... | Zusatzlicht |
+| FR main | bfc332c0... | Far Red Zusatz |
+| Pumpe | bfad1a50... | Bewässerung |
 
-### Voraussetzungen
+## Installation
 
-- Node.js 20+
-- SSH-Zugriff auf Raspberry Pi
-- npm oder yarn
-
-### Installation
-
-1. Repository klonen
+### 1. Repository klonen
 ```bash
 git clone <repository-url>
 cd GrowPi
 ```
 
-2. Umgebungsvariablen konfigurieren
+### 2. Pi-Controller deployen
 ```bash
-cp .env.example .env
-# .env mit deinen Zugangsdaten befüllen
+# Auf dem Raspberry Pi
+ssh admin@192.168.0.86
+cd /opt/grow-pi
+source venv/bin/activate
+python -m grow_pi.main
 ```
 
-3. Frontend installieren
+### 3. Systemd Service
 ```bash
-cd frontend
-npm install
+sudo systemctl enable grow-pi
+sudo systemctl start grow-pi
 ```
 
-4. Backend auf Raspberry Pi deployen
-```bash
-# Details folgen
+## Projekt-Struktur
+
 ```
+GrowPi/
+├── pi-controller/          # Raspberry Pi Controller (Python)
+│   └── grow_pi/
+│       ├── main.py         # Hauptcontroller
+│       ├── config/         # Konfigurationsdateien
+│       │   ├── config.yaml # Lampen-Kurven
+│       │   └── room_config.json # Entfeuchter + Kosten
+│       ├── database/       # SQLite Logging
+│       ├── lamps/          # PWM Controller
+│       ├── utils/          # Tuya, Entfeuchter, Kurven
+│       └── web/            # Flask API + Frontend
+│           ├── api.py      # REST Endpoints
+│           └── static/     # Web-Interface (HTML/CSS/JS)
+├── frontend/               # Next.js Dashboard (optional)
+├── docs/                   # Dokumentation
+│   └── ROADMAP.md         # Feature-Planung
+└── CHANGELOG.md            # Versionshistorie
+```
+
+## API Endpoints
+
+### Status & Kontrolle
+| Endpoint | Methode | Beschreibung |
+|----------|---------|--------------|
+| `/api/status` | GET | Lampen-Status + Temperatur |
+| `/api/lamp/<ch>` | POST | Lampe setzen (1-4) |
+| `/api/mode` | GET/POST | Modus (auto/manual) |
+| `/api/temperature` | GET | DHT22 Werte |
+
+### Kurven
+| Endpoint | Methode | Beschreibung |
+|----------|---------|--------------|
+| `/api/curves` | GET | Alle Lichtkurven |
+| `/api/curves/<ch>` | PUT | Kurve aktualisieren |
+| `/api/curves/intensities` | GET | Aktuelle Werte |
+
+### Room (Entfeuchter)
+| Endpoint | Methode | Beschreibung |
+|----------|---------|--------------|
+| `/api/room` | GET | Temp, Humidity, Dehumidifier Status |
+| `/api/room/config` | POST | Schwellwerte setzen |
+| `/api/room/dehumidifier` | POST | Manuell AN/AUS |
+
+### Kosten
+| Endpoint | Methode | Beschreibung |
+|----------|---------|--------------|
+| `/api/costs` | GET | Verbrauch + Kosten (period=today/week/month) |
+| `/api/costs/config` | GET/POST | kWh-Preis lesen/setzen |
+
+### Logs
+| Endpoint | Methode | Beschreibung |
+|----------|---------|--------------|
+| `/api/logs/sensors` | GET | Sensor-Historie |
+| `/api/logs/lamps` | GET | Lampen-Historie |
+| `/api/logs/plugs` | GET | Smart Plug Power-Logs |
+
+## Konfiguration
+
+### room_config.json
+```json
+{
+  "dehumidifier": {
+    "enabled": true,              // Automatik AN/AUS
+    "target": 60.0,               // Ziel-Luftfeuchtigkeit (%)
+    "threshold_high": 65.0,       // AN wenn > 65%
+    "threshold_low": 55.0,        // AUS wenn < 55%
+    "device_id": "bfc705014c6241667avzn8",
+    "min_run_time": 60,          // Min. 60s Laufzeit
+    "min_off_time": 60           // Min. 60s Auszeit
+  },
+  "costs": {
+    "kwh_price": 0.30,
+    "currency": "EUR"
+  },
+  "devices": {
+    "bf36487f67d7bb8fc18buj": "Main Light",
+    "bfc705014c6241667avzn8": "Entfeuchter",
+    ...
+  }
+}
+```
+
+## Web-Interface
+
+**URL**: http://192.168.0.86:5000
+
+### Tabs
+1. **Steuerung** - Lampen-Slider, Modus-Wechsel
+2. **Kurven** - 24h Lichtkurven-Editor
+3. **Verlauf** - Sensor- und Lampen-Charts
+4. **Room** - Entfeuchter-Steuerung
+5. **Kosten** - Stromverbrauch pro Gerät
 
 ## Entwicklung
 
-### Frontend starten
+### Lokaler Test (ohne Pi)
 ```bash
-cd frontend
-npm run dev
+cd pi-controller
+python -m pytest tests/
 ```
 
-### Backend auf Raspberry Pi
+### Deployment
 ```bash
-ssh admin@192.168.0.86
-# Weitere Befehle folgen
+# Dateien zum Pi kopieren
+scp -r pi-controller/grow_pi admin@192.168.0.86:/opt/grow-pi/
+
+# Service neustarten
+ssh admin@192.168.0.86 "sudo systemctl restart grow-pi"
 ```
 
-## Hardware Testing & Development
+## Dokumentation
 
-### SSH-Verbindung zum Raspberry Pi
-
-```bash
-# Standard SSH
-ssh admin@192.168.0.86
-
-# Mit sshpass (für Scripts)
-sshpass -p 'PASSWORD' ssh admin@192.168.0.86
-
-# Hostname: growpi
-```
-
-### DHT22 Sensor testen
-
-Der DHT22 Temperatur- und Luftfeuchtigkeitssensor ist auf **GPIO-4** angeschlossen.
-
-**Quick Test:**
-```bash
-ssh admin@192.168.0.86
-sudo python3 /tmp/test_dht22.py
-```
-
-**Expected Output:**
-```
-=== DHT22 Sensor Test auf GPIO-4 ===
-Lese Sensor aus...
-
-Messung 1:
-  Temperatur: 21.0°C
-  Luftfeuchtigkeit: 64.0%
-```
-
-**Python Code Pattern:**
-```python
-import board
-import adafruit_dht
-
-# GPIO-4 = board.D4
-dhtDevice = adafruit_dht.DHT22(board.D4)
-
-temperature = dhtDevice.temperature  # °C
-humidity = dhtDevice.humidity        # %
-
-dhtDevice.exit()  # Cleanup
-```
-
-### GPIO Pin Assignment
-
-Gemäß **docs/SPEC_RASPBERRY_PI.md**:
-
-**PWM Lampen (Output)**:
-- GPIO 12 → Kanal 1 (Red)
-- GPIO 13 → Kanal 2 (Blue)
-- GPIO 18 → Kanal 3 (Warm White)
-- GPIO 19 → Kanal 4 (Cool White)
-- GPIO 21 → Kanal 5 (UV) [Software PWM]
-
-**Sensoren (Input)**:
-- GPIO 4 → DHT22 (Temp + Humidity) ✅ Verified
-- GPIO 17 → Reserved
-
-**RS485**:
-- USB-to-RS485 Adapter → `/dev/ttyUSB0`
-- Soil sensors via Modbus protocol
-
-## Deployment
-
-Details zum Deployment folgen nach Fertigstellung der ersten Version.
-
-## Sicherheit
-
-⚠️ **WICHTIG**: Die `.env` Datei enthält sensible Zugangsdaten und darf NIEMALS committed werden!
-
-- Zugangsdaten werden über Umgebungsvariablen verwaltet
-- `.gitignore` ist entsprechend konfiguriert
-- Bei Problemen: Passwörter sofort ändern!
-
-## Roadmap
-
-### Phase 1: Frontend & Database ✅
-- [x] Next.js Dashboard mit App Router
-- [x] Supabase PostgreSQL Database
-- [x] JWT Authentifizierung
-- [x] Lighting Curve Editor (5 Kanäle)
-- [x] Sensor Charts (Recharts)
-- [x] Responsive Design (Mobile)
-- [x] i18n (Deutsch/Englisch)
-- [x] Production Deployment (http://growpi.nm-forum.de)
-
-### Phase 2: Hardware Integration 🚧
-- [x] SSH-Zugriff zum Raspberry Pi
-- [x] DHT22 Sensor-Test (GPIO-4)
-- [ ] DHT22 Sensor-Klasse implementieren
-- [ ] RS485 Bodensensoren testen
-- [ ] PWM Lampen-Steuerung (GPIO 12,13,18,19,21)
-- [ ] Python Controller Service (systemd)
-- [ ] API-Kommunikation Pi ↔ VPS
-
-### Phase 3: Production Features 📋
-- [ ] Historische Daten (Langzeitarchiv)
-- [ ] Alert-System (E-Mail/Push)
-- [ ] Offline-Modus (Pi arbeitet autonom)
-- [ ] Datenexport (CSV/Excel)
-- [ ] Kamera-Integration
-- [ ] Bewässerungssteuerung
+- [ROADMAP.md](docs/ROADMAP.md) - Feature-Planung
+- [CHANGELOG.md](CHANGELOG.md) - Versionshistorie
+- [HARDWARE_PINOUT.md](docs/HARDWARE_PINOUT.md) - GPIO-Belegung
 
 ## Entwickler
 
 Dennis Westermann (d.westermann@ol-mg.de)
 
-## Lizenz
-
-TBD
-
 ---
 
-**Status**: 🟢 Phase 1 Complete | 🟡 Phase 2 In Progress (Hardware Testing)
+**Status**: 🟢 Phase 2 Complete | 🟡 Phase 1 In Progress (Kosten-Monitoring)
 
-*Letzte Aktualisierung: 2025-12-04*
-
----
-
-## Aktueller Entwicklungsstand
-
-**Frontend**: ✅ Production-ready (http://growpi.nm-forum.de)
-**Hardware**: 🔧 DHT22 verified, RS485 + PWM pending
-**Integration**: ⏳ Controller service in development
-
-**Nächster Milestone**: Vollständige Python Controller Implementation
+*Letzte Aktualisierung: 2025-12-06*

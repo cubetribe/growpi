@@ -2,6 +2,256 @@
 
 ---
 
+## [2025-12-06 v6.4] - Automatische Entfeuchter-Steuerung 🌡️
+
+**Status**: ✅ DEPLOYED TO PRODUCTION
+**Platform**: Raspberry Pi 3B+ (growpi @ 192.168.0.86)
+
+### Summary
+
+DehumidifierController läuft jetzt automatisch im Hintergrund und prüft alle 10 Sekunden die Luftfeuchtigkeit. Schaltet den Entfeuchter basierend auf Hysterese-Schwellwerten automatisch AN/AUS.
+
+### Bug Fix
+
+**Problem**: Der DehumidifierController wurde zwar initialisiert, aber die `start()` Methode wurde nie aufgerufen. Der automatische Control-Loop lief nicht.
+
+**Lösung**:
+- Neue Funktion `start_dehumidifier_controller()` in `web/api.py` hinzugefügt
+- Wird automatisch beim Flask-Start aufgerufen (in `main.py` und `api.py`)
+- Controller prüft jetzt alle **10 Sekunden** (statt Standard 30s) die Luftfeuchtigkeit
+
+### Geänderte Dateien
+
+**pi-controller/grow_pi/web/api.py**:
+- Neue Funktion: `start_dehumidifier_controller()` - Startet den automatischen Control-Loop mit 10s Intervall
+- Neue Funktion: `stop_dehumidifier_controller()` - Stoppt den Loop beim Shutdown
+- Registriert `stop_dehumidifier_controller()` als `atexit` handler
+- Aufrufe in `run_server()` hinzugefügt
+
+**pi-controller/grow_pi/main.py**:
+- Import von `start_dehumidifier_controller` hinzugefügt
+- Aufruf in `_start_web_api()` nach `start_data_logger()` eingefügt
+
+### Verhalten
+
+**Automatische Steuerung** (alle 10 Sekunden):
+```
+Luftfeuchtigkeit > 65% → Entfeuchter AN
+Luftfeuchtigkeit < 55% → Entfeuchter AUS
+```
+
+**Schutz-Mechanismen**:
+- `min_run_time: 60s` - Mindestlaufzeit bevor AUS
+- `min_off_time: 60s` - Mindest-Auszeit bevor erneut AN
+
+### Logs (Verifiziert)
+
+```
+17:53:25 - DehumidifierController initialized with Tuya Cloud
+17:53:25 - Dehumidifier state synced from cloud: ON
+17:53:25 - DehumidifierController started (interval: 10s)
+17:53:36 - Humidity 53.4% < 55.0% - turning OFF ✅
+```
+
+### Technical Details
+
+**Control-Loop**:
+- Thread-basiert (`threading.Thread`, daemon=True)
+- Prüft `enabled` Flag vor jeder Aktion
+- Verwendet `_lock` für Thread-Safety
+- Ruft `check_and_control()` alle 10 Sekunden auf
+
+**Startup-Sync**:
+- Liest tatsächlichen Gerätestatus von Tuya Cloud beim Start
+- Verhindert State-Inkonsistenzen
+
+---
+
+## [2025-12-06 v6.3] - Stromkosten-Monitoring 💰
+
+**Status**: ✅ DEPLOYED TO PRODUCTION
+**Platform**: Raspberry Pi 3B+ (growpi @ 192.168.0.86)
+
+### Summary
+
+Neuer "Kosten" Tab im Web-Interface zur Überwachung des Stromverbrauchs aller 6 Smart Plugs mit kWh-Berechnung und konfigurierbarem Strompreis.
+
+### New Features
+
+#### 1. Kosten-Tab im Web-Interface
+- **Perioden-Auswahl**: Heute, Woche, Monat
+- **6 Geräte-Karten**: Jede Dose einzeln mit kWh und Kosten
+- **Gesamt-Summe**: Total kWh und Kosten am Ende
+- **kWh-Preis Config**: Eingabefeld zum Anpassen des Strompreises
+
+#### 2. Neue API Endpoints
+| Endpoint | Methode | Beschreibung |
+|----------|---------|--------------|
+| `/api/costs` | GET | Verbrauch & Kosten (period=today/week/month) |
+| `/api/costs/config` | GET | kWh-Preis und Währung lesen |
+| `/api/costs/config` | POST | kWh-Preis setzen |
+
+#### 3. Konfiguration erweitert
+
+`room_config.json` enthält jetzt:
+```json
+{
+  "costs": {
+    "kwh_price": 0.30,
+    "currency": "EUR"
+  },
+  "devices": {
+    "bf36487f67d7bb8fc18buj": "Main Light",
+    "bfcf3ba95588e232b08mg6": "Wohnzimmer",
+    "bfbbc4e059a6ae812csbyq": "Mittags Sonne",
+    "bfc332c0bf2f53a5cc23uz": "FR main",
+    "bfc705014c6241667avzn8": "Entfeuchter",
+    "bfad1a5081fa6a2342j7ye": "Pumpe"
+  }
+}
+```
+
+### Geänderte Dateien
+
+```
+pi-controller/grow_pi/
+├── config/
+│   └── room_config.json        # + costs config + device mapping
+└── web/
+    ├── api.py                  # + import json, Costs API Endpoints
+    └── static/index.html       # + Kosten Tab (HTML/CSS/JS)
+```
+
+### Berechnung
+
+```python
+# kWh = Σ(Watt × Intervall_in_Stunden) / 1000
+# Bei 60s Intervall: kWh = Σ(Watt × (60/3600)) / 1000
+interval_hours = 60 / 3600
+kwh = sum(power * interval_hours for power in readings) / 1000
+cost = kwh * kwh_price
+```
+
+### Verified API Response
+
+```json
+{
+  "success": true,
+  "period": "today",
+  "kwh_price": 0.3,
+  "currency": "EUR",
+  "devices": [
+    {"name": "Main Light", "kwh": 1.237, "cost": 0.371, "current_power": 177.1},
+    {"name": "Entfeuchter", "kwh": 0.511, "cost": 0.153, "current_power": 105.8},
+    {"name": "Wohnzimmer", "kwh": 0.150, "cost": 0.045, "current_power": 46.5},
+    ...
+  ],
+  "total_kwh": 1.898,
+  "total_cost": 0.569
+}
+```
+
+### Bug Fixes
+
+- **`import json` fehlte** in api.py - führte zu `name 'json' is not defined` Error
+- **Absolute Pfad-Auflösung** für room_config.json mit `os.path.abspath()`
+
+---
+
+## [2025-12-06 v6.2] - Room Dehumidifier Control 💨
+
+**Status**: ✅ DEPLOYED TO PRODUCTION
+**Platform**: Raspberry Pi 3B+ (growpi @ 192.168.0.86)
+
+### Summary
+
+Neue "Room" Seite im Web-Interface für Raumklima-Steuerung mit konfigurierbarer Entfeuchtung via Tuya Cloud Smart Plug.
+
+### New Features
+
+#### 1. Room Tab im Web-Interface
+- Temperatur und Luftfeuchtigkeit Anzeige (Live vom DHT22)
+- Entfeuchter Status (AN/AUS) mit manueller Steuerung
+- Automatik Toggle (aktiviert Hysterese-Logik)
+- Konfigurierbare Schwellwerte (Sollwert, oberer/unterer Schwellwert)
+
+#### 2. Tuya Cloud Service (`utils/tuya_cloud.py`)
+- TuyaCloudService Klasse für Smart Plug Steuerung
+- `switch_on()`, `switch_off()`, `get_device_status()` Methoden
+- Singleton-Pattern mit `get_tuya_service()`
+- Nutzt bestehende Tuya Cloud Credentials
+
+#### 3. Dehumidifier Controller (`utils/dehumidifier_controller.py`)
+- Hysterese-Logik: AN wenn > `threshold_high`, AUS wenn < `threshold_low`
+- Minimale Laufzeit / Auszeit zur Schonung des Kompressors
+- Persistente Konfiguration in `config/room_config.json`
+- Thread-basierte automatische Kontrolle
+
+#### 4. Neue API Endpoints
+| Endpoint | Methode | Beschreibung |
+|----------|---------|--------------|
+| `/api/room` | GET | Raumstatus (Temp, Humidity, Dehumidifier) |
+| `/api/room/config` | GET/POST | Konfiguration lesen/schreiben |
+| `/api/room/dehumidifier` | POST | Manuell AN/AUS (`{"action":"on"}`) |
+
+### Neue Dateien
+
+```
+pi-controller/grow_pi/
+├── config/
+│   └── room_config.json        # NEU - Schwellwert-Konfiguration
+└── utils/
+    ├── tuya_cloud.py           # NEU - Tuya Cloud API Service
+    └── dehumidifier_controller.py  # NEU - Hysterese Controller
+```
+
+### Geänderte Dateien
+
+```
+pi-controller/grow_pi/web/
+├── api.py                      # + Room API Endpoints
+└── static/index.html           # + Room Tab UI
+```
+
+### Default-Konfiguration
+
+```json
+{
+  "dehumidifier": {
+    "enabled": true,
+    "target": 60.0,
+    "threshold_high": 65.0,
+    "threshold_low": 55.0,
+    "device_id": "bfc705014c6241667avzn8",
+    "min_run_time": 60,
+    "min_off_time": 60
+  }
+}
+```
+
+### Hardware
+
+- **Steckdose**: "Entfeuchter" (Tuya BLE Plug, Cloud-gesteuert)
+- **Device ID**: `bfc705014c6241667avzn8`
+- **Steuerung**: Tuya Cloud API via TinyTuya
+
+### Verified API Response
+
+```json
+{
+  "success": true,
+  "temperature": 23.8,
+  "humidity": 67.0,
+  "dehumidifier": {
+    "is_on": false,
+    "tuya_available": true,
+    "config": {...}
+  }
+}
+```
+
+---
+
 ## [2025-12-06 v6.1] - Phase 1 Refactoring Live Deployment 🚀
 
 **Status**: ✅ DEPLOYED TO PRODUCTION
