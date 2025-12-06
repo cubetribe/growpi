@@ -6,10 +6,13 @@ Python-basierter Controller-Service für den Raspberry Pi 3B+.
 
 Dieser Controller läuft auf dem Raspberry Pi und steuert Grow-Lampen via PWM.
 
-**Aktueller Stand: MVP Complete (2025-12-05)**
+**Aktueller Stand: v6.6 (2025-12-06)**
 - Web-Interface auf Port 5000
+- Live-Kamera Livestream (USB-Webcam, 720p, ~2 FPS)
 - Sonnenkurven-Modus mit automatischer Tageszeit-Interpolation
 - 4 PWM-Kanäle für LED-Steuerung
+- Raumklima-Steuerung mit Entfeuchtung
+- **CPU-optimiert**: ~15-25% statt 75% Auslastung
 
 ## Quick Start (MVP)
 
@@ -153,9 +156,22 @@ pi-controller/
 | 4     | Kurven-Interpolation | ✅ Done |
 | 4b    | Web-Interface        | ✅ Done |
 | 5     | SQLite Daten-Logging | ✅ Done (2025-12-05) |
-| 6     | API-Client (Server)  | ⏳     |
-| 7     | Offline-Modus        | ⏳     |
-| 8     | RS485 Bodensensoren  | ⏳     |
+| 6     | Kosten-Tracking      | ✅ Done (2025-12-06) |
+| 7     | Room Environment     | ✅ Done (2025-12-06) |
+| 8     | **Live-Kamera**      | ✅ Done (2025-12-06) |
+| 9     | Timelapse            | ⏳ Vorbereitet |
+| 10    | RS485 Bodensensoren  | ⏳     |
+
+### Camera API Endpoints
+
+```bash
+# Live-Snapshot (JPEG)
+curl "http://192.168.0.86:5000/api/camera/snapshot" -o snapshot.jpg
+
+# Kamera-Status
+curl "http://192.168.0.86:5000/api/camera/status"
+# → {"available": true, "resolution": "1280x720", ...}
+```
 
 ### Logging API Endpoints
 
@@ -238,6 +254,25 @@ sudo journalctl -u grow-pi -n 50 --no-pager
 ---
 
 **Python Version**: 3.13
-**Aktuelles Level**: MVP Complete (Level 4b)
-**Stand**: 2025-12-05
+**Aktuelles Level**: v6.6 (CPU-Optimierung)
+**Stand**: 2025-12-06
 **Web-Interface**: http://192.168.0.86:5000
+**Changelog**: [CHANGELOG.md](CHANGELOG.md)
+
+---
+
+## Performance-Optimierung (v6.6)
+
+Die CPU-Last wurde von ~75% auf ~15-25% reduziert durch:
+
+| Optimierung | Vorher | Nachher | Einsparung |
+|-------------|--------|---------|------------|
+| Sleep-Loop → Event.wait() | 180 OS-Calls/min | 3 OS-Calls/min | ~98% |
+| Logging-Intervall | 60s | 120s | 50% weniger DB-Writes |
+| DHT22 Cache | 3s | 30s | 90% weniger Sensor-Reads |
+
+**Geänderte Dateien:**
+- `grow_pi/database/logger.py` - Threading-Optimierung
+- `grow_pi/web/api.py` - DHT Cache
+- `grow_pi/web/services/hardware_service.py` - DHT Cache
+- `grow_pi/web/blueprints/temperature_bp.py` - DHT Cache

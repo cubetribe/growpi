@@ -39,8 +39,8 @@ class DataLogger:
     def __init__(
         self,
         db: Optional[Database] = None,
-        sensor_interval: int = 60,
-        lamp_interval: int = 60,
+        sensor_interval: int = 120,
+        lamp_interval: int = 120,
         dedupe_seconds: int = 5
     ):
         """
@@ -67,6 +67,7 @@ class DataLogger:
 
         # Thread control
         self._running = False
+        self._stop_event = threading.Event()  # CPU-effizientes Warten
         self._sensor_thread: Optional[threading.Thread] = None
         self._lamp_thread: Optional[threading.Thread] = None
         self._plug_thread: Optional[threading.Thread] = None
@@ -148,6 +149,7 @@ class DataLogger:
 
         logger.info("Stopping DataLogger...")
         self._running = False
+        self._stop_event.set()  # Weckt alle wartenden Threads sofort auf
 
         # Log service stop
         self.log_event('service_stop', 'info', 'DataLogger service stopped')
@@ -171,11 +173,8 @@ class DataLogger:
                 logger.error(f"Sensor logging error: {e}")
                 self.log_event('sensor_error', 'error', str(e))
 
-            # Sleep in small increments for responsive shutdown
-            for _ in range(self.sensor_interval):
-                if not self._running:
-                    break
-                time.sleep(1)
+            # CPU-effizientes Warten mit Event (statt 120x time.sleep(1))
+            self._stop_event.wait(timeout=self.sensor_interval)
 
     def _lamp_loop(self) -> None:
         """Background loop for lamp state logging."""
@@ -186,11 +185,8 @@ class DataLogger:
                 logger.error(f"Lamp logging error: {e}")
                 self.log_event('pwm_error', 'error', str(e))
 
-            # Sleep in small increments for responsive shutdown
-            for _ in range(self.lamp_interval):
-                if not self._running:
-                    break
-                time.sleep(1)
+            # CPU-effizientes Warten mit Event (statt 120x time.sleep(1))
+            self._stop_event.wait(timeout=self.lamp_interval)
 
     def _plug_loop(self) -> None:
         """Background loop for plug logging."""
@@ -201,10 +197,8 @@ class DataLogger:
                 logger.error(f"Plug logging error: {e}")
                 self.log_event('plug_error', 'error', str(e))
 
-            for _ in range(self.plug_interval):
-                if not self._running:
-                    break
-                time.sleep(1)
+            # CPU-effizientes Warten mit Event (statt 60x time.sleep(1))
+            self._stop_event.wait(timeout=self.plug_interval)
 
     def _log_sensors(self) -> None:
         """Read and log sensor values."""

@@ -56,7 +56,7 @@ def create_response(success: bool, data: dict = None, error: str = None) -> dict
 
 # Cache for DHT22 readings (sensor needs 2s between reads)
 _dht_cache = {"temp": None, "humidity": None, "timestamp": 0}
-DHT_CACHE_SECONDS = 3  # Minimum seconds between sensor reads
+DHT_CACHE_SECONDS = 30  # Minimum seconds between sensor reads (erhöht für CPU-Optimierung)
 
 
 def read_dht22() -> Tuple[Optional[float], Optional[float]]:

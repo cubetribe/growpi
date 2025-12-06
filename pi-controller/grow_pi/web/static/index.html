@@ -397,6 +397,7 @@
             import { initEnvironmentTab } from './js/modules/environment.js';
             import { initCostsTab } from './js/modules/costs.js';
             import { showError, showSuccess, setupTabs } from './js/utils.js';
+            import { initCameraModule, cleanupCameraModule } from './js/modules/camera.js';
 
             // Expose utils to window for modules that rely on them (legacy support)
             window.showError = showError;
@@ -408,6 +409,7 @@
                 initEnvironmentTab();
                 initCostsTab();
                 initCurvesTab();
+                initCameraModule();
 
                 const historyModule = new HistoryModule();
                 historyModule.initHistoryTab();

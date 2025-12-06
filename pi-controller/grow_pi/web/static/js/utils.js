@@ -38,6 +38,7 @@ export function showSuccess(message) {
 /**
  * Setup tab switching logic
  * Handles active class toggling for tab buttons and content
+ * Also triggers data loading for specific tabs when switched to
  */
 export function setupTabs() {
     document.querySelectorAll('.tab-btn').forEach(btn => {
@@ -45,13 +46,23 @@ export function setupTabs() {
             // Remove active class from all buttons and content
             document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
             document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
-            
+
             // Add active class to clicked button and corresponding content
             btn.classList.add('active');
             const tabId = btn.dataset.tab;
             const content = document.getElementById(`tab-${tabId}`);
             if (content) {
                 content.classList.add('active');
+            }
+
+            // Load data when switching to specific tabs
+            if (tabId === 'curves') {
+                // Dynamically import and call fetchCurves
+                import('./modules/curves.js').then(module => {
+                    module.fetchCurves();
+                }).catch(err => {
+                    console.error('Failed to load curves module:', err);
+                });
             }
         });
     });

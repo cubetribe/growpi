@@ -148,6 +148,18 @@ STATIC_DIR = os.path.join(os.path.dirname(__file__), 'static')
 app = Flask(__name__, static_folder=STATIC_DIR)
 CORS(app)
 
+# ============================================================================
+# Register Blueprints for new API endpoints
+# ============================================================================
+try:
+    from .blueprints.costs_bp import costs_bp
+    from .blueprints.dehumidifier_bp import dehumidifier_bp
+    app.register_blueprint(costs_bp)
+    app.register_blueprint(dehumidifier_bp)
+    logging.info("Registered costs_bp and dehumidifier_bp blueprints")
+except ImportError as e:
+    logging.warning(f"Could not import blueprints: {e}")
+
 # Configure logging
 logging.basicConfig(
     level=logging.INFO,
@@ -211,6 +223,30 @@ if MODE_MANAGER_AVAILABLE:
     except Exception as e:
         logger.error(f"Failed to initialize ModeManager: {e}")
 
+# Initialize DehumidifierController and inject into blueprint
+dehumidifier_controller = None
+try:
+    try:
+        from ..utils.dehumidifier_controller import get_dehumidifier_controller
+    except ImportError:
+        from grow_pi.utils.dehumidifier_controller import get_dehumidifier_controller
+
+    dehumidifier_controller = get_dehumidifier_controller()
+
+    # Inject dependencies into dehumidifier blueprint
+    try:
+        from .blueprints.dehumidifier_bp import set_dehumidifier_controller, set_humidity_reader
+        set_dehumidifier_controller(dehumidifier_controller)
+
+        # Note: humidity_reader will be set after read_dht22 is defined
+        logger.info("DehumidifierController initialized and injected into blueprint")
+    except ImportError as e:
+        logger.warning(f"Could not inject dehumidifier dependencies: {e}")
+except ImportError as e:
+    logger.warning(f"DehumidifierController not available: {e}")
+except Exception as e:
+    logger.error(f"Failed to initialize DehumidifierController: {e}")
+
 
 # ============================================================================
 # Helper Functions
@@ -228,7 +264,7 @@ def create_response(success: bool, data: Dict = None, error: str = None) -> Dict
 
 # Cache for DHT22 readings (sensor needs 2s between reads)
 _dht_cache = {"temp": None, "humidity": None, "timestamp": 0}
-DHT_CACHE_SECONDS = 3  # Minimum seconds between sensor reads
+DHT_CACHE_SECONDS = 30  # Minimum seconds between sensor reads (erhöht für CPU-Optimierung)
 
 
 def read_dht22() -> Tuple[Optional[float], Optional[float]]:
@@ -268,6 +304,16 @@ def read_dht22() -> Tuple[Optional[float], Optional[float]]:
         return (_dht_cache["temp"], _dht_cache["humidity"])
 
     return (None, None)
+
+
+# Set humidity reader for dehumidifier blueprint now that read_dht22 is defined
+if dehumidifier_controller is not None:
+    try:
+        from .blueprints.dehumidifier_bp import set_humidity_reader
+        set_humidity_reader(read_dht22)
+        logger.info("Humidity reader set for dehumidifier blueprint")
+    except ImportError:
+        pass
 
 
 def get_lamp_states() -> Dict[int, Dict]:

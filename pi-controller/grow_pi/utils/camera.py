@@ -135,6 +135,9 @@ class CameraService:
                     self._init_camera()
                     return None
 
+                # Rotate 180 degrees (camera is mounted upside down)
+                frame = cv2.rotate(frame, cv2.ROTATE_180)
+
                 # Encode as JPEG
                 encode_params = [cv2.IMWRITE_JPEG_QUALITY, self.config.jpeg_quality]
                 ret, jpeg = cv2.imencode('.jpg', frame, encode_params)
