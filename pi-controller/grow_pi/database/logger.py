@@ -13,7 +13,8 @@ from datetime import datetime
 from typing import Optional, Dict, Callable, Any, List
 
 from .db import Database, get_database
-from .models import SensorReading, LampStateLog, SystemEvent, SensorType, SENSOR_UNITS
+from .models import SensorReading, LampStateLog, SystemEvent, SensorType, SENSOR_UNITS, PlugLog
+from ..lamps.smart_plug_controller import SmartPlugController
 
 logger = logging.getLogger(__name__)
 
@@ -53,8 +54,12 @@ class DataLogger:
         """
         self.db = db or get_database()
         self.sensor_interval = sensor_interval
+        self.sensor_interval = sensor_interval
         self.lamp_interval = lamp_interval
+        self.plug_interval = 60  # Default 60s for plugs
         self.dedupe_seconds = dedupe_seconds
+
+        self.plug_controller = SmartPlugController()
 
         # Callbacks for reading data
         self._sensor_reader: Optional[Callable[[], tuple]] = None
@@ -64,6 +69,7 @@ class DataLogger:
         self._running = False
         self._sensor_thread: Optional[threading.Thread] = None
         self._lamp_thread: Optional[threading.Thread] = None
+        self._plug_thread: Optional[threading.Thread] = None
 
         # Last logged values (for change detection)
         self._last_lamp_states: Dict[int, int] = {}
@@ -126,6 +132,15 @@ class DataLogger:
             self._lamp_thread.start()
             logger.info(f"Lamp logging started (interval: {self.lamp_interval}s)")
 
+        # Start plug logging thread
+        self._plug_thread = threading.Thread(
+            target=self._plug_loop,
+            name="DataLogger-Plugs",
+            daemon=True
+        )
+        self._plug_thread.start()
+        logger.info(f"Plug logging started (interval: {self.plug_interval}s)")
+
     def stop(self) -> None:
         """Stop the data logging threads."""
         if not self._running:
@@ -142,6 +157,8 @@ class DataLogger:
             self._sensor_thread.join(timeout=5)
         if self._lamp_thread and self._lamp_thread.is_alive():
             self._lamp_thread.join(timeout=5)
+        if self._plug_thread and self._plug_thread.is_alive():
+            self._plug_thread.join(timeout=5)
 
         logger.info("DataLogger stopped")
 
@@ -171,6 +188,20 @@ class DataLogger:
 
             # Sleep in small increments for responsive shutdown
             for _ in range(self.lamp_interval):
+                if not self._running:
+                    break
+                time.sleep(1)
+
+    def _plug_loop(self) -> None:
+        """Background loop for plug logging."""
+        while self._running:
+            try:
+                self._log_plugs()
+            except Exception as e:
+                logger.error(f"Plug logging error: {e}")
+                self.log_event('plug_error', 'error', str(e))
+
+            for _ in range(self.plug_interval):
                 if not self._running:
                     break
                 time.sleep(1)
@@ -224,6 +255,25 @@ class DataLogger:
             )
             self.db.insert_lamp_state(state)
             logger.debug(f"Logged lamp {channel} ({name}): {intensity}%")
+
+    def _log_plugs(self) -> None:
+        """Read and log plug values."""
+        plugs = self.plug_controller.get_plugs()
+        for plug in plugs:
+            device_id = plug.get('device_id')
+            if not device_id:
+                continue
+                
+            status = self.plug_controller.get_status(device_id)
+            if status:
+                log = PlugLog(
+                    device_id=device_id,
+                    voltage=status.get('voltage', 0),
+                    current=status.get('current', 0),
+                    power=status.get('power', 0)
+                )
+                self.db.insert_plug_log(log)
+                logger.debug(f"Logged plug {plug.get('name')}: {log.power}W")
 
     def log_lamp_change(
         self,

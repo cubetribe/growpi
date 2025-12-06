@@ -294,3 +294,44 @@ class LampCurve:
             updated_at=row[6],
             synced_at=row[7],
         )
+
+
+@dataclass
+class PlugLog:
+    """
+    Smart Plug Log Entry.
+    
+    Protokolliert Spannung, Strom und Leistung von Smart Plugs.
+    """
+    device_id: str
+    voltage: float          # V
+    current: float          # A
+    power: float            # W
+    id: str = field(default_factory=generate_uuid)
+    created_at: str = field(default_factory=now_iso)
+    synced_at: Optional[str] = None
+
+    def to_dict(self) -> Dict[str, Any]:
+        """Convert to dictionary for database insert."""
+        return {
+            'id': self.id,
+            'device_id': self.device_id,
+            'voltage': self.voltage,
+            'current': self.current,
+            'power': self.power,
+            'created_at': self.created_at,
+            'synced_at': self.synced_at,
+        }
+
+    @classmethod
+    def from_row(cls, row: tuple) -> 'PlugLog':
+        """Create from database row."""
+        return cls(
+            id=row[0],
+            device_id=row[1],
+            voltage=row[2],
+            current=row[3],
+            power=row[4],
+            created_at=row[5],
+            synced_at=row[6],
+        )

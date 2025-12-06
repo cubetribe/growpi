@@ -535,6 +535,30 @@ def get_event_logs():
         return jsonify(create_response(False, error=str(e))), 500
 
 
+@app.route('/api/logs/plugs', methods=['GET'])
+def get_plug_logs():
+    """Get smart plug history"""
+    if not DB_AVAILABLE or not data_logger:
+        return jsonify(create_response(False, error="Logging not available")), 503
+
+    try:
+        hours = int(request.args.get('hours', 24))
+        limit = int(request.args.get('limit', 1000))
+
+        db = get_database()
+        logs = db.get_plug_logs(hours=hours, limit=limit)
+
+        return jsonify(create_response(True, {
+            "data": [l.to_dict() for l in logs],
+            "count": len(logs),
+            "hours": hours
+        }))
+
+    except Exception as e:
+        logger.error(f"Error in get_plug_logs: {e}")
+        return jsonify(create_response(False, error=str(e))), 500
+
+
 @app.route('/api/logs/stats', methods=['GET'])
 def get_log_stats():
     """Get logging statistics"""

@@ -12,7 +12,7 @@ from datetime import datetime, timedelta
 from typing import Optional, List, Dict, Any
 from contextlib import contextmanager
 
-from .models import SensorReading, LampStateLog, SystemEvent, LampCurve
+from .models import SensorReading, LampStateLog, SystemEvent, LampCurve, PlugLog
 
 logger = logging.getLogger(__name__)
 
@@ -99,6 +99,20 @@ CREATE TABLE IF NOT EXISTS lamp_curves (
 
 CREATE INDEX IF NOT EXISTS idx_lamp_curves_channel
 ON lamp_curves(channel);
+
+-- Plug Logs Table
+CREATE TABLE IF NOT EXISTS plug_logs (
+    id TEXT PRIMARY KEY,
+    device_id TEXT NOT NULL,
+    voltage REAL,
+    current REAL,
+    power REAL,
+    created_at TEXT NOT NULL,
+    synced_at TEXT DEFAULT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_plug_logs_device_time
+ON plug_logs(device_id, created_at DESC);
 """
 
 
@@ -556,6 +570,55 @@ class Database:
             logger.info(f"Created default curve for {name} (ch{channel})")
 
     # =========================================================================
+    # Plug Logs
+    # =========================================================================
+
+    def insert_plug_log(self, log: PlugLog) -> None:
+        """Insert a plug log entry."""
+        with self._cursor() as cursor:
+            cursor.execute(
+                """
+                INSERT INTO plug_logs (id, device_id, voltage, current, power, created_at, synced_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
+                """,
+                (log.id, log.device_id, log.voltage, log.current, log.power, log.created_at, log.synced_at)
+            )
+
+    def get_plug_logs(
+        self,
+        device_id: Optional[str] = None,
+        hours: int = 24,
+        limit: int = 1000
+    ) -> List[PlugLog]:
+        """Get plug logs."""
+        since = (datetime.now() - timedelta(hours=hours)).isoformat()
+        
+        with self._cursor() as cursor:
+            if device_id:
+                cursor.execute(
+                    """
+                    SELECT id, device_id, voltage, current, power, created_at, synced_at
+                    FROM plug_logs
+                    WHERE device_id = ? AND created_at >= ?
+                    ORDER BY created_at DESC
+                    LIMIT ?
+                    """,
+                    (device_id, since, limit)
+                )
+            else:
+                cursor.execute(
+                    """
+                    SELECT id, device_id, voltage, current, power, created_at, synced_at
+                    FROM plug_logs
+                    WHERE created_at >= ?
+                    ORDER BY created_at DESC
+                    LIMIT ?
+                    """,
+                    (since, limit)
+                )
+            return [PlugLog.from_row(row) for row in cursor.fetchall()]
+
+    # =========================================================================
     # Statistics & Maintenance
     # =========================================================================
 
@@ -628,6 +691,16 @@ class Database:
                 (cutoff,)
             )
             deleted['system_events'] = cursor.rowcount
+
+            # Delete synced plug logs
+            cursor.execute(
+                """
+                DELETE FROM plug_logs
+                WHERE created_at < ? AND synced_at IS NOT NULL
+                """,
+                (cutoff,)
+            )
+            deleted['plug_logs'] = cursor.rowcount
 
         # Optimize database after deletion
         self._get_connection().execute('VACUUM')

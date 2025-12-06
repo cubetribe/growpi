@@ -9,7 +9,7 @@ Lokales SQLite-basiertes Logging-System für:
 Designed für spätere Synchronisation mit PostgreSQL-Server.
 """
 
-from .models import SensorReading, LampStateLog, SystemEvent, LampCurve, CurvePoint
+from .models import SensorReading, LampStateLog, SystemEvent, LampCurve, CurvePoint, PlugLog
 from .db import Database, get_database
 from .logger import DataLogger, get_logger
 
@@ -20,6 +20,7 @@ __all__ = [
     'SystemEvent',
     'LampCurve',
     'CurvePoint',
+    'PlugLog',
     # Database
     'Database',
     'get_database',
