@@ -13,9 +13,15 @@ WorkingDirectory=/opt/grow-pi
 # Main executable
 ExecStart=/opt/grow-pi/venv/bin/python -m grow_pi.main
 
-# Restart policy
+# Runtime directory für PWM State-Files (Zero-Downtime Feature #0)
+# Wird von systemd erstellt unter /run/growpi/
+RuntimeDirectory=growpi
+RuntimeDirectoryMode=0755
+RuntimeDirectoryPreserve=yes
+
+# Restart policy - schneller restart für Zero-Downtime
 Restart=always
-RestartSec=10
+RestartSec=5
 
 # Environment
 Environment=PYTHONUNBUFFERED=1
@@ -24,6 +30,11 @@ Environment=PYTHONUNBUFFERED=1
 StandardOutput=journal
 StandardError=journal
 SyslogIdentifier=grow-pi
+
+# Graceful shutdown - Zeit für State-Save (Zero-Downtime)
+TimeoutStopSec=30
+KillMode=mixed
+KillSignal=SIGTERM
 
 # Security hardening
 NoNewPrivileges=true

@@ -2,6 +2,80 @@
 
 ---
 
+## v6.9.0 (2025-12-06) - PWM Zero-Downtime Restarts
+
+**Zero-Downtime Service-Restarts für LED-Steuerung**
+
+### Problem (behoben)
+Beim Neustart des GrowPi-Services (`systemctl restart grow-pi`) wurden alle PWM-Kanäle kurzzeitig auf 0% zurückgesetzt, was zu sichtbarem **LED-Flackern** führte.
+
+**Root Cause**: `cleanup()` rief `all_off()` auf, obwohl `pigpiod` die PWM-Werte unabhängig vom Python-Prozess hält.
+
+### Lösung
+Nutzt die bereits vorhandene **pigpiod-Persistenz**:
+- Neue `disconnect()` Methode trennt nur die Verbindung (PWM bleibt stabil)
+- State-File in `/run/growpi/pwm_state.json` für schnelle Recovery
+- Warm-Restart erkennt gespeicherten State und überspringt Kurven-Anwendung
+
+### Neue Features
+
+**PWM State Persistence** (`grow_pi/utils/pwm_state.py`):
+- `save_state()` - Speichert PWM-Zustand vor Shutdown
+- `load_state()` - Lädt State für Warm-Restart
+- `state_exists()` - Prüft ob gültiger State vorhanden
+- File-Locking für atomische Schreiboperationen
+
+**PWMController Erweiterung** (`grow_pi/lamps/pwm_controller.py`):
+```python
+def disconnect(self) -> None:
+    """Trennt Verbindung OHNE PWM-Werte zu ändern."""
+    # PWM läuft weiter via pigpiod!
+    self.pi.stop()
+
+def cleanup(self, turn_off_lamps: bool = True) -> None:
+    """Cleanup mit optionalem Lampen-Ausschalten."""
+```
+
+**Startup State-Recovery** (`grow_pi/main.py`):
+- Erkennt Warm-Restart via State-File
+- Stellt PWM-Tracking wieder her ohne Hardware zu ändern
+- Log-Ausgabe: `"WARM RESTART DETECTED"`, `"PWM state restored - no flickering!"`
+
+**Systemd Service** (`systemd/grow-pi.service`):
+```ini
+RuntimeDirectory=growpi
+RuntimeDirectoryPreserve=yes
+TimeoutStopSec=30
+KillMode=mixed
+```
+
+### User-Entscheidung
+**Frage**: Soll bei `systemctl stop` PWM erhalten bleiben?
+**Antwort**: **JA** - PWM-Werte bleiben IMMER erhalten, auch bei stop.
+
+### Test-Ergebnis
+```
+VOR RESTART:  Ch1: 95%
+NACH RESTART: Ch1: 95%  ← KEIN FLACKERN!
+```
+
+### Dateien
+
+| Datei | Aktion |
+|-------|--------|
+| `grow_pi/utils/pwm_state.py` | **NEU** - State Persistence Modul |
+| `grow_pi/lamps/pwm_controller.py` | `disconnect()` + `cleanup()` Parameter |
+| `grow_pi/main.py` | State-Recovery + `stop()` mit `disconnect()` |
+| `systemd/grow-pi.service` | RuntimeDirectoryPreserve + Timeouts |
+
+### Deployment
+- ✅ Deployed auf Pi @ 192.168.0.86
+- ✅ Getestet mit mehreren Restarts
+- ✅ Logs zeigen "PWM preserved" bei Shutdown
+- ✅ Logs zeigen "Warm restart detected" bei Startup
+
+---
+
 ## v6.8.1 (2025-12-06) - Repository Cleanup
 
 **🗂️ Repository Reorganization**

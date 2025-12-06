@@ -241,15 +241,49 @@ class PWMController:
             for ch in self.channels.values()
         ]
 
-    def cleanup(self) -> None:
-        """Cleanup GPIO resources."""
+    def disconnect(self) -> None:
+        """
+        Trennt Verbindung zu pigpiod OHNE PWM-Werte zu ändern.
+
+        Für Service-Restarts: PWM bleibt via pigpiod stabil.
+        Dies ist die bevorzugte Methode für graceful shutdown,
+        da pigpiod die PWM-Signale weiter ausgibt.
+
+        Siehe: Feature #0 PWM Zero-Downtime (ROADMAP.md)
+        """
         if self.simulation_mode:
-            logger.info("Simulation mode: cleanup complete")
+            logger.info("Simulation mode: disconnect complete")
+            self._initialized = False
             return
 
         if self.pi and self.pi.connected:
-            # Turn all lamps off before cleanup
-            self.all_off()
+            # Nur trennen - PWM läuft weiter via pigpiod!
+            self.pi.stop()
+            logger.info("Disconnected from pigpiod (PWM preserved)")
+
+        self._initialized = False
+
+    def cleanup(self, turn_off_lamps: bool = True) -> None:
+        """
+        Cleanup GPIO resources.
+
+        Args:
+            turn_off_lamps: Wenn True, werden alle Lampen ausgeschaltet.
+                           Für Zero-Downtime Restart: False verwenden
+                           oder besser disconnect() aufrufen.
+
+        Hinweis: Für normale Service-Restarts sollte disconnect()
+        verwendet werden, um PWM-Werte zu erhalten.
+        """
+        if self.simulation_mode:
+            logger.info("Simulation mode: cleanup complete")
+            self._initialized = False
+            return
+
+        if self.pi and self.pi.connected:
+            if turn_off_lamps:
+                self.all_off()
+                logger.info("All lamps turned off")
             self.pi.stop()
             logger.info("PWM Controller cleaned up")
 
