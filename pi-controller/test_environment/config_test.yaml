@@ -1,0 +1,83 @@
+# GrowPi Test Configuration
+# Used for local development/testing WITHOUT Raspberry Pi hardware
+
+# CRITICAL: Enable simulation mode for testing without GPIO
+simulation_mode: true
+
+# API Configuration
+api:
+  host: "0.0.0.0"
+  port: 5000
+  debug: true
+  cors_enabled: true
+
+# Lamp Channels (GPIO pins ignored in simulation mode)
+lamps:
+  pwm_frequency: 1000  # Ignored in mock
+  channels:
+    - channel: 1
+      name: "Far Red"
+      gpio_pin: 16  # BCM pin (ignored in simulation)
+
+    - channel: 2
+      name: "Warm White"
+      gpio_pin: 13  # BCM pin (ignored in simulation)
+
+    - channel: 3
+      name: "Cool White"
+      gpio_pin: 12  # BCM pin (ignored in simulation)
+
+    - channel: 4
+      name: "UV"
+      gpio_pin: 18  # BCM pin (ignored in simulation)
+
+# Sensor Configuration
+sensors:
+  dht22:
+    enabled: true  # Uses MockDHT22
+    gpio_pin: 4  # Ignored in simulation
+    read_interval: 60  # Seconds between reads
+
+# Data Logging
+logging:
+  enabled: true
+  database_type: "memory"  # "memory" or "sqlite"
+  database_path: ":memory:"  # In-memory database
+
+  intervals:
+    sensors: 60  # Log sensors every 60s
+    lamps: 60    # Log lamp states every 60s
+    plugs: 60    # Log plug data every 60s
+
+  deduplication:
+    enabled: true
+    min_seconds: 5  # Don't log identical values within 5s
+
+# Mock Sensor Settings (only used in simulation mode)
+mock_sensors:
+  dht22:
+    base_temperature: 22.0      # Average temp (°C)
+    base_humidity: 60.0         # Average humidity (%)
+    temperature_variation: 4.0  # Daily swing (°C)
+    humidity_variation: 10.0    # Daily swing (%)
+
+# Curve Controller
+curves:
+  enabled: true
+  update_interval: 60  # Check curves every 60s
+
+# Mode Manager
+mode:
+  default: "auto"  # "auto" or "manual"
+  persist: true    # Remember mode across restarts
+
+# Smart Plugs (optional, mocked in simulation)
+smart_plugs:
+  enabled: false  # Disable for basic testing
+  devices: []
+
+# Development Settings
+development:
+  auto_reload: true
+  verbose_logging: true
+  log_level: "DEBUG"  # DEBUG, INFO, WARNING, ERROR

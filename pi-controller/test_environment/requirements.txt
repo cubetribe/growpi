@@ -1,0 +1,16 @@
+# GrowPi Test Environment Requirements
+# Install with: pip install -r requirements.txt
+
+# Web Framework
+Flask==3.0.0
+Flask-CORS==4.0.0
+
+# Configuration
+PyYAML==6.0.1
+
+# NO hardware dependencies required!
+# (pigpio, adafruit-circuitpython-dht, etc. are mocked)
+
+# Optional: For advanced testing
+# pytest==7.4.3
+# requests==2.31.0  # For API testing

@@ -1,0 +1,99 @@
+{
+  "devices": [
+    {
+      "name": "Main Light",
+      "device_id": "bf36487f67d7bb8fc18buj",
+      "local_key": "e3bcb8213df8febf",
+      "uuid": "98f747fc0a312c1a",
+      "product_id": "bhqkxecq6o5qkc52",
+      "category": "cz",
+      "ip": "192.168.0.73",
+      "version": 3.3,
+      "connection": "wifi",
+      "tested": true
+    },
+    {
+      "name": "Wohnzimmer",
+      "device_id": "bfcf3ba95588e232b08mg6",
+      "local_key": "18f7374e6561495a",
+      "uuid": "63bf177bcee99597",
+      "product_id": "bhqkxecq6o5qkc52",
+      "category": "cz",
+      "ip": "192.168.0.96",
+      "version": 3.3,
+      "connection": "wifi",
+      "tested": false
+    },
+    {
+      "name": "Mittags Sonne",
+      "device_id": "bfbbc4e059a6ae812csbyq",
+      "local_key": "b4485b5086aedd63",
+      "uuid": "faad72b32b342c17",
+      "product_id": "bhqkxecq6o5qkc52",
+      "category": "cz",
+      "ip": "192.168.0.130",
+      "version": 3.3,
+      "connection": "wifi",
+      "tested": false
+    },
+    {
+      "name": "FR main",
+      "device_id": "bfc332c0bf2f53a5cc23uz",
+      "local_key": "a2b22def0cbeeb92",
+      "uuid": "d5cd1905749e15a8",
+      "product_id": "bhqkxecq6o5qkc52",
+      "category": "cz",
+      "ip": "192.168.0.93",
+      "version": 3.3,
+      "connection": "wifi",
+      "tested": false
+    },
+    {
+      "name": "ANTELA Smart Steckdose",
+      "device_id": "bfc705014c6241667avzn8",
+      "local_key": "s@RYBBz3;?0D)eO9",
+      "uuid": "6f0bb38886593b70",
+      "product_id": "zgrntltgggxw0e5d",
+      "category": "cz",
+      "mac": "18:DE:50:93:13:6D",
+      "ip": null,
+      "connection": "ble",
+      "tested": false,
+      "notes": "BLE-only, requires special handling"
+    },
+    {
+      "name": "Pumpe",
+      "device_id": "bfad1a5081fa6a2342j7ye",
+      "local_key": "*D*YZzgwV55BSss#",
+      "uuid": "3864e53403be030a",
+      "product_id": "zgrntltgggxw0e5d",
+      "category": "cz",
+      "mac": null,
+      "ip": null,
+      "connection": "ble",
+      "tested": false,
+      "notes": "BLE-only, requires special handling"
+    }
+  ],
+  "tuya_cloud": {
+    "region": "eu",
+    "access_id": "x7gt474g4ac9nvwredk4",
+    "note": "Access Secret in .env file"
+  },
+  "data_points": {
+    "1": "switch (on/off)",
+    "9": "countdown timer",
+    "17": "power (W * 10)",
+    "18": "current (mA)",
+    "19": "voltage (V * 10)",
+    "20": "energy total (Wh)",
+    "21": "unknown",
+    "22": "unknown",
+    "23": "unknown",
+    "24": "unknown",
+    "25": "unknown",
+    "38": "power_on_state (memory/on/off)",
+    "39": "relay_status"
+  },
+  "updated": "2025-12-06"
+}

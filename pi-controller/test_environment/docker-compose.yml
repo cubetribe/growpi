@@ -1,0 +1,33 @@
+# Docker Compose for GrowPi Test Environment
+# Usage: docker-compose up
+
+version: '3.8'
+
+services:
+  growpi-test:
+    build:
+      context: ..
+      dockerfile: test_environment/Dockerfile
+    container_name: growpi-test
+    ports:
+      - "5000:5000"
+    environment:
+      - GROWPI_SIMULATION_MODE=1
+      - FLASK_ENV=development
+    volumes:
+      # Mount code for live-reload during development
+      - ../grow_pi:/app/grow_pi
+      - ./:/app/test_environment
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5000/api/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    networks:
+      - growpi-test-net
+
+networks:
+  growpi-test-net:
+    driver: bridge

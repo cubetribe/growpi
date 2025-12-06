@@ -1,0 +1,319 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GrowPi Modules Test</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            background: #0a0a0a;
+            color: #fff;
+            padding: 20px;
+            max-width: 800px;
+            margin: 0 auto;
+        }
+        .section {
+            background: #141414;
+            border: 1px solid #2a2a2a;
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+        h2 {
+            color: #11ff55;
+            margin-top: 0;
+        }
+        button {
+            background: #11ff55;
+            color: #0a0a0a;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 8px;
+            font-weight: 600;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover {
+            background: #00dd44;
+        }
+        #output {
+            background: #000;
+            border: 1px solid #333;
+            border-radius: 8px;
+            padding: 12px;
+            font-family: 'Monaco', monospace;
+            font-size: 12px;
+            line-height: 1.6;
+            overflow-x: auto;
+            white-space: pre-wrap;
+            max-height: 400px;
+            overflow-y: auto;
+        }
+        .success { color: #11ff55; }
+        .error { color: #ff4444; }
+        .info { color: #88ddff; }
+    </style>
+</head>
+<body>
+    <h1>GrowPi JavaScript Modules Test</h1>
+
+    <div class="section">
+        <h2>State Management Tests</h2>
+        <button onclick="testStateBasic()">Test Basic State</button>
+        <button onclick="testStateSubscription()">Test Subscriptions</button>
+        <button onclick="testStateCurves()">Test Curve State</button>
+        <button onclick="testStateReset()">Reset State</button>
+    </div>
+
+    <div class="section">
+        <h2>API Client Tests</h2>
+        <p style="color: #ffbb44;">⚠️ These require the backend to be running!</p>
+        <button onclick="testAPIStatus()">Get Status</button>
+        <button onclick="testAPIMode()">Get Mode</button>
+        <button onclick="testAPICurves()">Get Curves</button>
+        <button onclick="testAPISetLamp()">Set Lamp (Ch1 → 50%)</button>
+    </div>
+
+    <div class="section">
+        <h2>Output</h2>
+        <div id="output">Ready for testing...</div>
+    </div>
+
+    <!-- Load our modules -->
+    <script src="state.js"></script>
+    <script src="api.js"></script>
+
+    <script>
+        const output = document.getElementById('output');
+        let unsubscribe = null;
+
+        function log(message, type = 'info') {
+            const timestamp = new Date().toLocaleTimeString();
+            const className = type === 'error' ? 'error' : type === 'success' ? 'success' : 'info';
+            output.innerHTML += `<span class="${className}">[${timestamp}] ${message}</span>\n`;
+            output.scrollTop = output.scrollHeight;
+        }
+
+        function clear() {
+            output.innerHTML = '';
+        }
+
+        // ==========================================
+        // State Tests
+        // ==========================================
+
+        function testStateBasic() {
+            clear();
+            log('Testing basic state operations...', 'info');
+
+            try {
+                // Set mode
+                GrowPiState.setMode('manual');
+                log(`✓ Set mode to: ${GrowPiState.getMode()}`, 'success');
+
+                // Set temperature
+                GrowPiState.setTemperature(22.5);
+                log(`✓ Set temperature to: ${GrowPiState.getTemperature()}°C`, 'success');
+
+                // Set humidity
+                GrowPiState.setHumidity(65);
+                log(`✓ Set humidity to: ${GrowPiState.getHumidity()}%`, 'success');
+
+                // Set online status
+                GrowPiState.setOnline(true);
+                log(`✓ Online status: ${GrowPiState.isOnline()}`, 'success');
+
+                // Get full state
+                const state = GrowPiState.getState();
+                log(`✓ Full state:\n${JSON.stringify(state, null, 2)}`, 'success');
+
+            } catch (error) {
+                log(`✗ Error: ${error.message}`, 'error');
+            }
+        }
+
+        function testStateSubscription() {
+            clear();
+            log('Testing state subscriptions...', 'info');
+
+            try {
+                let callCount = 0;
+
+                // Subscribe to mode changes
+                unsubscribe = GrowPiState.subscribe('currentMode', (mode) => {
+                    callCount++;
+                    log(`✓ Subscription callback #${callCount}: mode changed to "${mode}"`, 'success');
+                });
+
+                log('Subscribed to "currentMode" changes', 'info');
+
+                // Trigger multiple mode changes
+                setTimeout(() => {
+                    GrowPiState.setMode('auto');
+                }, 500);
+
+                setTimeout(() => {
+                    GrowPiState.setMode('manual');
+                }, 1000);
+
+                setTimeout(() => {
+                    GrowPiState.setMode('auto');
+                }, 1500);
+
+                setTimeout(() => {
+                    if (unsubscribe) {
+                        unsubscribe();
+                        log('✓ Unsubscribed from mode changes', 'info');
+                    }
+                }, 2000);
+
+            } catch (error) {
+                log(`✗ Error: ${error.message}`, 'error');
+            }
+        }
+
+        function testStateCurves() {
+            clear();
+            log('Testing curve state management...', 'info');
+
+            try {
+                // Create mock curve data
+                const mockCurves = {
+                    1: {
+                        channel: 1,
+                        name: 'Far Red',
+                        enabled: true,
+                        curve: [
+                            { time: '06:00', intensity: 0 },
+                            { time: '12:00', intensity: 80 },
+                            { time: '18:00', intensity: 0 }
+                        ]
+                    },
+                    2: {
+                        channel: 2,
+                        name: 'Warm White',
+                        enabled: true,
+                        curve: [
+                            { time: '08:00', intensity: 0 },
+                            { time: '14:00', intensity: 100 },
+                            { time: '20:00', intensity: 0 }
+                        ]
+                    }
+                };
+
+                GrowPiState.setCurvesData(mockCurves);
+                log('✓ Set curves data for 2 channels', 'success');
+
+                const curve1 = GrowPiState.getCurve(1);
+                log(`✓ Retrieved curve 1: ${curve1.name}`, 'success');
+                log(`  Points: ${JSON.stringify(curve1.curve, null, 2)}`, 'info');
+
+                // Set active channel
+                GrowPiState.setActiveChannel(2);
+                log(`✓ Active channel: ${GrowPiState.getActiveChannel()}`, 'success');
+
+                // Get all curves
+                const allCurves = GrowPiState.getCurvesData();
+                log(`✓ Total curves: ${Object.keys(allCurves).length}`, 'success');
+
+            } catch (error) {
+                log(`✗ Error: ${error.message}`, 'error');
+            }
+        }
+
+        function testStateReset() {
+            clear();
+            log('Resetting state to defaults...', 'info');
+
+            try {
+                GrowPiState.reset();
+                const state = GrowPiState.getState();
+                log(`✓ State reset complete`, 'success');
+                log(`State after reset:\n${JSON.stringify(state, null, 2)}`, 'info');
+            } catch (error) {
+                log(`✗ Error: ${error.message}`, 'error');
+            }
+        }
+
+        // ==========================================
+        // API Tests
+        // ==========================================
+
+        async function testAPIStatus() {
+            clear();
+            log('Fetching system status from API...', 'info');
+
+            try {
+                const status = await GrowPiAPI.getStatus();
+                log(`✓ Status received:`, 'success');
+                log(`  Temperature: ${status.temperature}°C`, 'info');
+                log(`  Humidity: ${status.humidity}%`, 'info');
+                log(`  Lamps:`, 'info');
+                status.lamps.forEach(lamp => {
+                    log(`    Channel ${lamp.channel}: ${lamp.intensity}%`, 'info');
+                });
+            } catch (error) {
+                log(`✗ API Error: ${error.message}`, 'error');
+                log('Make sure the Flask backend is running!', 'error');
+            }
+        }
+
+        async function testAPIMode() {
+            clear();
+            log('Fetching current mode from API...', 'info');
+
+            try {
+                const data = await GrowPiAPI.getMode();
+                log(`✓ Current mode: ${data.mode}`, 'success');
+            } catch (error) {
+                log(`✗ API Error: ${error.message}`, 'error');
+            }
+        }
+
+        async function testAPICurves() {
+            clear();
+            log('Fetching curves from API...', 'info');
+
+            try {
+                const data = await GrowPiAPI.getCurves();
+                if (data.success) {
+                    log(`✓ Curves received: ${data.curves.length} channels`, 'success');
+                    data.curves.forEach(curve => {
+                        log(`  Channel ${curve.channel} (${curve.name}): ${curve.curve.length} points, enabled: ${curve.enabled}`, 'info');
+                    });
+                } else {
+                    log(`✗ API returned success=false`, 'error');
+                }
+            } catch (error) {
+                log(`✗ API Error: ${error.message}`, 'error');
+            }
+        }
+
+        async function testAPISetLamp() {
+            clear();
+            log('Setting lamp 1 to 50%...', 'info');
+
+            try {
+                const response = await GrowPiAPI.setLamp(1, 50);
+                log(`✓ Lamp set successfully`, 'success');
+                log(`Response: ${JSON.stringify(response, null, 2)}`, 'info');
+
+                // Verify by getting status
+                setTimeout(async () => {
+                    const status = await GrowPiAPI.getStatus();
+                    const lamp1 = status.lamps.find(l => l.channel === 1);
+                    log(`✓ Verified: Channel 1 is now at ${lamp1.intensity}%`, 'success');
+                }, 1000);
+            } catch (error) {
+                log(`✗ API Error: ${error.message}`, 'error');
+            }
+        }
+
+        // Initial log
+        log('Modules loaded successfully!', 'success');
+        log('GrowPiAPI and GrowPiState are available globally.', 'info');
+        log('Click buttons above to run tests.', 'info');
+    </script>
+</body>
+</html>
