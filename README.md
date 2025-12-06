@@ -3,7 +3,7 @@
 Professional greenhouse automation and monitoring platform powered by Raspberry Pi.
 
 **Live Demo**: http://growpi.nm-forum.de
-**Version**: v6.7.0 (2025-12-06)
+**Version**: v6.8.0 (2025-12-06)
 **Status**: Production-Ready
 
 ---
@@ -306,4 +306,4 @@ Orchestrated with Claude Code (17 parallel agents for v6.5 refactoring)
 ---
 
 **Last Updated**: 2025-12-06
-**Version**: v6.7.0
+**Version**: v6.8.0

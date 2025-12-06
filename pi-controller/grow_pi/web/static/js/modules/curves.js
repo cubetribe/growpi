@@ -25,6 +25,7 @@ import { GrowPiAPI } from '../api.js';
 let curvesData = {}; // { channel: { name, channel, enabled, curve: [{ time, intensity }], current_intensity } }
 let previewData = []; // [{ time: "HH:MM", intensities: { channel: intensity } }]
 let activeChannel = 1; // Currently selected channel for preview
+let presetsData = []; // [{ id, name, description, curves_json, is_system, created_at }]
 
 // Channel colors matching the UI
 const channelColors = {
@@ -50,6 +51,15 @@ let btnExportJson;
 let btnCopyJson;
 let btnDownloadJson;
 let btnImportJson;
+
+// Preset DOM references
+let presetControls;
+let presetSelect;
+let btnApplyPreset;
+let btnSavePreset;
+let btnManagePresets;
+let savePresetModal;
+let managePresetsModal;
 
 // ============================================================================
 // INITIALIZATION
@@ -113,6 +123,9 @@ export function initCurvesTab() {
     if (btnImportJson) {
         btnImportJson.addEventListener("click", importJson);
     }
+
+    // Initialize preset controls
+    initPresetControls();
 
     console.log("Curves module initialized");
 }
@@ -653,4 +666,490 @@ function importJson() {
     } catch (e) {
         window.showError?.("Import fehlgeschlagen: " + e.message);
     }
+}
+
+// ============================================================================
+// PRESET FUNCTIONALITY
+// ============================================================================
+
+/**
+ * Initialize preset controls - creates UI elements and sets up event handlers
+ */
+function initPresetControls() {
+    // Find or create preset controls container
+    const curvesTab = document.getElementById("tab-curves");
+    if (!curvesTab) return;
+
+    // Create preset controls HTML
+    const presetControlsHTML = `
+        <div class="preset-controls" id="presetControls">
+            <div class="preset-header">
+                <span class="preset-label">Presets:</span>
+                <select id="presetSelect" class="preset-select">
+                    <option value="">-- Preset wählen --</option>
+                </select>
+                <button class="btn-preset" id="btnApplyPreset" disabled>Anwenden</button>
+                <button class="btn-preset btn-preset-primary" id="btnSavePreset">Speichern als...</button>
+                <button class="btn-preset" id="btnManagePresets">Verwalten</button>
+            </div>
+        </div>
+    `;
+
+    // Create save preset modal
+    const saveModalHTML = `
+        <div class="modal-overlay" id="savePresetModal" style="display: none;">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h3>Preset speichern</h3>
+                    <button class="modal-close" id="closeSaveModal">&times;</button>
+                </div>
+                <div class="modal-body">
+                    <div class="form-group">
+                        <label for="presetName">Name:</label>
+                        <input type="text" id="presetName" class="form-input" placeholder="z.B. Meine Konfiguration" maxlength="50">
+                    </div>
+                    <div class="form-group">
+                        <label for="presetDescription">Beschreibung (optional):</label>
+                        <textarea id="presetDescription" class="form-textarea" placeholder="Beschreibung des Presets..." rows="3"></textarea>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button class="btn-modal btn-cancel" id="cancelSavePreset">Abbrechen</button>
+                    <button class="btn-modal btn-primary" id="confirmSavePreset">Speichern</button>
+                </div>
+            </div>
+        </div>
+    `;
+
+    // Create manage presets modal
+    const manageModalHTML = `
+        <div class="modal-overlay" id="managePresetsModal" style="display: none;">
+            <div class="modal-content modal-wide">
+                <div class="modal-header">
+                    <h3>Presets verwalten</h3>
+                    <button class="modal-close" id="closeManageModal">&times;</button>
+                </div>
+                <div class="modal-body">
+                    <div id="presetsListContainer" class="presets-list">
+                        <p class="loading-text">Lade Presets...</p>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button class="btn-modal" id="closeManagePresets">Schließen</button>
+                </div>
+            </div>
+        </div>
+    `;
+
+    // Insert preset controls before preview section
+    const previewSection = curvesTab.querySelector(".preview-section");
+    if (previewSection) {
+        previewSection.insertAdjacentHTML("beforebegin", presetControlsHTML);
+    }
+
+    // Add modals to body
+    document.body.insertAdjacentHTML("beforeend", saveModalHTML);
+    document.body.insertAdjacentHTML("beforeend", manageModalHTML);
+
+    // Get DOM references
+    presetControls = document.getElementById("presetControls");
+    presetSelect = document.getElementById("presetSelect");
+    btnApplyPreset = document.getElementById("btnApplyPreset");
+    btnSavePreset = document.getElementById("btnSavePreset");
+    btnManagePresets = document.getElementById("btnManagePresets");
+    savePresetModal = document.getElementById("savePresetModal");
+    managePresetsModal = document.getElementById("managePresetsModal");
+
+    // Setup event listeners
+    if (presetSelect) {
+        presetSelect.addEventListener("change", () => {
+            btnApplyPreset.disabled = !presetSelect.value;
+        });
+    }
+
+    if (btnApplyPreset) {
+        btnApplyPreset.addEventListener("click", applySelectedPreset);
+    }
+
+    if (btnSavePreset) {
+        btnSavePreset.addEventListener("click", () => showSavePresetModal());
+    }
+
+    if (btnManagePresets) {
+        btnManagePresets.addEventListener("click", () => showManagePresetsModal());
+    }
+
+    // Save modal events
+    document.getElementById("closeSaveModal")?.addEventListener("click", closeSavePresetModal);
+    document.getElementById("cancelSavePreset")?.addEventListener("click", closeSavePresetModal);
+    document.getElementById("confirmSavePreset")?.addEventListener("click", saveNewPreset);
+
+    // Manage modal events
+    document.getElementById("closeManageModal")?.addEventListener("click", closeManagePresetsModal);
+    document.getElementById("closeManagePresets")?.addEventListener("click", closeManagePresetsModal);
+
+    // Close modals on overlay click
+    savePresetModal?.addEventListener("click", (e) => {
+        if (e.target === savePresetModal) closeSavePresetModal();
+    });
+    managePresetsModal?.addEventListener("click", (e) => {
+        if (e.target === managePresetsModal) closeManagePresetsModal();
+    });
+
+    // Load presets on init
+    fetchPresets();
+}
+
+/**
+ * Fetch presets from server
+ */
+async function fetchPresets() {
+    try {
+        const response = await GrowPiAPI.getCurvePresets();
+        if (response.success) {
+            presetsData = response.presets || [];
+            renderPresetSelect();
+        }
+    } catch (error) {
+        console.error("Fetch presets error:", error);
+    }
+}
+
+/**
+ * Render preset dropdown options
+ */
+function renderPresetSelect() {
+    if (!presetSelect) return;
+
+    // Clear existing options except default
+    presetSelect.innerHTML = '<option value="">-- Preset wählen --</option>';
+
+    // Add system presets first
+    const systemPresets = presetsData.filter(p => p.is_system);
+    const userPresets = presetsData.filter(p => !p.is_system);
+
+    if (systemPresets.length > 0) {
+        const systemGroup = document.createElement("optgroup");
+        systemGroup.label = "System Presets";
+        systemPresets.forEach(p => {
+            const option = document.createElement("option");
+            option.value = p.id;
+            option.textContent = p.name;
+            option.title = p.description || "";
+            systemGroup.appendChild(option);
+        });
+        presetSelect.appendChild(systemGroup);
+    }
+
+    if (userPresets.length > 0) {
+        const userGroup = document.createElement("optgroup");
+        userGroup.label = "Eigene Presets";
+        userPresets.forEach(p => {
+            const option = document.createElement("option");
+            option.value = p.id;
+            option.textContent = p.name;
+            option.title = p.description || "";
+            userGroup.appendChild(option);
+        });
+        presetSelect.appendChild(userGroup);
+    }
+
+    btnApplyPreset.disabled = true;
+}
+
+/**
+ * Apply selected preset to curves
+ */
+async function applySelectedPreset() {
+    const presetId = parseInt(presetSelect.value);
+    if (!presetId) return;
+
+    btnApplyPreset.disabled = true;
+    btnApplyPreset.textContent = "Anwenden...";
+
+    try {
+        const response = await GrowPiAPI.applyCurvePreset(presetId);
+        if (response.success) {
+            // Update local curves data
+            if (response.curves) {
+                curvesData = {};
+                response.curves.forEach((c) => {
+                    curvesData[c.channel] = c;
+                });
+                renderCurves();
+            }
+            window.showSuccess?.(`Preset "${response.preset?.name}" angewendet!`);
+        } else {
+            throw new Error(response.error || "Fehler beim Anwenden");
+        }
+    } catch (error) {
+        console.error("Apply preset error:", error);
+        window.showError?.(`Preset konnte nicht angewendet werden: ${error.message}`);
+    } finally {
+        btnApplyPreset.disabled = false;
+        btnApplyPreset.textContent = "Anwenden";
+        presetSelect.value = "";
+    }
+}
+
+/**
+ * Show save preset modal
+ */
+function showSavePresetModal() {
+    if (!savePresetModal) return;
+    document.getElementById("presetName").value = "";
+    document.getElementById("presetDescription").value = "";
+    savePresetModal.style.display = "flex";
+    document.getElementById("presetName").focus();
+}
+
+/**
+ * Close save preset modal
+ */
+function closeSavePresetModal() {
+    if (savePresetModal) {
+        savePresetModal.style.display = "none";
+    }
+}
+
+/**
+ * Save a new preset with current curves
+ */
+async function saveNewPreset() {
+    const nameInput = document.getElementById("presetName");
+    const descInput = document.getElementById("presetDescription");
+    const name = nameInput.value.trim();
+    const description = descInput.value.trim();
+
+    if (!name) {
+        window.showError?.("Bitte geben Sie einen Namen ein");
+        nameInput.focus();
+        return;
+    }
+
+    const confirmBtn = document.getElementById("confirmSavePreset");
+    confirmBtn.disabled = true;
+    confirmBtn.textContent = "Speichern...";
+
+    try {
+        const response = await GrowPiAPI.createCurvePreset(name, description);
+        if (response.success) {
+            window.showSuccess?.(`Preset "${name}" erstellt!`);
+            closeSavePresetModal();
+            await fetchPresets();
+        } else {
+            throw new Error(response.error || "Fehler beim Erstellen");
+        }
+    } catch (error) {
+        console.error("Create preset error:", error);
+        window.showError?.(`Preset konnte nicht erstellt werden: ${error.message}`);
+    } finally {
+        confirmBtn.disabled = false;
+        confirmBtn.textContent = "Speichern";
+    }
+}
+
+/**
+ * Show manage presets modal
+ */
+async function showManagePresetsModal() {
+    if (!managePresetsModal) return;
+    managePresetsModal.style.display = "flex";
+    await renderPresetsList();
+}
+
+/**
+ * Close manage presets modal
+ */
+function closeManagePresetsModal() {
+    if (managePresetsModal) {
+        managePresetsModal.style.display = "none";
+    }
+}
+
+/**
+ * Render presets list in manage modal
+ */
+async function renderPresetsList() {
+    const container = document.getElementById("presetsListContainer");
+    if (!container) return;
+
+    // Refresh presets data
+    await fetchPresets();
+
+    if (presetsData.length === 0) {
+        container.innerHTML = '<p class="empty-text">Keine Presets vorhanden</p>';
+        return;
+    }
+
+    let html = '<table class="presets-table"><thead><tr><th>Name</th><th>Beschreibung</th><th>Typ</th><th>Aktionen</th></tr></thead><tbody>';
+
+    presetsData.forEach(preset => {
+        const isSystem = preset.is_system;
+        html += `
+            <tr data-preset-id="${preset.id}">
+                <td>
+                    <span class="preset-name-display">${escapeHtml(preset.name)}</span>
+                    <input type="text" class="preset-name-edit form-input" value="${escapeHtml(preset.name)}" style="display: none;" maxlength="50">
+                </td>
+                <td>
+                    <span class="preset-desc-display">${escapeHtml(preset.description || "-")}</span>
+                    <textarea class="preset-desc-edit form-textarea" style="display: none;" rows="2">${escapeHtml(preset.description || "")}</textarea>
+                </td>
+                <td><span class="preset-type ${isSystem ? "system" : "user"}">${isSystem ? "System" : "Eigene"}</span></td>
+                <td class="preset-actions">
+                    ${!isSystem ? `
+                        <button class="btn-preset-action btn-edit" data-id="${preset.id}" title="Bearbeiten">Bearbeiten</button>
+                        <button class="btn-preset-action btn-save-edit" data-id="${preset.id}" style="display: none;" title="Speichern">OK</button>
+                        <button class="btn-preset-action btn-cancel-edit" data-id="${preset.id}" style="display: none;" title="Abbrechen">X</button>
+                        <button class="btn-preset-action btn-delete" data-id="${preset.id}" title="Löschen">Löschen</button>
+                    ` : '<span class="system-hint">Geschützt</span>'}
+                </td>
+            </tr>
+        `;
+    });
+
+    html += '</tbody></table>';
+    container.innerHTML = html;
+
+    // Setup event listeners for table actions
+    setupPresetTableListeners();
+}
+
+/**
+ * Setup event listeners for preset table actions
+ */
+function setupPresetTableListeners() {
+    const container = document.getElementById("presetsListContainer");
+    if (!container) return;
+
+    // Edit buttons
+    container.querySelectorAll(".btn-edit").forEach(btn => {
+        btn.addEventListener("click", () => {
+            const row = btn.closest("tr");
+            enterEditMode(row);
+        });
+    });
+
+    // Save edit buttons
+    container.querySelectorAll(".btn-save-edit").forEach(btn => {
+        btn.addEventListener("click", async () => {
+            const row = btn.closest("tr");
+            await savePresetEdit(row);
+        });
+    });
+
+    // Cancel edit buttons
+    container.querySelectorAll(".btn-cancel-edit").forEach(btn => {
+        btn.addEventListener("click", () => {
+            const row = btn.closest("tr");
+            exitEditMode(row);
+        });
+    });
+
+    // Delete buttons
+    container.querySelectorAll(".btn-delete").forEach(btn => {
+        btn.addEventListener("click", async () => {
+            const presetId = parseInt(btn.dataset.id);
+            await deletePreset(presetId);
+        });
+    });
+}
+
+/**
+ * Enter edit mode for a preset row
+ */
+function enterEditMode(row) {
+    row.querySelector(".preset-name-display").style.display = "none";
+    row.querySelector(".preset-name-edit").style.display = "block";
+    row.querySelector(".preset-desc-display").style.display = "none";
+    row.querySelector(".preset-desc-edit").style.display = "block";
+    row.querySelector(".btn-edit").style.display = "none";
+    row.querySelector(".btn-save-edit").style.display = "inline-block";
+    row.querySelector(".btn-cancel-edit").style.display = "inline-block";
+    row.querySelector(".btn-delete").style.display = "none";
+}
+
+/**
+ * Exit edit mode for a preset row
+ */
+function exitEditMode(row) {
+    const preset = presetsData.find(p => p.id === parseInt(row.dataset.presetId));
+    if (preset) {
+        row.querySelector(".preset-name-edit").value = preset.name;
+        row.querySelector(".preset-desc-edit").value = preset.description || "";
+    }
+    row.querySelector(".preset-name-display").style.display = "inline";
+    row.querySelector(".preset-name-edit").style.display = "none";
+    row.querySelector(".preset-desc-display").style.display = "inline";
+    row.querySelector(".preset-desc-edit").style.display = "none";
+    row.querySelector(".btn-edit").style.display = "inline-block";
+    row.querySelector(".btn-save-edit").style.display = "none";
+    row.querySelector(".btn-cancel-edit").style.display = "none";
+    row.querySelector(".btn-delete").style.display = "inline-block";
+}
+
+/**
+ * Save preset edit
+ */
+async function savePresetEdit(row) {
+    const presetId = parseInt(row.dataset.presetId);
+    const newName = row.querySelector(".preset-name-edit").value.trim();
+    const newDesc = row.querySelector(".preset-desc-edit").value.trim();
+
+    if (!newName) {
+        window.showError?.("Name darf nicht leer sein");
+        return;
+    }
+
+    try {
+        const response = await GrowPiAPI.updateCurvePreset(presetId, {
+            name: newName,
+            description: newDesc
+        });
+
+        if (response.success) {
+            window.showSuccess?.("Preset aktualisiert!");
+            await renderPresetsList();
+        } else {
+            throw new Error(response.error || "Fehler beim Aktualisieren");
+        }
+    } catch (error) {
+        console.error("Update preset error:", error);
+        window.showError?.(`Aktualisierung fehlgeschlagen: ${error.message}`);
+    }
+}
+
+/**
+ * Delete a preset
+ */
+async function deletePreset(presetId) {
+    const preset = presetsData.find(p => p.id === presetId);
+    if (!preset) return;
+
+    if (!confirm(`Preset "${preset.name}" wirklich löschen?`)) {
+        return;
+    }
+
+    try {
+        const response = await GrowPiAPI.deleteCurvePreset(presetId);
+        if (response.success) {
+            window.showSuccess?.(`Preset "${preset.name}" gelöscht!`);
+            await renderPresetsList();
+        } else {
+            throw new Error(response.error || "Fehler beim Löschen");
+        }
+    } catch (error) {
+        console.error("Delete preset error:", error);
+        window.showError?.(`Löschen fehlgeschlagen: ${error.message}`);
+    }
+}
+
+/**
+ * Escape HTML to prevent XSS
+ */
+function escapeHtml(text) {
+    const div = document.createElement("div");
+    div.textContent = text;
+    return div.innerHTML;
 }

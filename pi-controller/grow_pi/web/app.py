@@ -274,6 +274,18 @@ def _initialize_curve_controller(app: Flask) -> None:
             app.curve_controller = get_curve_controller()
             app.curve_controller.initialize(channels)
             logger.info("CurveController initialized successfully")
+
+            # Initialize default curve presets
+            try:
+                try:
+                    from ..database import get_database
+                except ImportError:
+                    from grow_pi.database import get_database
+                db = get_database()
+                db.initialize_default_presets()
+                logger.info("Curve presets initialized")
+            except Exception as preset_e:
+                logger.warning(f"Could not initialize curve presets: {preset_e}")
         except Exception as e:
             logger.error(f"Failed to initialize CurveController: {e}")
     except ImportError as e:

@@ -168,6 +168,56 @@ export const GrowPiAPI = {
         return await get('/api/curves/intensities');
     },
 
+    // ==========================================
+    // Curve Presets API (v6.8)
+    // ==========================================
+
+    /**
+     * Get all curve presets
+     * @returns {Promise<Object>} List of presets
+     */
+    async getCurvePresets() {
+        return await get('/api/curves/presets');
+    },
+
+    /**
+     * Create a new curve preset from current curves
+     * @param {string} name - Preset name
+     * @param {string} description - Optional description
+     * @returns {Promise<Object>} Created preset data
+     */
+    async createCurvePreset(name, description = '') {
+        return await post('/api/curves/presets', { name, description });
+    },
+
+    /**
+     * Update a curve preset (rename or change description)
+     * @param {number} presetId - Preset ID
+     * @param {Object} data - { name?: string, description?: string }
+     * @returns {Promise<Object>} Updated preset data
+     */
+    async updateCurvePreset(presetId, data) {
+        return await put(`/api/curves/presets/${presetId}`, data);
+    },
+
+    /**
+     * Delete a curve preset
+     * @param {number} presetId - Preset ID
+     * @returns {Promise<Object>} Response data
+     */
+    async deleteCurvePreset(presetId) {
+        return await request(`/api/curves/presets/${presetId}`, { method: 'DELETE' });
+    },
+
+    /**
+     * Apply a curve preset to all lamp channels
+     * @param {number} presetId - Preset ID
+     * @returns {Promise<Object>} Response with updated curves
+     */
+    async applyCurvePreset(presetId) {
+        return await post(`/api/curves/presets/${presetId}/apply`, {});
+    },
+
     /**
      * Get sensor logs
      * @param {string} type - Sensor type ('temperature' | 'humidity')
@@ -241,10 +291,55 @@ export const GrowPiAPI = {
      * @param {number} config.target - Target humidity percentage
      * @param {number} config.threshold_high - High threshold (turn on)
      * @param {number} config.threshold_low - Low threshold (turn off)
+     * @param {boolean} config.time_schedule_enabled - Enable time-based scheduling
      * @returns {Promise<Object>} Response data
      */
     async saveRoomConfig(config) {
         return await post('/api/room/config', config);
+    },
+
+    // ==========================================
+    // Time Schedule API (v6.8 - Feature #2)
+    // ==========================================
+
+    /**
+     * Get all time schedules for dehumidifier
+     * @returns {Promise<Object>} Schedules list and active schedule
+     */
+    async getSchedules() {
+        return await get('/api/room/schedules');
+    },
+
+    /**
+     * Create a new time schedule
+     * @param {Object} schedule - Schedule data
+     * @param {string} schedule.start_time - Start time "HH:MM"
+     * @param {string} schedule.end_time - End time "HH:MM"
+     * @param {string} schedule.target_state - "on" or "off" (default: "on")
+     * @param {boolean} schedule.enabled - Whether schedule is active (default: true)
+     * @returns {Promise<Object>} Created schedule with ID
+     */
+    async createSchedule(schedule) {
+        return await post('/api/room/schedules', schedule);
+    },
+
+    /**
+     * Update an existing time schedule
+     * @param {number} scheduleId - Schedule ID
+     * @param {Object} updates - Fields to update
+     * @returns {Promise<Object>} Success response
+     */
+    async updateSchedule(scheduleId, updates) {
+        return await put(`/api/room/schedules/${scheduleId}`, updates);
+    },
+
+    /**
+     * Delete a time schedule
+     * @param {number} scheduleId - Schedule ID
+     * @returns {Promise<Object>} Success response
+     */
+    async deleteSchedule(scheduleId) {
+        return await request(`/api/room/schedules/${scheduleId}`, { method: 'DELETE' });
     },
 
     // ==========================================

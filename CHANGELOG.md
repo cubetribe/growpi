@@ -2,6 +2,54 @@
 
 ---
 
+## v6.8.0 (2025-12-06) - Feature Pack: Usability & Automation
+
+**🎯 Features Implemented (4 parallel agents)**
+
+### Feature #1: Version Display im Header ⚡ KRITISCH
+- Version Badge "v6.8.0" neben "Aktualisiert: HH:MM"
+- Neon-grün Glassmorphism Styling
+- Deployment-Verification für schnelles Debugging
+
+### Feature #2: Zeitbasierte Geräte-Schaltung 🔥 KOMPLEX
+- Neue DB-Tabelle: `device_time_schedules`
+- Priority-Logik: Zeit-Fenster > Feuchtigkeit > Manuell
+- Smart Fallback: Prüft Feuchtigkeit wenn Zeitfenster endet
+- 4 API Endpoints: `/api/room/schedules` (CRUD)
+- Frontend: Zeitfenster-Verwaltung im Room-Tab
+- Validierung: Verhindert überlappende Zeitfenster
+- Mitternachts-Wrap-around Support (23:00-01:00)
+
+### Feature #3: Collapsible Sections (Accordion)
+- Klappbare Sektionen: "Beleuchtung" + "Schaltbare Geräte"
+- Smooth CSS Animations (0.3s transitions)
+- localStorage Persistence (überlebt Page-Reloads)
+- Keyboard-Accessible (Enter/Space) + ARIA-Attribute
+- Neues Modul: `accordion.js`
+
+### Feature #4: Kurven-Presets System
+- Neue DB-Tabelle: `curve_presets`
+- 3 Built-in Presets: Keimung, Wachstum, Blüte
+- 5 API Endpoints: `/api/curves/presets` (GET, POST, PUT, DELETE, APPLY)
+- Frontend: Dropdown + Save/Manage Modals
+- System-Preset Schutz (können nicht gelöscht werden)
+
+**🔧 Technical**
+- 11 Agent Reports in `/agents/` Ordner
+- Parallel Implementation + Validation + Integration Testing
+- Deployment-ready: ✅ APPROVED (Integration Test)
+- CSS: +~900 Zeilen (Dark Theme konsistent)
+- JavaScript: +~1200 Zeilen (3 neue Module)
+- SQL: 2 neue Tabellen mit Indexes
+
+**📊 Code Statistics**
+- Files Modified: 15
+- Lines Added: ~2100
+- Agent Workflow: 4 Implementation → 4 Validation → 1 Fix → 1 Re-Validation → 1 Integration
+- Build Status: ✅ All Tests Passed
+
+---
+
 ## [v6.7.0] - 2025-12-06
 
 ### Bug Fixes & Deployment (Post v6.6)

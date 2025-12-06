@@ -133,7 +133,7 @@ def load_lamp_channels():
 load_lamp_channels()
 
 # API Configuration
-API_VERSION = "1.2.0"  # Bumped for per-channel curves
+API_VERSION = "6.8.0"  # GrowPi production version
 API_PORT = 5000
 API_HOST = "0.0.0.0"
 

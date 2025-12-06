@@ -14,8 +14,11 @@
         <div class="container">
             <header>
                 <h1>GrowPi Control</h1>
-                <div class="status-badge status-offline" id="statusBadge">
-                    Verbinde...
+                <div class="header-info">
+                    <span class="version-badge" id="versionBadge">v6.8.0</span>
+                    <div class="status-badge status-offline" id="statusBadge">
+                        Verbinde...
+                    </div>
                 </div>
                 <div class="last-update" id="lastUpdate">-</div>
             </header>
@@ -82,67 +85,92 @@
                     </div>
                 </section>
 
-                <section class="section" id="lampSection">
-                    <h2 class="section-title">Beleuchtung</h2>
-
-                    <div class="lamp-control lamp-farred">
-                        <div class="lamp-header">
-                            <span class="lamp-name">Far Red</span>
-                            <span class="lamp-value" id="lamp1Value">0%</span>
-                        </div>
-                        <input
-                            type="range"
-                            id="lamp1"
-                            min="0"
-                            max="100"
-                            value="0"
-                            data-channel="1"
-                        >
+                <section class="section collapsible-section" id="lampSection" data-section-id="beleuchtung">
+                    <div class="collapsible-header" data-section="beleuchtung">
+                        <h2 class="section-title">Beleuchtung</h2>
+                        <span class="collapse-icon">&#9660;</span>
                     </div>
-
-                    <div class="lamp-control lamp-warm">
-                        <div class="lamp-header">
-                            <span class="lamp-name">Warm White</span>
-                            <span class="lamp-value" id="lamp2Value">0%</span>
+                    <div class="collapsible-content" id="beleuchtung-content">
+                        <div class="lamp-control lamp-farred">
+                            <div class="lamp-header">
+                                <span class="lamp-name">Far Red</span>
+                                <span class="lamp-value" id="lamp1Value">0%</span>
+                            </div>
+                            <input
+                                type="range"
+                                id="lamp1"
+                                min="0"
+                                max="100"
+                                value="0"
+                                data-channel="1"
+                            >
                         </div>
-                        <input
-                            type="range"
-                            id="lamp2"
-                            min="0"
-                            max="100"
-                            value="0"
-                            data-channel="2"
-                        >
+
+                        <div class="lamp-control lamp-warm">
+                            <div class="lamp-header">
+                                <span class="lamp-name">Warm White</span>
+                                <span class="lamp-value" id="lamp2Value">0%</span>
+                            </div>
+                            <input
+                                type="range"
+                                id="lamp2"
+                                min="0"
+                                max="100"
+                                value="0"
+                                data-channel="2"
+                            >
+                        </div>
+
+                        <div class="lamp-control lamp-cool">
+                            <div class="lamp-header">
+                                <span class="lamp-name">Cool White</span>
+                                <span class="lamp-value" id="lamp3Value">0%</span>
+                            </div>
+                            <input
+                                type="range"
+                                id="lamp3"
+                                min="0"
+                                max="100"
+                                value="0"
+                                data-channel="3"
+                            >
+                        </div>
+
+                        <div class="lamp-control lamp-uv">
+                            <div class="lamp-header">
+                                <span class="lamp-name">UV</span>
+                                <span class="lamp-value" id="lamp4Value">0%</span>
+                            </div>
+                            <input
+                                type="range"
+                                id="lamp4"
+                                min="0"
+                                max="100"
+                                value="0"
+                                data-channel="4"
+                            >
+                        </div>
                     </div>
+                </section>
 
-                    <div class="lamp-control lamp-cool">
-                        <div class="lamp-header">
-                            <span class="lamp-name">Cool White</span>
-                            <span class="lamp-value" id="lamp3Value">0%</span>
-                        </div>
-                        <input
-                            type="range"
-                            id="lamp3"
-                            min="0"
-                            max="100"
-                            value="0"
-                            data-channel="3"
-                        >
+                <section class="section collapsible-section" id="devicesSection" data-section-id="schaltbare-geraete">
+                    <div class="collapsible-header" data-section="schaltbare-geraete">
+                        <h2 class="section-title">Schaltbare Geraete</h2>
+                        <span class="collapse-icon">&#9660;</span>
                     </div>
-
-                    <div class="lamp-control lamp-uv">
-                        <div class="lamp-header">
-                            <span class="lamp-name">UV</span>
-                            <span class="lamp-value" id="lamp4Value">0%</span>
+                    <div class="collapsible-content" id="schaltbare-geraete-content">
+                        <div class="device-status-item">
+                            <div class="device-info">
+                                <span class="device-name">Entfeuchter</span>
+                                <span class="device-state" id="deviceDehumidifierState">--</span>
+                            </div>
+                            <div class="device-mode">
+                                <span class="device-mode-label" id="deviceDehumidifierMode">AUTO</span>
+                            </div>
                         </div>
-                        <input
-                            type="range"
-                            id="lamp4"
-                            min="0"
-                            max="100"
-                            value="0"
-                            data-channel="4"
-                        >
+                        <div class="device-hint">
+                            Detaillierte Steuerung im Room-Tab
+                        </div>
                     </div>
                 </section>
             </div>
@@ -202,6 +230,41 @@
                         <button class="btn-save" id="btnSaveRoomConfig" style="margin-top: 16px;">
                             Einstellungen speichern
                         </button>
+                    </div>
+                </section>
+
+                <!-- Time Schedule Section (Feature #2) -->
+                <section class="section schedule-section">
+                    <h2 class="section-title">Zeitgesteuerte Schaltung</h2>
+
+                    <!-- Enable Toggle -->
+                    <div class="schedule-toggle-row">
+                        <div class="curve-toggle" id="timeScheduleToggle"></div>
+                        <span>Zeitsteuerung aktiv</span>
+                    </div>
+
+                    <!-- Active Schedule Info -->
+                    <div id="activeScheduleInfo" class="active-schedule-info" style="display: none;"></div>
+
+                    <!-- Schedule List -->
+                    <div id="scheduleList" class="schedule-list"></div>
+
+                    <!-- Add Schedule Form -->
+                    <div class="schedule-form">
+                        <input type="time" id="scheduleStartTime" class="schedule-time-input" placeholder="Start">
+                        <span class="schedule-separator">-</span>
+                        <input type="time" id="scheduleEndTime" class="schedule-time-input" placeholder="Ende">
+                        <select id="scheduleTargetState" class="schedule-state-select">
+                            <option value="on">AN</option>
+                            <option value="off">AUS</option>
+                        </select>
+                        <button id="btnAddSchedule" class="btn schedule-add-btn">+ Hinzufugen</button>
+                    </div>
+
+                    <!-- Info Notice -->
+                    <div class="schedule-info-notice">
+                        Zeitfenster uberschreiben die Feuchtigkeits-Automatik.
+                        Nach Ende des Zeitfensters greift wieder die normale Automatik.
                     </div>
                 </section>
             </div>
@@ -398,6 +461,7 @@
             import { initCostsTab } from './js/modules/costs.js';
             import { showError, showSuccess, setupTabs } from './js/utils.js';
             import { initCameraModule, cleanupCameraModule } from './js/modules/camera.js';
+            import { initAccordion } from './js/modules/accordion.js';
 
             // Expose utils to window for modules that rely on them (legacy support)
             window.showError = showError;
@@ -410,6 +474,7 @@
                 initCostsTab();
                 initCurvesTab();
                 initCameraModule();
+                initAccordion();
 
                 const historyModule = new HistoryModule();
                 historyModule.initHistoryTab();

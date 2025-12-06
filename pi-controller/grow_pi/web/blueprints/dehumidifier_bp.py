@@ -4,10 +4,16 @@ Dehumidifier Blueprint - Room Climate Control API
 Provides endpoints for dehumidifier control and room status monitoring.
 
 Endpoints:
-    GET  /api/room                 - Get room status (temp, humidity, dehumidifier)
-    GET  /api/room/config          - Get dehumidifier configuration
-    POST /api/room/config          - Update dehumidifier configuration
-    POST /api/room/dehumidifier    - Manual dehumidifier control (on/off)
+    GET  /api/room                      - Get room status (temp, humidity, dehumidifier)
+    GET  /api/room/config               - Get dehumidifier configuration
+    POST /api/room/config               - Update dehumidifier configuration
+    POST /api/room/dehumidifier         - Manual dehumidifier control (on/off)
+    GET  /api/room/schedules            - List all time schedules
+    POST /api/room/schedules            - Create a new time schedule
+    PUT  /api/room/schedules/<id>       - Update a time schedule
+    DELETE /api/room/schedules/<id>     - Delete a time schedule
+
+Version: 6.8.0 - Added time-based scheduling (Feature #2)
 """
 
 from flask import Blueprint, jsonify, request
@@ -132,9 +138,7 @@ def update_room_config():
             threshold_low=data.get('threshold_low'),
             min_run_time=data.get('min_run_time'),
             min_off_time=data.get('min_off_time'),
-            schedule_enabled=data.get('schedule_enabled'),
-            schedule_start_time=data.get('schedule_start_time'),
-            schedule_duration_minutes=data.get('schedule_duration_minutes')
+            time_schedule_enabled=data.get('time_schedule_enabled')
         )
 
         logger.info(f"Room config updated: {updated}")
@@ -189,4 +193,212 @@ def control_dehumidifier():
 
     except Exception as e:
         logger.error(f"Error in control_dehumidifier: {e}")
+        return jsonify(create_response(False, error=str(e))), 500
+
+
+# ============================================================================
+# Time Schedule API Routes (Feature #2 - v6.8.0)
+# ============================================================================
+
+@dehumidifier_bp.route('/api/room/schedules', methods=['GET'])
+def get_schedules():
+    """
+    Get all time schedules for the dehumidifier.
+
+    Returns:
+        List of schedules with id, start_time, end_time, target_state, enabled
+    """
+    controller = _get_dehumidifier()
+    if not controller:
+        return jsonify(create_response(False, error="Dehumidifier not available")), 503
+
+    try:
+        schedules = controller.get_time_schedules()
+        schedule_list = [
+            {
+                "id": s.id,
+                "start_time": s.start_time,
+                "end_time": s.end_time,
+                "target_state": s.target_state,
+                "enabled": s.enabled
+            }
+            for s in schedules
+        ]
+
+        # Also include the current active schedule if any
+        active = controller.get_active_time_schedule()
+        active_info = None
+        if active:
+            active_info = {
+                "id": active.id,
+                "start_time": active.start_time,
+                "end_time": active.end_time,
+                "target_state": active.target_state
+            }
+
+        return jsonify(create_response(True, {
+            "schedules": schedule_list,
+            "active_schedule": active_info,
+            "time_schedule_enabled": controller.get_config().get("time_schedule_enabled", False)
+        }))
+
+    except Exception as e:
+        logger.error(f"Error in get_schedules: {e}")
+        return jsonify(create_response(False, error=str(e))), 500
+
+
+@dehumidifier_bp.route('/api/room/schedules', methods=['POST'])
+def create_schedule():
+    """
+    Create a new time schedule.
+
+    Request body:
+        {
+            "start_time": "HH:MM",
+            "end_time": "HH:MM",
+            "target_state": "on" | "off",  (optional, default: "on")
+            "enabled": true | false        (optional, default: true)
+        }
+
+    Returns:
+        Created schedule with ID
+    """
+    controller = _get_dehumidifier()
+    if not controller:
+        return jsonify(create_response(False, error="Dehumidifier not available")), 503
+
+    if not request.is_json:
+        return jsonify(create_response(False, error="Request must be JSON")), 400
+
+    try:
+        data = request.get_json()
+
+        # Validate required fields
+        start_time = data.get('start_time')
+        end_time = data.get('end_time')
+
+        if not start_time or not end_time:
+            return jsonify(create_response(
+                False,
+                error="start_time and end_time are required"
+            )), 400
+
+        # Create schedule
+        schedule_id = controller.add_time_schedule(
+            start_time=start_time,
+            end_time=end_time,
+            target_state=data.get('target_state', 'on'),
+            enabled=data.get('enabled', True)
+        )
+
+        if schedule_id is None:
+            return jsonify(create_response(
+                False,
+                error="Failed to create schedule"
+            )), 500
+
+        logger.info(f"Created schedule {schedule_id}: {start_time}-{end_time}")
+
+        return jsonify(create_response(True, {
+            "schedule": {
+                "id": schedule_id,
+                "start_time": start_time,
+                "end_time": end_time,
+                "target_state": data.get('target_state', 'on'),
+                "enabled": data.get('enabled', True)
+            },
+            "message": "Schedule created"
+        })), 201
+
+    except ValueError as e:
+        logger.warning(f"Validation error in create_schedule: {e}")
+        return jsonify(create_response(False, error=str(e))), 400
+    except Exception as e:
+        logger.error(f"Error in create_schedule: {e}")
+        return jsonify(create_response(False, error=str(e))), 500
+
+
+@dehumidifier_bp.route('/api/room/schedules/<int:schedule_id>', methods=['PUT'])
+def update_schedule(schedule_id: int):
+    """
+    Update an existing time schedule.
+
+    Request body (all fields optional):
+        {
+            "start_time": "HH:MM",
+            "end_time": "HH:MM",
+            "target_state": "on" | "off",
+            "enabled": true | false
+        }
+
+    Returns:
+        Success status
+    """
+    controller = _get_dehumidifier()
+    if not controller:
+        return jsonify(create_response(False, error="Dehumidifier not available")), 503
+
+    if not request.is_json:
+        return jsonify(create_response(False, error="Request must be JSON")), 400
+
+    try:
+        data = request.get_json()
+
+        success = controller.update_time_schedule(
+            schedule_id=schedule_id,
+            start_time=data.get('start_time'),
+            end_time=data.get('end_time'),
+            target_state=data.get('target_state'),
+            enabled=data.get('enabled')
+        )
+
+        if not success:
+            return jsonify(create_response(
+                False,
+                error=f"Schedule {schedule_id} not found"
+            )), 404
+
+        logger.info(f"Updated schedule {schedule_id}")
+
+        return jsonify(create_response(True, {
+            "message": f"Schedule {schedule_id} updated"
+        }))
+
+    except ValueError as e:
+        logger.warning(f"Validation error in update_schedule: {e}")
+        return jsonify(create_response(False, error=str(e))), 400
+    except Exception as e:
+        logger.error(f"Error in update_schedule: {e}")
+        return jsonify(create_response(False, error=str(e))), 500
+
+
+@dehumidifier_bp.route('/api/room/schedules/<int:schedule_id>', methods=['DELETE'])
+def delete_schedule(schedule_id: int):
+    """
+    Delete a time schedule.
+
+    Returns:
+        Success status
+    """
+    controller = _get_dehumidifier()
+    if not controller:
+        return jsonify(create_response(False, error="Dehumidifier not available")), 503
+
+    try:
+        success = controller.delete_time_schedule(schedule_id)
+
+        if not success:
+            return jsonify(create_response(
+                False,
+                error=f"Schedule {schedule_id} not found"
+            )), 404
+
+        logger.info(f"Deleted schedule {schedule_id}")
+
+        return jsonify(create_response(True, {
+            "message": f"Schedule {schedule_id} deleted"
+        }))
+
+    except Exception as e:
+        logger.error(f"Error in delete_schedule: {e}")
         return jsonify(create_response(False, error=str(e))), 500
