@@ -8,6 +8,241 @@
 
 ## 🚀 Nächste Features (Priorisiert)
 
+### Feature #0: PWM Zero-Downtime (KRITISCH)
+
+**Ziel**: PWM-Werte bleiben bei Service-Restart stabil - kein LED-Flackern
+
+**Priorität**: KRITISCH (beeinträchtigt Pflanzenwachstum)
+
+**Aufwand**: 2 Stunden
+
+#### Problem-Beschreibung
+
+Beim Neustart des GrowPi-Services (`sudo systemctl restart grow-pi`) werden alle PWM-Kanäle kurzzeitig auf 0% zurückgesetzt. Dies verursacht:
+- Sichtbares Flackern der LED-Beleuchtung
+- Stress für lichtempfindliche Pflanzen
+- Unterbrechung der Photoperiode
+
+**Root Cause** (identifiziert in Code-Analyse):
+```python
+# pwm_controller.py:252
+def cleanup(self):
+    if self.pi and self.pi.connected:
+        self.all_off()  # <-- DAS VERURSACHT FLACKERN
+        self.pi.stop()
+
+# main.py:319
+def stop(self):
+    self.pwm_controller.cleanup()  # <-- RUFT all_off() AUF
+```
+
+**Key Insight**: Das System nutzt bereits `pigpiod` (pigpio daemon), der PWM-Werte **unabhängig** vom Python-Prozess hält. Das Flackern entsteht nur, weil explizit `all_off()` aufgerufen wird.
+
+#### Lösungs-Architektur
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                    SERVICE LAYER                             │
+├─────────────────────────────────────────────────────────────┤
+│                                                              │
+│  ┌─────────────────┐     ┌─────────────────┐                │
+│  │ pigpiod.service │     │ grow-pi.service │                │
+│  │ (Hardware PWM)  │◄────│ (Main App)      │                │
+│  │ PERSISTIERT PWM │     │                 │                │
+│  └─────────────────┘     └────────┬────────┘                │
+│          ▲                        │                          │
+│          │                        ▼                          │
+│          │                ┌───────────────┐                  │
+│          └────────────────│ PWMController │                  │
+│                           │ disconnect()  │ ← NEU!          │
+│                           └───────┬───────┘                  │
+│                                   ▼                          │
+│                          ┌────────────────┐                  │
+│                          │ State Files    │                  │
+│                          │ /run/growpi/   │                  │
+│                          └────────────────┘                  │
+│                                                              │
+└─────────────────────────────────────────────────────────────┘
+
+NEUSTART-FLOW:
+1. SIGTERM → save_state() → disconnect() (NICHT all_off!)
+2. pigpiod hält PWM-Werte stabil
+3. Neuer Prozess → load_state() → verify PWM → weiter
+```
+
+#### User-Entscheidung (2025-12-06)
+
+**Frage**: Soll bei `systemctl stop` PWM erhalten bleiben?
+**Antwort**: **JA** - PWM-Werte bleiben IMMER erhalten, auch bei stop.
+Lampen werden nur über explizite API-Calls ausgeschaltet.
+
+#### Technische Umsetzung
+
+**Neue Datei: `grow_pi/utils/pwm_state.py`**
+```python
+"""
+PWM State Persistence - Zero-Downtime Restarts
+
+Speichert PWM-Zustand in /run/growpi/ für nahtlose Service-Neustarts.
+"""
+
+STATE_DIR = '/run/growpi'
+STATE_FILE = f'{STATE_DIR}/pwm_state.json'
+
+def save_state(pwm_controller, mode: str = 'auto') -> bool:
+    """Speichert aktuellen PWM-Zustand mit File-Locking."""
+
+def load_state() -> Optional[Dict]:
+    """Lädt gespeicherten PWM-Zustand."""
+
+def state_exists() -> bool:
+    """Prüft ob gültiger State existiert."""
+```
+
+**State-File Format**:
+```json
+{
+  "version": 1,
+  "timestamp": "2025-12-06T14:30:00.123456",
+  "mode": "auto",
+  "channels": {
+    "1": {"gpio": 16, "name": "Far Red", "intensity": 75, "source": "curve"},
+    "2": {"gpio": 13, "name": "Warm White", "intensity": 50, "source": "curve"},
+    "3": {"gpio": 12, "name": "Cool White", "intensity": 80, "source": "manual"},
+    "4": {"gpio": 18, "name": "UV", "intensity": 0, "source": "curve"}
+  }
+}
+```
+
+**Änderung: `grow_pi/lamps/pwm_controller.py`**
+
+1. Neue Methode `disconnect()`:
+```python
+def disconnect(self) -> None:
+    """
+    Trennt Verbindung zu pigpiod OHNE PWM-Werte zu ändern.
+    Für Service-Restarts: PWM bleibt via pigpiod stabil.
+    """
+    if self.pi and self.pi.connected:
+        self.pi.stop()  # Nur trennen - PWM läuft weiter!
+        logger.info("Disconnected from pigpiod (PWM preserved)")
+    self._initialized = False
+```
+
+2. `cleanup()` mit Parameter erweitern:
+```python
+def cleanup(self, turn_off_lamps: bool = True) -> None:
+    """Cleanup GPIO resources."""
+    if self.pi and self.pi.connected:
+        if turn_off_lamps:
+            self.all_off()
+        self.pi.stop()
+    self._initialized = False
+```
+
+**Änderung: `grow_pi/main.py`**
+
+1. Signal-Handler:
+```python
+def signal_handler(sig, frame):
+    logger.info(f"Signal {sig} received - saving state...")
+    if controller:
+        controller.stop()  # PWM wird immer erhalten
+    sys.exit(0)
+```
+
+2. `stop()` Methode:
+```python
+def stop(self) -> None:
+    """Stop the controller gracefully. PWM bleibt IMMER erhalten."""
+    self.running = False
+    if STATE_PERSISTENCE_AVAILABLE:
+        save_state(self.pwm_controller, _get_current_mode())
+    self.pwm_controller.disconnect()  # NICHT cleanup()!
+    logger.info("GrowPi Controller stopped (PWM preserved).")
+```
+
+3. Startup State-Recovery (in `initialize()`):
+```python
+if STATE_PERSISTENCE_AVAILABLE and state_exists():
+    logger.info("Warm restart detected - restoring PWM state...")
+    saved_state = load_state()
+    for ch_str, ch_data in saved_state.get('channels', {}).items():
+        self.pwm_controller.set_intensity(int(ch_str), ch_data['intensity'])
+```
+
+**Änderung: `systemd/grow-pi.service`**
+```ini
+[Service]
+# Runtime directory für State-Files
+RuntimeDirectory=growpi
+RuntimeDirectoryMode=0755
+
+# Graceful shutdown (30s Zeit)
+TimeoutStopSec=30
+KillMode=mixed
+KillSignal=SIGTERM
+```
+
+#### Betroffene Dateien
+
+| Datei | Aktion | Aufwand |
+|-------|--------|---------|
+| `grow_pi/utils/pwm_state.py` | **NEU** | 30 Min |
+| `grow_pi/lamps/pwm_controller.py` | ÄNDERN | 15 Min |
+| `grow_pi/main.py` | ÄNDERN | 20 Min |
+| `systemd/grow-pi.service` | ÄNDERN | 10 Min |
+
+#### Test-Verfahren
+
+```bash
+# 1. Lampen auf bekannten Wert setzen
+curl -X POST http://192.168.0.86:5000/api/lamp/1 \
+  -H "Content-Type: application/json" \
+  -d '{"intensity": 75}'
+
+# 2. Service neustarten
+ssh admin@192.168.0.86 'sudo systemctl restart grow-pi'
+
+# 3. Wert prüfen (sollte noch 75 sein!)
+curl http://192.168.0.86:5000/api/status | jq '.lamps[0].intensity'
+# Erwartet: 75 (NICHT 0!)
+
+# 4. State-File prüfen
+ssh admin@192.168.0.86 'cat /run/growpi/pwm_state.json'
+
+# 5. Cold Boot Test (optional)
+ssh admin@192.168.0.86 'sudo reboot'
+# Nach Reboot: Lampen sollten Kurven-Werte haben
+```
+
+#### Akzeptanzkriterien
+
+- [ ] `systemctl restart grow-pi` verursacht KEIN Flackern
+- [ ] `systemctl stop grow-pi` lässt Lampen an
+- [ ] State-File wird in `/run/growpi/pwm_state.json` geschrieben
+- [ ] Warm-Restart stellt PWM-Werte aus State-File wieder her
+- [ ] Cold-Boot berechnet PWM-Werte aus Kurven (kein State-File nach Reboot)
+- [ ] Logging zeigt "PWM preserved" bei Shutdown
+- [ ] Logging zeigt "Warm restart detected" bei Restart
+
+#### Risiko-Bewertung
+
+| Risiko | Wahrscheinlichkeit | Mitigation |
+|--------|-------------------|------------|
+| pigpiod Neustart | Niedrig | Reconnect-Logic vorhanden |
+| Korrupter State-File | Sehr niedrig | Fallback auf Kurven-Berechnung |
+| Timing-Issue | Niedrig | State wird vor disconnect() gespeichert |
+
+#### Rollback-Plan
+
+Falls Probleme auftreten:
+1. `cleanup()` Parameter auf default `True` setzen
+2. `stop()` auf alte Version zurücksetzen
+3. `pwm_state.py` Imports auskommentieren
+
+---
+
 ### Feature #1: Device Status Dashboard
 
 **Ziel**: Zentrale Übersicht aller schaltbaren Geräte mit Manual Override
