@@ -273,7 +273,7 @@ class GrowPiController:
             last_known_mode = _get_current_mode()  # Track mode changes
 
             while self.running:
-                time.sleep(1)
+                time.sleep(5)  # CPU-Optimierung: 5s statt 1s (Mode-Wechsel max 5s Verzögerung)
                 now = time.time()
 
                 # Get current mode from ModeManager (single source of truth)

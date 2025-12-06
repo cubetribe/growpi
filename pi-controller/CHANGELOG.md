@@ -2,37 +2,21 @@
 
 Alle wichtigen Änderungen am GrowPi Pi-Controller werden hier dokumentiert.
 
-## [v6.6] - 2025-12-06
+## [v6.7] - 2025-12-06
 
 ### Performance
-- **CPU-Optimierung**: Reduzierung von ~75% auf ~15-25% CPU-Last
-  - Sleep-Loops durch `threading.Event.wait()` ersetzt (3 DataLogger Threads)
-  - Eliminiert ~180 unnötige OS-Kontextwechsel pro Minute
-  - Logging-Intervalle von 60s auf 120s erhöht (Sensor, Lampen, Plugs)
-  - DHT22-Sensor Cache von 3s auf 30s erhöht
+- **CPU-Optimierung Phase 2**: Reduzierung von ~75% auf ~28% CPU-Last
+  - Kamera-Polling von 500ms auf 10s erhöht (weniger Snapshot-Anfragen)
+  - Main-Loop Sleep von 1s auf 5s erhöht
+  - DataLogger Sleep-Loops durch `threading.Event.wait()` ersetzt
+  - Logging-Intervalle von 60s auf 120s erhöht
+  - DHT22 Cache von 3s auf 30s erhöht
 
 ### Changed
-- `grow_pi/database/logger.py`:
-  - Neues `_stop_event` für CPU-effizientes Thread-Warten
-  - `sensor_interval`: 60s → 120s
-  - `lamp_interval`: 60s → 120s
-  - For-Loops mit `time.sleep(1)` durch `Event.wait(timeout=interval)` ersetzt
-- `grow_pi/web/api.py`: `DHT_CACHE_SECONDS`: 3 → 30
-- `grow_pi/web/services/hardware_service.py`: `DHT_CACHE_SECONDS`: 3 → 30
-- `grow_pi/web/blueprints/temperature_bp.py`: `DHT_CACHE_SECONDS`: 3 → 30
-
-### Technical Details
-Das ursprüngliche Problem war eine ineffiziente Implementierung der Logging-Threads:
-```python
-# VORHER (ineffizient - 60 OS-Aufweckvorgänge pro Intervall):
-for _ in range(60):
-    if not self._running:
-        break
-    time.sleep(1)
-
-# NACHHER (effizient - 1 OS-Aufruf pro Intervall):
-self._stop_event.wait(timeout=120)
-```
+- `camera.js`: Refresh-Intervall 500ms → 10s
+- `main.py`: Main-Loop Sleep 1s → 5s
+- `logger.py`: Event-basiertes Warten, Intervalle 120s
+- DHT22 Cache auf 30s in allen relevanten Dateien
 
 ---
 

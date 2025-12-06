@@ -8,7 +8,7 @@ import { GrowPiAPI } from '../api.js';
 // ==========================================
 // Configuration
 // ==========================================
-const REFRESH_INTERVAL_MS = 500; // 2 FPS = 500ms between frames
+const REFRESH_INTERVAL_MS = 10000; // 0.1 FPS = 10s between frames (CPU-Optimierung)
 const STATUS_CHECK_INTERVAL_MS = 10000; // Check camera status every 10s
 
 // ==========================================
