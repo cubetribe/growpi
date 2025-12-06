@@ -2,10 +2,63 @@
 
 ---
 
+## [2025-12-06 v6.1] - Phase 1 Refactoring Live Deployment 🚀
+
+**Status**: ✅ DEPLOYED TO PRODUCTION
+**Platform**: Raspberry Pi 3B+ (growpi @ 192.168.0.86)
+**Commit**: `c7766fd`
+
+### Summary
+
+Phase 1 Refactoring erfolgreich auf dem Raspberry Pi deployed und getestet:
+
+- **91 Unit Tests** lokal bestanden (Curve Interpolation + ModeManager)
+- **13 API Smoke Tests** auf dem Pi bestanden
+- **Web-Interface** vollständig funktionsfähig
+- **systemd Service** läuft stabil
+
+### Deployment Verification
+
+| Test | Status |
+|------|--------|
+| Unit Tests (pytest) | ✅ 91/91 passed |
+| Smoke Test (API) | ✅ 13/13 passed |
+| Web Interface | ✅ Online |
+| PWM Control | ✅ Working |
+| Sensor Data | ✅ 23.3°C, 66% |
+
+### Files Deployed
+
+```
+69 files changed
+15,194 insertions
+Neue Module:
+- web/app.py (Flask App Factory)
+- web/blueprints/ (6 API Blueprints)
+- web/services/ (4 Service Modules)
+- web/dependencies.py (DI Container)
+- tests/ (91 Unit Tests)
+- smoke_test.sh (API Tests)
+```
+
+### Backward Compatibility
+
+- ✅ main.py weiterhin unverändert nutzbar
+- ✅ Alte api.py als Fallback verfügbar
+- ✅ Alle API Endpoints identisch
+
+### Known Fix
+
+`web/__init__.py` angepasst um Double-App-Initialization zu verhindern:
+- Kein automatischer `create_app()` beim Import
+- Backward-kompatibel mit main.py's direktem api.py Import
+
+---
+
 ## [2025-12-06 v6.0] - Complete Code Refactoring & Modularization 🎉
 
-**Status**: Branch `refactoring/phase-1-modularization` - Ready for Test Deployment
-**Platform**: Development (macOS) - NOT LIVE YET
+**Status**: ✅ MERGED TO MAIN (previously: Branch `refactoring/phase-1-modularization`)
+**Platform**: Development (macOS) + Raspberry Pi
 **Author**: Claude Code (Orchestrated 15 parallel agents)
 
 ### Summary
