@@ -1,0 +1,1811 @@
+/* GrowPi Control Panel Styles
+ * Extracted from index.html during refactoring
+ * Date: 2025-12-06
+ */
+
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family:
+        -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+        sans-serif;
+    background: linear-gradient(
+        135deg,
+        #0a0a0a 0%,
+        #1a1a1a 100%
+    );
+    color: #ffffff;
+    min-height: 100vh;
+    padding: 16px;
+    -webkit-font-smoothing: antialiased;
+}
+
+.container {
+    max-width: 480px;
+    margin: 0 auto;
+}
+
+header {
+    text-align: center;
+    margin-bottom: 24px;
+    padding: 16px 0;
+    border-bottom: 2px solid #11ff55;
+}
+
+h1 {
+    font-size: 28px;
+    font-weight: 700;
+    color: #11ff55;
+    text-shadow: 0 0 20px rgba(17, 255, 85, 0.5);
+}
+
+.status-badge {
+    display: inline-block;
+    padding: 6px 16px;
+    border-radius: 20px;
+    font-size: 12px;
+    font-weight: 600;
+    margin-top: 8px;
+}
+
+.status-online {
+    background: rgba(17, 255, 85, 0.2);
+    color: #11ff55;
+    border: 1px solid #11ff55;
+}
+
+.status-offline {
+    background: rgba(255, 68, 68, 0.2);
+    color: #ff4444;
+    border: 1px solid #ff4444;
+}
+
+.last-update {
+    font-size: 11px;
+    color: #888;
+    margin-top: 6px;
+}
+
+/* Header Info Container */
+.header-info {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 12px;
+    margin-top: 8px;
+    flex-wrap: wrap;
+}
+
+/* Version Badge - Neon Green Glassmorphism */
+.version-badge {
+    display: inline-block;
+    padding: 4px 12px;
+    border-radius: 16px;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.5px;
+    background: rgba(17, 255, 85, 0.15);
+    color: #11ff55;
+    border: 1px solid rgba(17, 255, 85, 0.4);
+    box-shadow: 0 0 10px rgba(17, 255, 85, 0.2);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+}
+
+.section {
+    background: rgba(20, 20, 20, 0.9);
+    border-radius: 16px;
+    padding: 20px;
+    margin-bottom: 20px;
+    border: 1px solid #2a2a2a;
+}
+
+.temp-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+}
+
+.temp-card {
+    text-align: center;
+    padding: 16px;
+    background: rgba(255, 255, 255, 0.03);
+    border-radius: 12px;
+}
+
+.temp-label {
+    font-size: 12px;
+    color: #888;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    margin-bottom: 8px;
+}
+
+.temp-value {
+    font-size: 36px;
+    font-weight: 700;
+    color: #11ff55;
+}
+
+.temp-unit {
+    font-size: 18px;
+    color: #666;
+}
+
+.section-title {
+    font-size: 16px;
+    font-weight: 600;
+    margin-bottom: 16px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.section-title::before {
+    content: "";
+    width: 4px;
+    height: 16px;
+    background: #11ff55;
+    border-radius: 2px;
+}
+
+.lamp-control {
+    margin-bottom: 20px;
+    padding-bottom: 16px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.lamp-control:last-child {
+    margin-bottom: 0;
+    padding-bottom: 0;
+    border-bottom: none;
+}
+
+.lamp-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 10px;
+}
+
+.lamp-name {
+    font-size: 15px;
+    font-weight: 600;
+}
+
+.lamp-value {
+    font-size: 18px;
+    font-weight: 700;
+    min-width: 50px;
+    text-align: right;
+}
+
+input[type="range"] {
+    -webkit-appearance: none;
+    width: 100%;
+    height: 44px;
+    background: transparent;
+    cursor: pointer;
+}
+
+input[type="range"]::-webkit-slider-runnable-track {
+    width: 100%;
+    height: 8px;
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 4px;
+}
+
+input[type="range"]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    background: #fff;
+    border: 3px solid currentColor;
+    margin-top: -10px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+}
+
+input[type="range"]::-moz-range-track {
+    height: 8px;
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 4px;
+}
+
+input[type="range"]::-moz-range-thumb {
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    background: #fff;
+    border: 3px solid currentColor;
+}
+
+.lamp-farred {
+    color: #ff4444;
+}
+.lamp-warm {
+    color: #ffbb44;
+}
+.lamp-cool {
+    color: #88ddff;
+}
+.lamp-uv {
+    color: #cc66ff;
+}
+
+.error-msg {
+    background: rgba(255, 68, 68, 0.2);
+    border: 1px solid #ff4444;
+    color: #ff4444;
+    padding: 12px;
+    border-radius: 8px;
+    margin-bottom: 16px;
+    font-size: 13px;
+    display: none;
+}
+
+.error-msg.show {
+    display: block;
+}
+
+/* Tabs */
+.tabs {
+    display: flex;
+    margin-bottom: 20px;
+    border-radius: 12px;
+    background: rgba(20, 20, 20, 0.9);
+    padding: 4px;
+    border: 1px solid #2a2a2a;
+}
+
+.tab-btn {
+    flex: 1;
+    padding: 12px;
+    border: none;
+    background: transparent;
+    color: #888;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    border-radius: 8px;
+    transition: all 0.2s;
+}
+
+.tab-btn.active {
+    background: #11ff55;
+    color: #0a0a0a;
+}
+
+.tab-content {
+    display: none;
+}
+
+.tab-content.active {
+    display: block;
+}
+
+/* Curve Editor */
+.curve-channel {
+    background: rgba(20, 20, 20, 0.9);
+    border-radius: 12px;
+    padding: 16px;
+    margin-bottom: 16px;
+    border: 1px solid #2a2a2a;
+}
+
+/* Curve Channel Accordion */
+.curve-channel.collapsible-section .curve-header {
+    cursor: pointer;
+    user-select: none;
+    -webkit-tap-highlight-color: transparent;
+}
+
+.curve-channel.collapsible-section .curve-header:hover {
+    opacity: 0.9;
+}
+
+.curve-channel.collapsible-section.collapsed .curve-header {
+    margin-bottom: 0;
+}
+
+.curve-header-actions {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.curve-channel .collapse-icon {
+    font-size: 12px;
+    color: #888;
+    transition: transform 0.3s ease;
+    padding: 8px;
+    margin: -8px;
+}
+
+.curve-channel.collapsed .collapse-icon {
+    transform: rotate(-90deg);
+}
+
+.curve-channel .collapsible-content {
+    max-height: 1000px;
+    overflow: hidden;
+    transition: max-height 0.3s ease-out, opacity 0.25s ease-out;
+    opacity: 1;
+}
+
+.curve-channel.collapsed .collapsible-content {
+    max-height: 0;
+    opacity: 0;
+    transition: max-height 0.25s ease-in, opacity 0.15s ease-in;
+}
+
+.curve-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 12px;
+}
+
+.curve-name {
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.curve-dot {
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+}
+
+.curve-toggle {
+    position: relative;
+    width: 44px;
+    height: 24px;
+    background: #333;
+    border-radius: 12px;
+    cursor: pointer;
+    transition: background 0.3s;
+}
+
+.curve-toggle.enabled {
+    background: #11ff55;
+}
+
+.curve-toggle::after {
+    content: "";
+    position: absolute;
+    width: 20px;
+    height: 20px;
+    background: white;
+    border-radius: 50%;
+    top: 2px;
+    left: 2px;
+    transition: transform 0.3s;
+}
+
+.curve-toggle.enabled::after {
+    transform: translateX(20px);
+}
+
+.curve-points {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.curve-point {
+    display: grid;
+    grid-template-columns: 70px 70px 1fr;
+    gap: 8px;
+    align-items: center;
+}
+
+.curve-point input {
+    padding: 10px 12px;
+    border: 1px solid #333;
+    border-radius: 8px;
+    background: rgba(0, 0, 0, 0.3);
+    color: white;
+    font-size: 16px;
+    text-align: center;
+}
+
+.curve-point input:focus {
+    outline: none;
+    border-color: #11ff55;
+}
+
+.curve-point input::placeholder {
+    color: #666;
+}
+
+.btn-remove {
+    width: 36px;
+    height: 36px;
+    border-radius: 8px;
+    border: 1px solid #ff4444;
+    background: rgba(255, 68, 68, 0.1);
+    color: #ff4444;
+    cursor: pointer;
+    font-size: 18px;
+}
+
+.btn-move {
+    width: 28px;
+    height: 28px;
+    border-radius: 6px;
+    border: 1px solid #666;
+    background: rgba(255, 255, 255, 0.05);
+    color: #888;
+    cursor: pointer;
+    font-size: 14px;
+    padding: 0;
+}
+
+.btn-move:hover {
+    border-color: #11ff55;
+    color: #11ff55;
+}
+
+.btn-move:disabled {
+    opacity: 0.3;
+    cursor: not-allowed;
+}
+
+.point-actions {
+    display: flex;
+    gap: 4px;
+    align-items: center;
+}
+
+.btn-add {
+    width: 100%;
+    padding: 12px;
+    border: 1px dashed #444;
+    border-radius: 8px;
+    background: transparent;
+    color: #888;
+    cursor: pointer;
+    font-size: 14px;
+    margin-top: 8px;
+}
+
+.btn-add:hover {
+    border-color: #11ff55;
+    color: #11ff55;
+}
+
+.btn-save {
+    width: 100%;
+    padding: 14px;
+    border: none;
+    border-radius: 12px;
+    background: #11ff55;
+    color: #0a0a0a;
+    font-size: 16px;
+    font-weight: 600;
+    cursor: pointer;
+    margin-top: 16px;
+}
+
+.btn-save:disabled {
+    background: #333;
+    color: #666;
+    cursor: not-allowed;
+}
+
+.current-intensity {
+    font-size: 24px;
+    font-weight: 700;
+    text-align: center;
+    padding: 8px;
+}
+
+/* Preview Chart */
+.preview-section {
+    background: rgba(20, 20, 20, 0.9);
+    border-radius: 12px;
+    padding: 16px;
+    margin-bottom: 20px;
+    border: 1px solid #2a2a2a;
+}
+
+.preview-title {
+    font-size: 14px;
+    font-weight: 600;
+    margin-bottom: 12px;
+    color: #888;
+}
+
+/* Old bar-based preview chart - replaced by multi-line SVG */
+/* .preview-chart and .preview-bar styles moved to Multi-Line Preview Chart section below */
+
+.preview-labels {
+    display: flex;
+    justify-content: space-between;
+    margin-top: 4px;
+    font-size: 10px;
+    color: #666;
+    padding-left: 35px;
+}
+
+/* Multi-Line Preview Chart */
+.preview-chart {
+    height: 120px;
+    background: rgba(0, 0, 0, 0.3);
+    border-radius: 8px;
+    overflow: hidden;
+}
+
+.preview-svg {
+    width: 100%;
+    height: 100%;
+}
+
+.preview-line {
+    fill: none;
+    stroke-width: 2;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+}
+
+.preview-grid-line {
+    stroke: rgba(255, 255, 255, 0.1);
+    stroke-width: 1;
+}
+
+.preview-axis-label {
+    fill: #666;
+    font-size: 9px;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+}
+
+/* Channel Visibility Checkboxes */
+.preview-channel-checkboxes {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+    margin-bottom: 12px;
+    padding: 10px 12px;
+    background: rgba(255, 255, 255, 0.03);
+    border-radius: 8px;
+}
+
+.preview-channel-checkbox {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    cursor: pointer;
+    font-size: 12px;
+    color: #ccc;
+    user-select: none;
+    -webkit-tap-highlight-color: transparent;
+    transition: opacity 0.2s ease;
+}
+
+.preview-channel-checkbox:hover {
+    opacity: 0.85;
+}
+
+.preview-channel-checkbox input[type="checkbox"] {
+    -webkit-appearance: none;
+    -moz-appearance: none;
+    appearance: none;
+    width: 16px;
+    height: 16px;
+    border: 2px solid #444;
+    border-radius: 4px;
+    background: rgba(0, 0, 0, 0.3);
+    cursor: pointer;
+    position: relative;
+    transition: all 0.2s ease;
+}
+
+.preview-channel-checkbox input[type="checkbox"]:checked {
+    background: #11ff55;
+    border-color: #11ff55;
+}
+
+.preview-channel-checkbox input[type="checkbox"]:checked::after {
+    content: "";
+    position: absolute;
+    left: 4px;
+    top: 1px;
+    width: 4px;
+    height: 8px;
+    border: solid #000;
+    border-width: 0 2px 2px 0;
+    transform: rotate(45deg);
+}
+
+.preview-channel-checkbox input[type="checkbox"]:focus {
+    outline: none;
+    box-shadow: 0 0 0 2px rgba(17, 255, 85, 0.3);
+}
+
+.preview-channel-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    flex-shrink: 0;
+}
+
+.preview-channel-name {
+    font-weight: 500;
+    white-space: nowrap;
+}
+
+/* Responsive adjustments for channel checkboxes */
+@media (max-width: 400px) {
+    .preview-channel-checkboxes {
+        gap: 8px;
+    }
+
+    .preview-channel-checkbox {
+        font-size: 11px;
+        gap: 4px;
+    }
+
+    .preview-channel-dot {
+        width: 8px;
+        height: 8px;
+    }
+
+    .preview-channel-checkbox input[type="checkbox"] {
+        width: 14px;
+        height: 14px;
+    }
+}
+
+.success-msg {
+    background: rgba(17, 255, 85, 0.2);
+    border: 1px solid #11ff55;
+    color: #11ff55;
+    padding: 12px;
+    border-radius: 8px;
+    margin-bottom: 16px;
+    font-size: 13px;
+    display: none;
+}
+
+.success-msg.show {
+    display: block;
+}
+
+/* JSON Editor */
+.json-section {
+    background: rgba(20, 20, 20, 0.9);
+    border-radius: 12px;
+    padding: 16px;
+    margin-top: 20px;
+    border: 1px solid #2a2a2a;
+}
+
+.json-section.expanded .json-textarea {
+    min-height: 350px;
+}
+
+.json-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 12px;
+    cursor: pointer;
+}
+
+.json-title {
+    font-size: 14px;
+    font-weight: 600;
+    color: #888;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.json-title::before {
+    content: "▶";
+    font-size: 10px;
+    transition: transform 0.2s;
+}
+
+.json-section.expanded .json-title::before {
+    transform: rotate(90deg);
+}
+
+.json-content {
+    display: none;
+}
+
+.json-section.expanded .json-content {
+    display: block;
+}
+
+.json-preview {
+    padding: 8px 12px;
+    border-radius: 8px;
+    background: rgba(0, 0, 0, 0.3);
+    color: #666;
+    font-family: "Monaco", "Menlo", monospace;
+    font-size: 11px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.json-section.expanded .json-preview {
+    display: none;
+}
+
+.json-buttons {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 12px;
+    flex-wrap: wrap;
+}
+
+.btn-json {
+    padding: 8px 12px;
+    border-radius: 8px;
+    border: 1px solid #444;
+    background: rgba(255, 255, 255, 0.05);
+    color: #888;
+    cursor: pointer;
+    font-size: 12px;
+    font-weight: 600;
+}
+
+.btn-json:hover {
+    border-color: #11ff55;
+    color: #11ff55;
+}
+
+.btn-json.primary {
+    background: #11ff55;
+    color: #0a0a0a;
+    border-color: #11ff55;
+}
+
+.btn-json.primary:disabled {
+    background: #333;
+    color: #666;
+    border-color: #333;
+    cursor: not-allowed;
+}
+
+.json-textarea {
+    width: 100%;
+    min-height: 200px;
+    padding: 12px;
+    border-radius: 8px;
+    border: 1px solid #333;
+    background: rgba(0, 0, 0, 0.5);
+    color: #11ff55;
+    font-family: "Monaco", "Menlo", monospace;
+    font-size: 11px;
+    line-height: 1.4;
+    resize: vertical;
+}
+
+.json-textarea:focus {
+    outline: none;
+    border-color: #11ff55;
+}
+
+.json-textarea.invalid {
+    border-color: #ff4444;
+    color: #ff8888;
+}
+
+.json-status {
+    font-size: 11px;
+    margin-top: 8px;
+    padding: 6px 10px;
+    border-radius: 6px;
+}
+
+.json-status.valid {
+    background: rgba(17, 255, 85, 0.1);
+    color: #11ff55;
+}
+
+.json-status.invalid {
+    background: rgba(255, 68, 68, 0.1);
+    color: #ff4444;
+}
+
+/* Mode Switch */
+.mode-section {
+    background: rgba(20, 20, 20, 0.9);
+    border-radius: 12px;
+    padding: 16px;
+    margin-bottom: 20px;
+    border: 1px solid #2a2a2a;
+}
+
+.mode-switch {
+    display: flex;
+    background: rgba(0, 0, 0, 0.3);
+    border-radius: 10px;
+    padding: 4px;
+}
+
+.mode-option {
+    flex: 1;
+    padding: 12px;
+    border: none;
+    background: transparent;
+    color: #888;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    border-radius: 8px;
+    transition: all 0.2s;
+}
+
+.mode-option.active {
+    background: #11ff55;
+    color: #0a0a0a;
+}
+.mode-option:not(.active):hover {
+    color: #fff;
+}
+
+.section.disabled {
+    opacity: 0.4;
+    pointer-events: none;
+}
+
+.section.disabled::after {
+    content: "Zeitsteuerung aktiv";
+    display: block;
+    text-align: center;
+    color: #666;
+    font-size: 12px;
+    margin-top: 12px;
+    font-style: italic;
+}
+
+/* History Charts */
+.chart-container {
+    position: relative;
+    height: 300px;
+    width: 100%;
+    margin-bottom: 20px;
+}
+
+.range-selector {
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+    margin-bottom: 16px;
+}
+
+.range-btn {
+    padding: 6px 12px;
+    border: 1px solid #333;
+    background: rgba(255, 255, 255, 0.05);
+    color: #888;
+    border-radius: 6px;
+}
+
+.range-btn.active {
+    background: #11ff55;
+    color: #0a0a0a;
+    border-color: #11ff55;
+}
+
+/* Log Table */
+.log-container {
+    max-height: 300px;
+    overflow-y: auto;
+    border: 1px solid #333;
+    border-radius: 8px;
+    background: rgba(0, 0, 0, 0.3);
+}
+
+.log-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 12px;
+}
+
+.log-table th {
+    text-align: left;
+    padding: 8px;
+    background: rgba(255, 255, 255, 0.05);
+    color: #888;
+    position: sticky;
+    top: 0;
+}
+
+.log-table td {
+    padding: 8px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+    color: #ccc;
+}
+
+.log-row-error {
+    color: #ff4444 !important;
+}
+.log-row-warning {
+    color: #ffbb44 !important;
+}
+.log-time {
+    color: #666 !important;
+    width: 120px;
+}
+
+/* Camera Section */
+.camera-section {
+    margin-bottom: 20px;
+}
+
+.camera-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 12px;
+}
+
+.camera-header .section-title {
+    margin-bottom: 0;
+}
+
+.camera-status {
+    font-size: 12px;
+    padding: 4px 10px;
+    border-radius: 12px;
+    font-weight: 600;
+}
+
+.camera-status.online {
+    background: rgba(17, 255, 85, 0.2);
+    color: #11ff55;
+    border: 1px solid rgba(17, 255, 85, 0.5);
+}
+
+.camera-status.offline {
+    background: rgba(255, 68, 68, 0.2);
+    color: #ff4444;
+    border: 1px solid rgba(255, 68, 68, 0.5);
+}
+
+.camera-wrapper {
+    position: relative;
+    width: 100%;
+    aspect-ratio: 16 / 9;
+    background: rgba(0, 0, 0, 0.5);
+    border-radius: 12px;
+    overflow: hidden;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.camera-image {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+    border-radius: 12px;
+}
+
+.camera-error {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    color: #666;
+    font-size: 14px;
+    text-align: center;
+    padding: 20px;
+}
+
+/* ==========================================
+   Cost & Room Tab Button Styles
+   ========================================== */
+
+.cost-period-btn,
+.room-toggle-btn {
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    color: #888;
+    padding: 8px 16px;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all 0.2s;
+    font-size: 14px;
+}
+
+.cost-period-btn:hover,
+.room-toggle-btn:hover {
+    background: rgba(255, 255, 255, 0.08);
+    border-color: rgba(17, 255, 85, 0.3);
+    color: #aaa;
+}
+
+.cost-period-btn.active,
+.room-toggle-btn.active {
+    background: #11ff55;
+    border-color: #11ff55;
+    color: #000;
+    font-weight: 600;
+}
+
+/* Generic button styles for Apply/Save buttons */
+.btn {
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    color: #11ff55;
+    padding: 8px 16px;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all 0.2s;
+    font-size: 14px;
+}
+
+.btn:hover {
+    background: rgba(17, 255, 85, 0.1);
+    border-color: #11ff55;
+}
+
+/* Config form styles */
+.config-form .btn-save {
+    width: 100%;
+}
+
+/* ==========================================
+   Collapsible Sections (Accordion)
+   ========================================== */
+
+.collapsible-section {
+    position: relative;
+}
+
+.collapsible-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    cursor: pointer;
+    user-select: none;
+    padding: 4px 0;
+    margin-bottom: 12px;
+    -webkit-tap-highlight-color: transparent;
+}
+
+.collapsible-header:hover {
+    opacity: 0.85;
+}
+
+.collapsible-header:active {
+    opacity: 0.7;
+}
+
+.collapsible-header .section-title {
+    margin-bottom: 0;
+}
+
+.collapse-icon {
+    font-size: 12px;
+    color: #888;
+    transition: transform 0.3s ease;
+    padding: 8px;
+    margin: -8px;
+}
+
+.collapsible-section.collapsed .collapse-icon {
+    transform: rotate(-90deg);
+}
+
+.collapsible-content {
+    max-height: 2000px;
+    overflow: hidden;
+    transition: max-height 0.3s ease-out, opacity 0.25s ease-out;
+    opacity: 1;
+}
+
+.collapsible-section.collapsed .collapsible-content {
+    max-height: 0;
+    opacity: 0;
+    transition: max-height 0.25s ease-in, opacity 0.15s ease-in;
+}
+
+/* Device Status Item (for Schaltbare Geraete) */
+.device-status-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 12px 16px;
+    background: rgba(255, 255, 255, 0.03);
+    border-radius: 10px;
+    margin-bottom: 8px;
+}
+
+.device-info {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.device-name {
+    font-size: 14px;
+    font-weight: 600;
+    color: #fff;
+}
+
+.device-state {
+    font-size: 12px;
+    color: #888;
+}
+
+.device-state.running {
+    color: #11ff55;
+}
+
+.device-state.off {
+    color: #666;
+}
+
+.device-mode {
+    display: flex;
+    align-items: center;
+}
+
+.device-mode-label {
+    font-size: 11px;
+    font-weight: 600;
+    padding: 4px 10px;
+    border-radius: 12px;
+    background: rgba(17, 255, 85, 0.15);
+    color: #11ff55;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.device-mode-label.manual {
+    background: rgba(255, 187, 68, 0.15);
+    color: #ffbb44;
+}
+
+.device-hint {
+    font-size: 12px;
+    color: #666;
+    text-align: center;
+    padding: 8px;
+    font-style: italic;
+}
+
+/* ============================================
+   Curve Presets Styles (Feature #4)
+   ============================================ */
+
+.preset-controls {
+    background: rgba(20, 20, 20, 0.9);
+    border-radius: 12px;
+    padding: 16px;
+    margin-bottom: 16px;
+    border: 1px solid #333;
+}
+
+.preset-header {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex-wrap: wrap;
+}
+
+.preset-label {
+    font-size: 14px;
+    font-weight: 600;
+    color: #888;
+}
+
+.preset-select {
+    flex: 1;
+    min-width: 150px;
+    padding: 10px 14px;
+    background: rgba(0, 0, 0, 0.4);
+    border: 1px solid #444;
+    border-radius: 8px;
+    color: #fff;
+    font-size: 14px;
+    cursor: pointer;
+}
+
+.preset-select:focus {
+    outline: none;
+    border-color: #11ff55;
+}
+
+.preset-select option {
+    background: #1a1a1a;
+    color: #fff;
+}
+
+.preset-select optgroup {
+    background: #222;
+    color: #888;
+    font-style: normal;
+}
+
+.btn-preset {
+    padding: 10px 16px;
+    border: 1px solid #444;
+    border-radius: 8px;
+    background: rgba(255, 255, 255, 0.05);
+    color: #fff;
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.btn-preset:hover:not(:disabled) {
+    background: rgba(255, 255, 255, 0.1);
+    border-color: #666;
+}
+
+.btn-preset:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.btn-preset-primary {
+    background: rgba(17, 255, 85, 0.15);
+    border-color: rgba(17, 255, 85, 0.4);
+    color: #11ff55;
+}
+
+.btn-preset-primary:hover:not(:disabled) {
+    background: rgba(17, 255, 85, 0.25);
+    border-color: #11ff55;
+}
+
+/* Modal Overlay */
+.modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.8);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 1000;
+    padding: 16px;
+    backdrop-filter: blur(4px);
+}
+
+.modal-content {
+    background: linear-gradient(135deg, #1a1a1a 0%, #0d0d0d 100%);
+    border: 1px solid #333;
+    border-radius: 16px;
+    max-width: 400px;
+    width: 100%;
+    max-height: 90vh;
+    overflow-y: auto;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+}
+
+.modal-wide {
+    max-width: 600px;
+}
+
+.modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 20px;
+    border-bottom: 1px solid #333;
+}
+
+.modal-header h3 {
+    font-size: 18px;
+    font-weight: 600;
+    color: #fff;
+    margin: 0;
+}
+
+.modal-close {
+    background: none;
+    border: none;
+    color: #888;
+    font-size: 24px;
+    cursor: pointer;
+    padding: 0;
+    line-height: 1;
+    transition: color 0.2s;
+}
+
+.modal-close:hover {
+    color: #ff4444;
+}
+
+.modal-body {
+    padding: 20px;
+}
+
+.modal-footer {
+    display: flex;
+    justify-content: flex-end;
+    gap: 12px;
+    padding: 16px 20px;
+    border-top: 1px solid #333;
+}
+
+/* Form elements in modals */
+.form-group {
+    margin-bottom: 16px;
+}
+
+.form-group label {
+    display: block;
+    font-size: 13px;
+    color: #888;
+    margin-bottom: 6px;
+}
+
+.form-input,
+.form-textarea {
+    width: 100%;
+    padding: 12px;
+    background: rgba(0, 0, 0, 0.4);
+    border: 1px solid #444;
+    border-radius: 8px;
+    color: #fff;
+    font-size: 14px;
+    font-family: inherit;
+}
+
+.form-input:focus,
+.form-textarea:focus {
+    outline: none;
+    border-color: #11ff55;
+}
+
+.form-textarea {
+    resize: vertical;
+    min-height: 80px;
+}
+
+/* Modal buttons */
+.btn-modal {
+    padding: 10px 20px;
+    border-radius: 8px;
+    font-size: 14px;
+    font-weight: 500;
+    cursor: pointer;
+    border: 1px solid #444;
+    background: rgba(255, 255, 255, 0.05);
+    color: #fff;
+    transition: all 0.2s ease;
+}
+
+.btn-modal:hover {
+    background: rgba(255, 255, 255, 0.1);
+}
+
+.btn-modal.btn-primary {
+    background: rgba(17, 255, 85, 0.2);
+    border-color: rgba(17, 255, 85, 0.5);
+    color: #11ff55;
+}
+
+.btn-modal.btn-primary:hover {
+    background: rgba(17, 255, 85, 0.3);
+}
+
+.btn-modal.btn-primary:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.btn-modal.btn-cancel {
+    background: rgba(255, 68, 68, 0.1);
+    border-color: rgba(255, 68, 68, 0.3);
+    color: #ff6666;
+}
+
+.btn-modal.btn-cancel:hover {
+    background: rgba(255, 68, 68, 0.2);
+}
+
+/* Presets list table */
+.presets-list {
+    max-height: 400px;
+    overflow-y: auto;
+}
+
+.presets-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13px;
+}
+
+.presets-table th,
+.presets-table td {
+    padding: 12px 10px;
+    text-align: left;
+    border-bottom: 1px solid #333;
+}
+
+.presets-table th {
+    color: #888;
+    font-weight: 600;
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.presets-table tr:hover {
+    background: rgba(255, 255, 255, 0.03);
+}
+
+.preset-type {
+    display: inline-block;
+    padding: 4px 10px;
+    border-radius: 12px;
+    font-size: 11px;
+    font-weight: 600;
+}
+
+.preset-type.system {
+    background: rgba(136, 221, 255, 0.15);
+    color: #88ddff;
+}
+
+.preset-type.user {
+    background: rgba(17, 255, 85, 0.15);
+    color: #11ff55;
+}
+
+.preset-actions {
+    white-space: nowrap;
+}
+
+.btn-preset-action {
+    padding: 6px 12px;
+    border: 1px solid #444;
+    border-radius: 6px;
+    background: rgba(255, 255, 255, 0.05);
+    color: #fff;
+    font-size: 12px;
+    cursor: pointer;
+    margin-right: 6px;
+    transition: all 0.2s ease;
+}
+
+.btn-preset-action:hover {
+    background: rgba(255, 255, 255, 0.1);
+}
+
+.btn-preset-action.btn-delete {
+    border-color: rgba(255, 68, 68, 0.4);
+    color: #ff6666;
+}
+
+.btn-preset-action.btn-delete:hover {
+    background: rgba(255, 68, 68, 0.2);
+}
+
+.system-hint {
+    color: #666;
+    font-size: 12px;
+    font-style: italic;
+}
+
+.empty-text,
+.loading-text {
+    color: #666;
+    text-align: center;
+    padding: 20px;
+    font-style: italic;
+}
+
+/* Responsive adjustments for preset controls */
+@media (max-width: 480px) {
+    .preset-header {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    .preset-select {
+        width: 100%;
+    }
+
+    .btn-preset {
+        flex: 1;
+    }
+
+    .preset-header > .btn-preset {
+        min-width: auto;
+    }
+
+    .presets-table th:nth-child(2),
+    .presets-table td:nth-child(2) {
+        display: none;
+    }
+}
+
+/* ============================================
+   Time Schedule Styles (Feature #2)
+   ============================================ */
+
+.schedule-section {
+    margin-top: 16px;
+}
+
+.schedule-toggle-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px;
+    background: rgba(255, 255, 255, 0.03);
+    border-radius: 8px;
+    margin-bottom: 16px;
+}
+
+.active-schedule-info {
+    background: rgba(17, 255, 85, 0.1);
+    border: 1px solid rgba(17, 255, 85, 0.3);
+    padding: 10px 14px;
+    border-radius: 8px;
+    margin-bottom: 12px;
+    font-size: 14px;
+    color: #11ff55;
+}
+
+.active-schedule-info .active-indicator {
+    display: inline-block;
+    background: #11ff55;
+    color: #000;
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-size: 11px;
+    font-weight: 700;
+    margin-right: 8px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.schedule-list {
+    margin: 12px 0;
+}
+
+.schedule-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 12px 14px;
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 8px;
+    margin-bottom: 8px;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    transition: all 0.2s ease;
+}
+
+.schedule-item:hover {
+    background: rgba(255, 255, 255, 0.07);
+    border-color: rgba(255, 255, 255, 0.12);
+}
+
+.schedule-item.disabled {
+    opacity: 0.5;
+}
+
+.schedule-item.active {
+    border-color: rgba(17, 255, 85, 0.4);
+    background: rgba(17, 255, 85, 0.08);
+}
+
+.schedule-time {
+    font-family: 'Monaco', 'Menlo', 'Consolas', monospace;
+    font-size: 15px;
+    font-weight: 600;
+    color: #fff;
+    letter-spacing: 0.5px;
+}
+
+.schedule-time-badge {
+    display: inline-block;
+    padding: 4px 10px;
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 6px;
+    font-family: 'Monaco', 'Menlo', 'Consolas', monospace;
+    font-size: 13px;
+    color: #ccc;
+}
+
+.schedule-state {
+    display: inline-block;
+    padding: 4px 12px;
+    border-radius: 6px;
+    font-size: 12px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.schedule-state.on {
+    background: rgba(17, 255, 85, 0.15);
+    color: #11ff55;
+    border: 1px solid rgba(17, 255, 85, 0.3);
+}
+
+.schedule-state.off {
+    background: rgba(255, 68, 68, 0.15);
+    color: #ff4444;
+    border: 1px solid rgba(255, 68, 68, 0.3);
+}
+
+.schedule-actions {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+}
+
+.schedule-actions button {
+    padding: 6px 12px;
+    font-size: 12px;
+    border: 1px solid #444;
+    border-radius: 6px;
+    background: rgba(255, 255, 255, 0.08);
+    color: #ccc;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.schedule-actions button:hover {
+    background: rgba(255, 255, 255, 0.12);
+    border-color: #666;
+    color: #fff;
+}
+
+.schedule-actions .btn-toggle-schedule {
+    min-width: 70px;
+}
+
+.schedule-actions .btn-toggle-schedule.enabled {
+    background: rgba(17, 255, 85, 0.15);
+    border-color: rgba(17, 255, 85, 0.4);
+    color: #11ff55;
+}
+
+.schedule-actions .btn-delete-schedule {
+    border-color: rgba(255, 68, 68, 0.4);
+    color: #ff6666;
+}
+
+.schedule-actions .btn-delete-schedule:hover {
+    background: rgba(255, 68, 68, 0.2);
+    border-color: rgba(255, 68, 68, 0.6);
+}
+
+.schedule-empty {
+    text-align: center;
+    color: #666;
+    padding: 24px;
+    font-size: 14px;
+    font-style: italic;
+    background: rgba(255, 255, 255, 0.02);
+    border-radius: 8px;
+    border: 1px dashed rgba(255, 255, 255, 0.1);
+}
+
+.schedule-form {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+    flex-wrap: wrap;
+    margin-top: 12px;
+}
+
+.schedule-time-input {
+    padding: 10px 12px;
+    background: rgba(255, 255, 255, 0.08);
+    border: 1px solid #444;
+    border-radius: 8px;
+    color: #fff;
+    font-size: 14px;
+    font-family: 'Monaco', 'Menlo', 'Consolas', monospace;
+    width: 100px;
+}
+
+.schedule-time-input:focus {
+    outline: none;
+    border-color: #11ff55;
+    background: rgba(255, 255, 255, 0.1);
+}
+
+.schedule-separator {
+    color: #666;
+    font-size: 16px;
+    padding: 0 4px;
+}
+
+.schedule-state-select {
+    padding: 10px 14px;
+    background: rgba(255, 255, 255, 0.08);
+    border: 1px solid #444;
+    border-radius: 8px;
+    color: #fff;
+    font-size: 14px;
+    cursor: pointer;
+    min-width: 80px;
+}
+
+.schedule-state-select:focus {
+    outline: none;
+    border-color: #11ff55;
+}
+
+.schedule-state-select option {
+    background: #1a1a1a;
+    color: #fff;
+}
+
+.schedule-add-btn {
+    padding: 10px 18px;
+    background: rgba(17, 255, 85, 0.15);
+    border: 1px solid rgba(17, 255, 85, 0.4);
+    border-radius: 8px;
+    color: #11ff55;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.schedule-add-btn:hover {
+    background: rgba(17, 255, 85, 0.25);
+    border-color: #11ff55;
+}
+
+.schedule-info-notice {
+    margin-top: 14px;
+    padding: 12px 14px;
+    background: rgba(17, 255, 85, 0.05);
+    border-left: 3px solid rgba(17, 255, 85, 0.5);
+    border-radius: 0 8px 8px 0;
+    font-size: 13px;
+    color: #888;
+    line-height: 1.5;
+}
+
+/* Responsive adjustments for schedule form */
+@media (max-width: 480px) {
+    .schedule-form {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    .schedule-form > * {
+        width: 100%;
+    }
+
+    .schedule-time-input {
+        width: 100%;
+    }
+
+    .schedule-separator {
+        text-align: center;
+        padding: 4px 0;
+    }
+
+    .schedule-item {
+        flex-direction: column;
+        gap: 12px;
+        align-items: flex-start;
+    }
+
+    .schedule-actions {
+        width: 100%;
+        justify-content: flex-end;
+    }
+}

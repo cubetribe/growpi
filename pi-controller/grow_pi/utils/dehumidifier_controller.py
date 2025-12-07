@@ -1,149 +1,719 @@
+#!/usr/bin/env python3
 """
-Dehumidifier Controller with Hysteresis Logic
+Dehumidifier Controller - Automated Humidity Control with Time-Based Scheduling
 
-Controls a smart plug based on humidity sensor readings.
-Implements configurable hysteresis to prevent rapid on/off cycling.
+This controller manages the dehumidifier device with the following priority logic:
+1. TIME SCHEDULE (highest priority) - Force ON/OFF during defined time windows
+2. HUMIDITY AUTOMATION (fallback) - Control based on humidity thresholds
+3. MANUAL MODE - User can override all automation
+
+Key Features:
+- Time window scheduling with midnight wrap-around support
+- Hysteresis-based humidity control (prevents rapid cycling)
+- Minimum run/off time enforcement
+- Automatic fallback from time schedule to humidity automation
+- Comprehensive logging of all state changes
+
+Version: 6.8.0
+Date: 2025-12-06
 """
 
-import json
 import logging
-import os
 import threading
 import time
+import sqlite3
+import os
+import json
+from datetime import datetime, timedelta
+from typing import Optional, Dict, List, Any, Tuple
 from dataclasses import dataclass, asdict
-from typing import Optional, Callable
-
-from .tuya_cloud import get_tuya_service, TuyaCloudService
+from enum import Enum
 
 logger = logging.getLogger(__name__)
 
-# Config file location
-CONFIG_DIR = os.path.join(os.path.dirname(__file__), '..', 'config')
-CONFIG_FILE = os.path.join(CONFIG_DIR, 'room_config.json')
+
+class TriggerType(Enum):
+    """Types of triggers that can change device state"""
+    TIME_SCHEDULE = "time_schedule"
+    HUMIDITY_AUTO = "humidity_auto"
+    MANUAL = "manual"
+    FALLBACK = "fallback"  # When time schedule ends, falls back to humidity
+
+
+@dataclass
+class TimeSchedule:
+    """Time schedule for device control"""
+    id: int
+    device_id: int
+    start_time: str  # "HH:MM" format
+    end_time: str    # "HH:MM" format
+    target_state: str  # "on" or "off"
+    enabled: bool
+
+    @classmethod
+    def from_row(cls, row: tuple) -> 'TimeSchedule':
+        return cls(
+            id=row[0],
+            device_id=row[1],
+            start_time=row[2],
+            end_time=row[3],
+            target_state=row[4],
+            enabled=bool(row[5])
+        )
 
 
 @dataclass
 class DehumidifierConfig:
-    """Configuration for dehumidifier control."""
+    """Configuration for dehumidifier automation"""
     enabled: bool = True
-    target: float = 60.0  # Target humidity %
-    threshold_high: float = 65.0  # Turn ON above this
-    threshold_low: float = 55.0  # Turn OFF below this
-    device_id: str = "bfc705014c6241667avzn8"  # Entfeuchter
-    min_run_time: int = 60  # Minimum seconds to run before turning off
-    min_off_time: int = 60  # Minimum seconds off before turning on again
+    target: float = 60.0
+    threshold_high: float = 5.0
+    threshold_low: float = 5.0
+    min_run_time: int = 300  # seconds
+    min_off_time: int = 60   # seconds
+    time_schedule_enabled: bool = False
 
-    # Zeitfenster-Override (präventiv vor Lampen-Aus)
-    schedule_enabled: bool = False  # Zeitfenster aktiviert?
-    schedule_start_time: str = "19:45"  # Start-Zeit (HH:MM)
-    schedule_duration_minutes: int = 30  # Dauer in Minuten
+    def to_dict(self) -> Dict:
+        return asdict(self)
 
 
 class DehumidifierController:
     """
-    Controls dehumidifier based on humidity with hysteresis.
+    Controller for automated dehumidifier management.
 
-    Hysteresis Logic:
-    - Turn ON when humidity > threshold_high
-    - Turn OFF when humidity < threshold_low
-    - This prevents rapid cycling around the target value
+    Priority Logic:
+        1. TIME SCHEDULE - If current time is within a schedule window, force ON/OFF
+        2. HUMIDITY AUTOMATION - If no schedule active, control based on humidity
+        3. MANUAL - User can override by disabling automation
 
-    Example:
-        target=60%, high=65%, low=55%
-        - At 66% humidity -> turns ON
-        - Stays ON until humidity drops to 54%
-        - Then stays OFF until humidity rises to 66% again
+    Fallback Behavior:
+        When a time schedule ends, the controller does NOT just turn off.
+        Instead, it immediately checks the humidity automation logic
+        and decides whether to keep the device running or turn it off.
     """
 
-    def __init__(self, humidity_reader: Optional[Callable[[], Optional[float]]] = None):
-        """
-        Initialize controller.
+    _instance = None
+    _lock = threading.Lock()
 
-        Args:
-            humidity_reader: Callable that returns current humidity or None
-        """
-        self.config = DehumidifierConfig()
-        self._tuya: Optional[TuyaCloudService] = None
-        self._humidity_reader = humidity_reader
+    def __new__(cls):
+        if cls._instance is None:
+            with cls._lock:
+                if cls._instance is None:
+                    cls._instance = super().__new__(cls)
+                    cls._instance._initialized = False
+        return cls._instance
+
+    def __init__(self):
+        if self._initialized:
+            return
+
+        self._config = DehumidifierConfig()
         self._is_on = False
-        self._last_switch_time = 0
+        self._last_toggle_time: Optional[datetime] = None
+        self._last_trigger: Optional[TriggerType] = None
+        self._last_trigger_details: Optional[str] = None
         self._running = False
         self._thread: Optional[threading.Thread] = None
-        self._lock = threading.Lock()
+        self._stop_event = threading.Event()
+        self._humidity_reader = None
+        self._plug_controller = None
+        self._device_id = 1  # Default device ID for dehumidifier
+        self._tuya_device_id: Optional[str] = None
+        self._db_path = '/opt/grow-pi/data/growpi.db'
 
-        # Load saved config
+        # In-time-window tracking (to detect when window ends)
+        self._was_in_time_window = False
+
+        # Load configuration from database
         self._load_config()
+        self._load_plug_controller()
 
-        # Initialize Tuya service
-        self._tuya = get_tuya_service()
-        if self._tuya and self._tuya.is_available:
-            logger.info("DehumidifierController initialized with Tuya Cloud")
-            # Sync actual device state on startup
-            self._sync_device_state()
-        else:
-            logger.warning("DehumidifierController: Tuya Cloud not available")
+        self._initialized = True
+        logger.info("DehumidifierController initialized")
 
-    def _sync_device_state(self):
-        """Sync internal state with actual device state from Tuya Cloud."""
+    def _load_config(self) -> None:
+        """Load configuration from database"""
         try:
-            if not self._tuya or not self._tuya.is_available:
-                return
+            # BUGFIX 2025-12-07: Create database directory and file if they don't exist
+            # This ensures migration can always run on fresh installations
+            db_dir = os.path.dirname(self._db_path)
+            if not os.path.exists(db_dir):
+                logger.info(f"Creating database directory: {db_dir}")
+                os.makedirs(db_dir, exist_ok=True)
 
-            status = self._tuya.get_device_status(self.config.device_id)
-            if status and 'switch' in status:
-                self._is_on = status['switch']
-                logger.info(f"Dehumidifier state synced from cloud: {'ON' if self._is_on else 'OFF'}")
-            else:
-                logger.warning("Could not get device status from Tuya Cloud")
-        except Exception as e:
-            logger.error(f"Error syncing device state: {e}")
+            # Connect to database (creates file if not exists)
+            conn = sqlite3.connect(self._db_path)
+            cursor = conn.cursor()
 
-    def _load_config(self):
-        """Load config from file."""
-        try:
-            if os.path.exists(CONFIG_FILE):
-                with open(CONFIG_FILE, 'r') as f:
-                    data = json.load(f)
-                    if 'dehumidifier' in data:
-                        cfg = data['dehumidifier']
-                        self.config = DehumidifierConfig(
-                            enabled=cfg.get('enabled', True),
-                            target=cfg.get('target', 60.0),
-                            threshold_high=cfg.get('threshold_high', 65.0),
-                            threshold_low=cfg.get('threshold_low', 55.0),
-                            device_id=cfg.get('device_id', self.config.device_id),
-                            min_run_time=cfg.get('min_run_time', 60),
-                            min_off_time=cfg.get('min_off_time', 60),
-                            schedule_enabled=cfg.get('schedule_enabled', False),
-                            schedule_start_time=cfg.get('schedule_start_time', '19:45'),
-                            schedule_duration_minutes=cfg.get('schedule_duration_minutes', 30)
-                        )
-                        logger.info(f"Loaded dehumidifier config: target={self.config.target}%, schedule={'ON' if self.config.schedule_enabled else 'OFF'}")
+            # Check if tables exist - ALWAYS run migration if missing
+            cursor.execute("""
+                SELECT name FROM sqlite_master
+                WHERE type='table' AND name='device_automation_config'
+            """)
+            if not cursor.fetchone():
+                logger.info("device_automation_config table not found, running migration...")
+                self._run_migration(conn)
+
+            # Load config
+            cursor.execute("""
+                SELECT enabled, target_value, threshold_high, threshold_low,
+                       min_run_time, min_off_time, time_schedule_enabled
+                FROM device_automation_config
+                WHERE device_id = ?
+            """, (self._device_id,))
+            row = cursor.fetchone()
+
+            if row:
+                self._config = DehumidifierConfig(
+                    enabled=bool(row[0]),
+                    target=row[1] or 60.0,
+                    threshold_high=row[2] or 5.0,
+                    threshold_low=row[3] or 5.0,
+                    min_run_time=row[4] or 300,
+                    min_off_time=row[5] or 60,
+                    time_schedule_enabled=bool(row[6])
+                )
+                logger.info(f"Loaded config: {self._config}")
+
+            # Load Tuya device ID
+            cursor.execute("""
+                SELECT tuya_device_id FROM switchable_devices WHERE id = ?
+            """, (self._device_id,))
+            row = cursor.fetchone()
+            if row and row[0]:
+                self._tuya_device_id = row[0]
+
+            conn.close()
+
         except Exception as e:
             logger.error(f"Error loading config: {e}")
 
-    def _save_config(self):
-        """Save config to file."""
+    def _run_migration(self, conn: sqlite3.Connection) -> None:
+        """Run database migration"""
         try:
-            os.makedirs(CONFIG_DIR, exist_ok=True)
-
-            data = {}
-            if os.path.exists(CONFIG_FILE):
-                with open(CONFIG_FILE, 'r') as f:
-                    data = json.load(f)
-
-            data['dehumidifier'] = asdict(self.config)
-
-            with open(CONFIG_FILE, 'w') as f:
-                json.dump(data, f, indent=2)
-
-            logger.info("Saved dehumidifier config")
+            migration_path = os.path.join(
+                os.path.dirname(__file__),
+                '..', 'database', 'migrations', '20251206_device_time_schedules.sql'
+            )
+            if os.path.exists(migration_path):
+                with open(migration_path, 'r') as f:
+                    sql = f.read()
+                conn.executescript(sql)
+                conn.commit()
+                logger.info("Migration completed successfully")
+            else:
+                logger.warning(f"Migration file not found: {migration_path}")
         except Exception as e:
-            logger.error(f"Error saving config: {e}")
+            logger.error(f"Migration error: {e}")
 
-    def get_config(self) -> dict:
-        """Get current config as dict."""
-        return asdict(self.config)
+    def _load_plug_controller(self) -> None:
+        """Load Tuya plug controller"""
+        try:
+            from ..lamps.smart_plug_controller import SmartPlugController
+            self._plug_controller = SmartPlugController()
+            logger.info("SmartPlugController loaded")
+        except ImportError as e:
+            logger.warning(f"SmartPlugController not available: {e}")
+
+    def set_humidity_reader(self, reader_func) -> None:
+        """Set the humidity reader function"""
+        self._humidity_reader = reader_func
+
+    def get_humidity(self) -> Optional[float]:
+        """Get current humidity reading"""
+        if self._humidity_reader:
+            try:
+                result = self._humidity_reader()
+                if isinstance(result, tuple):
+                    return result[1]  # (temp, humidity)
+                return result
+            except Exception as e:
+                logger.error(f"Error reading humidity: {e}")
+        return None
+
+    # =========================================================================
+    # Time Schedule Logic
+    # =========================================================================
+
+    def get_time_schedules(self) -> List[TimeSchedule]:
+        """Get all time schedules for this device"""
+        schedules = []
+        try:
+            conn = sqlite3.connect(self._db_path)
+            cursor = conn.cursor()
+            cursor.execute("""
+                SELECT id, device_id, start_time, end_time, target_state, enabled
+                FROM device_time_schedules
+                WHERE device_id = ?
+                ORDER BY start_time
+            """, (self._device_id,))
+            schedules = [TimeSchedule.from_row(row) for row in cursor.fetchall()]
+            conn.close()
+        except Exception as e:
+            logger.error(f"Error getting schedules: {e}")
+        return schedules
+
+    def add_time_schedule(
+        self,
+        start_time: str,
+        end_time: str,
+        target_state: str = "on",
+        enabled: bool = True
+    ) -> Optional[int]:
+        """
+        Add a new time schedule.
+
+        Args:
+            start_time: Start time in "HH:MM" format
+            end_time: End time in "HH:MM" format
+            target_state: "on" or "off"
+            enabled: Whether the schedule is active
+
+        Returns:
+            Schedule ID if successful, None otherwise
+        """
+        # Validate inputs
+        if not self._validate_time_format(start_time):
+            raise ValueError(f"Invalid start_time format: {start_time}")
+        if not self._validate_time_format(end_time):
+            raise ValueError(f"Invalid end_time format: {end_time}")
+        if target_state not in ("on", "off"):
+            raise ValueError(f"target_state must be 'on' or 'off', got: {target_state}")
+
+        # Check for overlaps
+        if self._check_schedule_overlap(start_time, end_time):
+            raise ValueError("Schedule overlaps with existing schedule")
+
+        try:
+            conn = sqlite3.connect(self._db_path)
+            cursor = conn.cursor()
+            cursor.execute("""
+                INSERT INTO device_time_schedules
+                (device_id, start_time, end_time, target_state, enabled)
+                VALUES (?, ?, ?, ?, ?)
+            """, (self._device_id, start_time, end_time, target_state, int(enabled)))
+            schedule_id = cursor.lastrowid
+            conn.commit()
+            conn.close()
+
+            logger.info(f"Added schedule {schedule_id}: {start_time}-{end_time} ({target_state})")
+            return schedule_id
+
+        except Exception as e:
+            logger.error(f"Error adding schedule: {e}")
+            return None
+
+    def delete_time_schedule(self, schedule_id: int) -> bool:
+        """Delete a time schedule"""
+        try:
+            conn = sqlite3.connect(self._db_path)
+            cursor = conn.cursor()
+            cursor.execute("""
+                DELETE FROM device_time_schedules
+                WHERE id = ? AND device_id = ?
+            """, (schedule_id, self._device_id))
+            deleted = cursor.rowcount > 0
+            conn.commit()
+            conn.close()
+
+            if deleted:
+                logger.info(f"Deleted schedule {schedule_id}")
+            return deleted
+
+        except Exception as e:
+            logger.error(f"Error deleting schedule: {e}")
+            return False
+
+    def update_time_schedule(
+        self,
+        schedule_id: int,
+        start_time: Optional[str] = None,
+        end_time: Optional[str] = None,
+        target_state: Optional[str] = None,
+        enabled: Optional[bool] = None
+    ) -> bool:
+        """Update an existing time schedule"""
+        try:
+            # Build update query dynamically
+            updates = []
+            params = []
+
+            if start_time is not None:
+                if not self._validate_time_format(start_time):
+                    raise ValueError(f"Invalid start_time: {start_time}")
+                updates.append("start_time = ?")
+                params.append(start_time)
+
+            if end_time is not None:
+                if not self._validate_time_format(end_time):
+                    raise ValueError(f"Invalid end_time: {end_time}")
+                updates.append("end_time = ?")
+                params.append(end_time)
+
+            if target_state is not None:
+                if target_state not in ("on", "off"):
+                    raise ValueError(f"Invalid target_state: {target_state}")
+                updates.append("target_state = ?")
+                params.append(target_state)
+
+            if enabled is not None:
+                updates.append("enabled = ?")
+                params.append(int(enabled))
+
+            if not updates:
+                return True  # Nothing to update
+
+            params.extend([schedule_id, self._device_id])
+
+            conn = sqlite3.connect(self._db_path)
+            cursor = conn.cursor()
+            cursor.execute(f"""
+                UPDATE device_time_schedules
+                SET {', '.join(updates)}
+                WHERE id = ? AND device_id = ?
+            """, params)
+            updated = cursor.rowcount > 0
+            conn.commit()
+            conn.close()
+
+            return updated
+
+        except Exception as e:
+            logger.error(f"Error updating schedule: {e}")
+            return False
+
+    def _validate_time_format(self, time_str: str) -> bool:
+        """Validate time format is HH:MM"""
+        try:
+            parts = time_str.split(':')
+            if len(parts) != 2:
+                return False
+            hours, minutes = int(parts[0]), int(parts[1])
+            return 0 <= hours <= 23 and 0 <= minutes <= 59
+        except (ValueError, AttributeError):
+            return False
+
+    def _check_schedule_overlap(
+        self,
+        start_time: str,
+        end_time: str,
+        exclude_id: Optional[int] = None
+    ) -> bool:
+        """Check if a schedule overlaps with existing schedules"""
+        schedules = self.get_time_schedules()
+
+        start = self._time_to_minutes(start_time)
+        end = self._time_to_minutes(end_time)
+
+        for schedule in schedules:
+            if exclude_id and schedule.id == exclude_id:
+                continue
+            if not schedule.enabled:
+                continue
+
+            s_start = self._time_to_minutes(schedule.start_time)
+            s_end = self._time_to_minutes(schedule.end_time)
+
+            # Check for overlap (including midnight wrap-around)
+            if self._times_overlap(start, end, s_start, s_end):
+                return True
+
+        return False
+
+    def _time_to_minutes(self, time_str: str) -> int:
+        """Convert HH:MM to minutes since midnight"""
+        parts = time_str.split(':')
+        return int(parts[0]) * 60 + int(parts[1])
+
+    def _times_overlap(self, s1: int, e1: int, s2: int, e2: int) -> bool:
+        """Check if two time ranges overlap (handling midnight wrap)"""
+        # Normalize ranges that wrap around midnight
+        if e1 < s1:
+            e1 += 24 * 60
+        if e2 < s2:
+            e2 += 24 * 60
+
+        # Check overlap
+        return not (e1 <= s2 or e2 <= s1)
+
+    def get_active_time_schedule(
+        self,
+        current_time: Optional[datetime] = None
+    ) -> Optional[TimeSchedule]:
+        """
+        Check if there's an active time schedule for the current time.
+
+        Handles midnight wrap-around (e.g., 23:00 - 01:00).
+
+        Returns:
+            Active schedule if in a time window, None otherwise
+        """
+        if not self._config.time_schedule_enabled:
+            return None
+
+        if current_time is None:
+            current_time = datetime.now()
+
+        current_minutes = current_time.hour * 60 + current_time.minute
+
+        for schedule in self.get_time_schedules():
+            if not schedule.enabled:
+                continue
+
+            start = self._time_to_minutes(schedule.start_time)
+            end = self._time_to_minutes(schedule.end_time)
+
+            # Handle midnight wrap-around
+            if end < start:
+                # Schedule wraps midnight (e.g., 23:00 - 01:00)
+                if current_minutes >= start or current_minutes < end:
+                    return schedule
+            else:
+                # Normal schedule (e.g., 19:00 - 20:30)
+                if start <= current_minutes < end:
+                    return schedule
+
+        return None
+
+    # =========================================================================
+    # Control Logic
+    # =========================================================================
+
+    def check_and_control(self) -> Optional[bool]:
+        """
+        Main control logic with priority:
+        1. TIME SCHEDULE (highest)
+        2. HUMIDITY AUTOMATION (fallback)
+        3. MANUAL (disabled automation)
+
+        Returns:
+            True if turned ON, False if turned OFF, None if no change
+        """
+        if not self._config.enabled:
+            # Manual mode - don't change anything
+            return None
+
+        current_time = datetime.now()
+
+        # PRIORITY 1: Check time schedule
+        active_schedule = self.get_active_time_schedule(current_time)
+
+        if active_schedule:
+            # We're IN a time window
+            self._was_in_time_window = True
+            target_on = active_schedule.target_state == "on"
+
+            logger.debug(
+                f"Time schedule active: {active_schedule.start_time}-{active_schedule.end_time} "
+                f"-> {'ON' if target_on else 'OFF'}"
+            )
+
+            if target_on and not self._is_on:
+                return self._ensure_state(
+                    True,
+                    TriggerType.TIME_SCHEDULE,
+                    f"{active_schedule.start_time}-{active_schedule.end_time}"
+                )
+            elif not target_on and self._is_on:
+                return self._ensure_state(
+                    False,
+                    TriggerType.TIME_SCHEDULE,
+                    f"{active_schedule.start_time}-{active_schedule.end_time}"
+                )
+            return None
+
+        # Time window just ended - check fallback
+        if self._was_in_time_window:
+            self._was_in_time_window = False
+            logger.info("Time schedule ended -> Checking humidity fallback")
+
+            # Don't just turn off! Check humidity logic first
+            humidity_decision = self._check_humidity_logic()
+            if humidity_decision is not None:
+                return self._ensure_state(
+                    humidity_decision,
+                    TriggerType.FALLBACK,
+                    "post-schedule humidity check"
+                )
+
+        # PRIORITY 2: Humidity automation
+        return self._check_humidity_automation()
+
+    def _check_humidity_logic(self) -> Optional[bool]:
+        """
+        Check humidity and determine if device should be ON or OFF.
+
+        Returns:
+            True if should be ON, False if should be OFF, None if in hysteresis zone
+        """
+        humidity = self.get_humidity()
+        if humidity is None:
+            logger.warning("Humidity read failed - keeping current state")
+            return None
+
+        target = self._config.target
+        high_threshold = target + self._config.threshold_high
+        low_threshold = target - self._config.threshold_low
+
+        if humidity > high_threshold:
+            return True  # Should be ON
+        elif humidity < low_threshold:
+            return False  # Should be OFF
+        else:
+            return None  # In hysteresis zone - no change
+
+    def _check_humidity_automation(self) -> Optional[bool]:
+        """
+        Humidity-based automation with hysteresis.
+
+        Returns:
+            True if turned ON, False if turned OFF, None if no change
+        """
+        humidity = self.get_humidity()
+        if humidity is None:
+            logger.warning("Humidity read failed - skipping automation")
+            return None
+
+        target = self._config.target
+        high_threshold = target + self._config.threshold_high
+        low_threshold = target - self._config.threshold_low
+
+        logger.debug(
+            f"Humidity: {humidity:.1f}% (target: {target}%, "
+            f"high: {high_threshold}%, low: {low_threshold}%)"
+        )
+
+        # Check if humidity is too high -> turn ON
+        if humidity > high_threshold and not self._is_on:
+            return self._ensure_state(
+                True,
+                TriggerType.HUMIDITY_AUTO,
+                f"humidity {humidity:.1f}% > {high_threshold}%"
+            )
+
+        # Check if humidity is low enough -> turn OFF
+        if humidity < low_threshold and self._is_on:
+            return self._ensure_state(
+                False,
+                TriggerType.HUMIDITY_AUTO,
+                f"humidity {humidity:.1f}% < {low_threshold}%"
+            )
+
+        return None  # No change needed
+
+    def _ensure_state(
+        self,
+        target_on: bool,
+        trigger: TriggerType,
+        details: str = ""
+    ) -> Optional[bool]:
+        """
+        Ensure device is in the target state, respecting min run/off times.
+
+        Returns:
+            True if turned ON, False if turned OFF, None if blocked by min time
+        """
+        # Check minimum time constraints
+        if self._last_toggle_time:
+            elapsed = (datetime.now() - self._last_toggle_time).total_seconds()
+
+            if target_on and not self._is_on:
+                # Want to turn ON - check min_off_time
+                if elapsed < self._config.min_off_time:
+                    logger.debug(f"Blocked: min_off_time ({elapsed:.0f}s < {self._config.min_off_time}s)")
+                    return None
+            elif not target_on and self._is_on:
+                # Want to turn OFF - check min_run_time
+                if elapsed < self._config.min_run_time:
+                    logger.debug(f"Blocked: min_run_time ({elapsed:.0f}s < {self._config.min_run_time}s)")
+                    return None
+
+        # State is already correct
+        if target_on == self._is_on:
+            return None
+
+        # Execute state change
+        success = self._set_plug_state(target_on)
+
+        if success:
+            self._is_on = target_on
+            self._last_toggle_time = datetime.now()
+            self._last_trigger = trigger
+            self._last_trigger_details = details
+
+            # Log the state change
+            self._log_state_change(target_on, trigger, details)
+
+            logger.info(
+                f"Dehumidifier {'ON' if target_on else 'OFF'} "
+                f"(trigger: {trigger.value}, {details})"
+            )
+            return target_on
+        else:
+            logger.error(f"Failed to set dehumidifier state to {'ON' if target_on else 'OFF'}")
+            return None
+
+    def _set_plug_state(self, on: bool) -> bool:
+        """Set the Tuya smart plug state"""
+        if self._plug_controller is None:
+            logger.warning("Plug controller not available - simulating state change")
+            return True  # Simulate success for testing
+
+        try:
+            if self._tuya_device_id:
+                if on:
+                    return self._plug_controller.turn_on(self._tuya_device_id)
+                else:
+                    return self._plug_controller.turn_off(self._tuya_device_id)
+            else:
+                logger.warning("No Tuya device ID configured")
+                return True  # Simulate success
+        except Exception as e:
+            logger.error(f"Error controlling plug: {e}")
+            return False
+
+    def _log_state_change(self, on: bool, trigger: TriggerType, details: str) -> None:
+        """Log state change to database"""
+        try:
+            import uuid
+            conn = sqlite3.connect(self._db_path)
+            cursor = conn.cursor()
+            cursor.execute("""
+                INSERT INTO device_state_log (id, device_id, state, trigger_type, trigger_details)
+                VALUES (?, ?, ?, ?, ?)
+            """, (
+                str(uuid.uuid4()),
+                self._device_id,
+                "on" if on else "off",
+                trigger.value,
+                details
+            ))
+            conn.commit()
+            conn.close()
+        except Exception as e:
+            logger.error(f"Error logging state change: {e}")
+
+    # =========================================================================
+    # Manual Control
+    # =========================================================================
+
+    def switch_on(self) -> bool:
+        """Manually turn on dehumidifier"""
+        result = self._ensure_state(True, TriggerType.MANUAL, "manual on")
+        return result is True
+
+    def switch_off(self) -> bool:
+        """Manually turn off dehumidifier"""
+        result = self._ensure_state(False, TriggerType.MANUAL, "manual off")
+        return result is True
+
+    # =========================================================================
+    # Configuration
+    # =========================================================================
+
+    def get_config(self) -> Dict:
+        """Get current configuration"""
+        return self._config.to_dict()
 
     def update_config(
         self,
@@ -153,240 +723,136 @@ class DehumidifierController:
         threshold_low: Optional[float] = None,
         min_run_time: Optional[int] = None,
         min_off_time: Optional[int] = None,
-        schedule_enabled: Optional[bool] = None,
-        schedule_start_time: Optional[str] = None,
-        schedule_duration_minutes: Optional[int] = None
-    ) -> dict:
-        """
-        Update configuration.
+        time_schedule_enabled: Optional[bool] = None,
+        **kwargs  # Ignore unknown parameters
+    ) -> Dict:
+        """Update configuration"""
+        if enabled is not None:
+            self._config.enabled = enabled
+        if target is not None:
+            self._config.target = target
+        if threshold_high is not None:
+            self._config.threshold_high = threshold_high
+        if threshold_low is not None:
+            self._config.threshold_low = threshold_low
+        if min_run_time is not None:
+            self._config.min_run_time = min_run_time
+        if min_off_time is not None:
+            self._config.min_off_time = min_off_time
+        if time_schedule_enabled is not None:
+            self._config.time_schedule_enabled = time_schedule_enabled
 
-        Args:
-            enabled: Enable/disable automatic control
-            target: Target humidity percentage
-            threshold_high: Turn ON threshold
-            threshold_low: Turn OFF threshold
-            min_run_time: Minimum run time in seconds
-            min_off_time: Minimum off time in seconds
-            schedule_enabled: Enable/disable schedule window
-            schedule_start_time: Schedule start time (HH:MM)
-            schedule_duration_minutes: Schedule duration in minutes
+        # Save to database
+        self._save_config()
 
-        Returns:
-            Updated config dict
-        """
-        with self._lock:
-            if enabled is not None:
-                self.config.enabled = enabled
-            if target is not None:
-                self.config.target = float(target)
-            if threshold_high is not None:
-                self.config.threshold_high = float(threshold_high)
-            if threshold_low is not None:
-                self.config.threshold_low = float(threshold_low)
-            if min_run_time is not None:
-                self.config.min_run_time = int(min_run_time)
-            if min_off_time is not None:
-                self.config.min_off_time = int(min_off_time)
-            if schedule_enabled is not None:
-                self.config.schedule_enabled = schedule_enabled
-            if schedule_start_time is not None:
-                self.config.schedule_start_time = schedule_start_time
-            if schedule_duration_minutes is not None:
-                self.config.schedule_duration_minutes = int(schedule_duration_minutes)
+        return self._config.to_dict()
 
-            self._save_config()
-            return self.get_config()
-
-    def set_humidity_reader(self, reader: Callable[[], Optional[float]]):
-        """Set the humidity reader function."""
-        self._humidity_reader = reader
-
-    def get_current_humidity(self) -> Optional[float]:
-        """Get current humidity from reader."""
-        if self._humidity_reader:
-            try:
-                return self._humidity_reader()
-            except Exception as e:
-                logger.error(f"Error reading humidity: {e}")
-        return None
-
-    def _is_in_schedule_window(self) -> bool:
-        """
-        Check if current time is within the scheduled time window.
-
-        Returns:
-            True if schedule is enabled AND current time is within window
-        """
-        if not self.config.schedule_enabled:
-            return False
-
-        from datetime import datetime, time as dt_time, timedelta
-
-        now = datetime.now()
-        current_time = now.time()
-
-        # Parse start time
+    def _save_config(self) -> None:
+        """Save configuration to database"""
         try:
-            start_hour, start_minute = map(int, self.config.schedule_start_time.split(':'))
-            start_time = dt_time(start_hour, start_minute)
+            conn = sqlite3.connect(self._db_path)
+            cursor = conn.cursor()
+            cursor.execute("""
+                UPDATE device_automation_config
+                SET enabled = ?, target_value = ?, threshold_high = ?,
+                    threshold_low = ?, min_run_time = ?, min_off_time = ?,
+                    time_schedule_enabled = ?, updated_at = datetime('now')
+                WHERE device_id = ?
+            """, (
+                int(self._config.enabled),
+                self._config.target,
+                self._config.threshold_high,
+                self._config.threshold_low,
+                self._config.min_run_time,
+                self._config.min_off_time,
+                int(self._config.time_schedule_enabled),
+                self._device_id
+            ))
+            conn.commit()
+            conn.close()
+            logger.debug("Configuration saved")
         except Exception as e:
-            logger.error(f"Invalid schedule_start_time format: {e}")
-            return False
+            logger.error(f"Error saving config: {e}")
 
-        # Calculate end time
-        start_datetime = datetime.combine(now.date(), start_time)
-        end_datetime = start_datetime + timedelta(minutes=self.config.schedule_duration_minutes)
-        end_time = end_datetime.time()
+    # =========================================================================
+    # Status
+    # =========================================================================
 
-        # Handle midnight wraparound
-        if end_datetime.date() > now.date():
-            # Window crosses midnight
-            return current_time >= start_time or current_time <= end_time
-        else:
-            # Normal window within same day
-            return start_time <= current_time <= end_time
+    def get_status(self) -> Dict:
+        """Get current status"""
+        humidity = self.get_humidity()
 
-    def switch_on(self) -> bool:
-        """Manually turn dehumidifier ON."""
-        if not self._tuya or not self._tuya.is_available:
-            logger.warning("Cannot switch: Tuya not available")
-            return False
-
-        success = self._tuya.switch_on(self.config.device_id)
-        if success:
-            self._is_on = True
-            self._last_switch_time = time.time()
-        return success
-
-    def switch_off(self) -> bool:
-        """Manually turn dehumidifier OFF."""
-        if not self._tuya or not self._tuya.is_available:
-            logger.warning("Cannot switch: Tuya not available")
-            return False
-
-        success = self._tuya.switch_off(self.config.device_id)
-        if success:
-            self._is_on = False
-            self._last_switch_time = time.time()
-        return success
-
-    def get_status(self) -> dict:
-        """
-        Get current status.
-
-        Returns:
-            Dict with is_on, humidity, config, in_schedule, etc.
-        """
-        humidity = self.get_current_humidity()
-        in_schedule = self._is_in_schedule_window()
+        # Get active schedule if any
+        active_schedule = self.get_active_time_schedule()
+        active_schedule_info = None
+        if active_schedule:
+            active_schedule_info = {
+                "id": active_schedule.id,
+                "start_time": active_schedule.start_time,
+                "end_time": active_schedule.end_time,
+                "target_state": active_schedule.target_state
+            }
 
         return {
-            'is_on': self._is_on,
-            'humidity': humidity,
-            'enabled': self.config.enabled,
-            'config': self.get_config(),
-            'tuya_available': self._tuya.is_available if self._tuya else False,
-            'running': self._running,
-            'in_schedule_window': in_schedule  # Neuer Status für UI
+            "is_on": self._is_on,
+            "humidity": humidity,
+            "config": self._config.to_dict(),
+            "last_toggle": self._last_toggle_time.isoformat() if self._last_toggle_time else None,
+            "last_trigger": self._last_trigger.value if self._last_trigger else None,
+            "last_trigger_details": self._last_trigger_details,
+            "active_schedule": active_schedule_info,
+            "available": True
         }
 
-    def check_and_control(self) -> Optional[bool]:
-        """
-        Check humidity and control dehumidifier.
+    # =========================================================================
+    # Background Control Loop
+    # =========================================================================
 
-        Logic:
-        1. If in schedule window -> ALWAYS ON (Override)
-        2. If not in schedule window -> Normal hysteresis control
-
-        Returns:
-            True if turned ON, False if turned OFF, None if no change
-        """
-        if not self.config.enabled:
-            return None
-
-        if not self._tuya or not self._tuya.is_available:
-            return None
-
-        humidity = self.get_current_humidity()
-        if humidity is None:
-            logger.warning("No humidity reading available")
-            return None
-
-        now = time.time()
-        time_since_switch = now - self._last_switch_time
-        in_schedule = self._is_in_schedule_window()
-
-        with self._lock:
-            # PRIORITY 1: Schedule Window Override
-            if in_schedule:
-                # During schedule window, always turn ON (ignoring hysteresis)
-                if not self._is_on:
-                    logger.info(f"Schedule active [{self.config.schedule_start_time} for {self.config.schedule_duration_minutes}min] - turning ON")
-                    if self.switch_on():
-                        return True
-                # If already ON during schedule, keep it ON
-                return None
-
-            # PRIORITY 2: Normal Hysteresis Control (outside schedule window)
-            # Check if we should turn ON
-            if not self._is_on and humidity > self.config.threshold_high:
-                # Respect minimum off time
-                if time_since_switch >= self.config.min_off_time:
-                    logger.info(f"Humidity {humidity}% > {self.config.threshold_high}% - turning ON")
-                    if self.switch_on():
-                        return True
-
-            # Check if we should turn OFF
-            elif self._is_on and humidity < self.config.threshold_low:
-                # Respect minimum run time
-                if time_since_switch >= self.config.min_run_time:
-                    logger.info(f"Humidity {humidity}% < {self.config.threshold_low}% - turning OFF")
-                    if self.switch_off():
-                        return False
-
-        return None
-
-    def start(self, check_interval: int = 30):
-        """
-        Start automatic control loop.
-
-        Args:
-            check_interval: Seconds between checks
-        """
+    def start(self, check_interval: int = 10) -> None:
+        """Start the background control loop"""
         if self._running:
             return
 
         self._running = True
+        self._stop_event.clear()
 
         def control_loop():
-            while self._running:
+            logger.info(f"Control loop started (interval: {check_interval}s)")
+            while not self._stop_event.is_set():
                 try:
                     self.check_and_control()
                 except Exception as e:
                     logger.error(f"Control loop error: {e}")
-                time.sleep(check_interval)
+
+                # Wait with event for clean shutdown
+                self._stop_event.wait(timeout=check_interval)
+
+            logger.info("Control loop stopped")
 
         self._thread = threading.Thread(target=control_loop, daemon=True)
         self._thread.start()
-        logger.info(f"DehumidifierController started (interval: {check_interval}s)")
 
-    def stop(self):
-        """Stop automatic control loop."""
+    def stop(self) -> None:
+        """Stop the background control loop"""
+        if not self._running:
+            return
+
         self._running = False
+        self._stop_event.set()
+
         if self._thread:
             self._thread.join(timeout=5)
+
         logger.info("DehumidifierController stopped")
 
 
-# Singleton instance
-_controller: Optional[DehumidifierController] = None
+# Singleton accessor
+_controller_instance: Optional[DehumidifierController] = None
 
 
 def get_dehumidifier_controller() -> DehumidifierController:
-    """Get or create singleton DehumidifierController."""
-    global _controller
-
-    if _controller is None:
-        _controller = DehumidifierController()
-
-    return _controller
+    """Get or create the singleton DehumidifierController instance"""
+    global _controller_instance
+    if _controller_instance is None:
+        _controller_instance = DehumidifierController()
+    return _controller_instance

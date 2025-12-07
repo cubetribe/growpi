@@ -49,6 +49,14 @@ try:
 except ImportError:
     pass
 
+# Try to import PWM state persistence (Zero-Downtime Feature #0)
+STATE_PERSISTENCE_AVAILABLE = False
+try:
+    from .utils.pwm_state import save_state, load_state, state_exists
+    STATE_PERSISTENCE_AVAILABLE = True
+except ImportError:
+    pass
+
 # Try to import web API
 WEB_API_AVAILABLE = False
 try:
@@ -132,9 +140,36 @@ class GrowPiController:
             logger.error("No lamp channels configured!")
             return False
 
-        if not self.pwm_controller.initialize(channels):
+        # Zero-Downtime: Check for saved state BEFORE initializing PWM
+        # BUGFIX 2025-12-07: Bei Warm-Restart darf PWM nicht auf 0 gesetzt werden!
+        warm_restart = False
+        saved_state = None
+        if STATE_PERSISTENCE_AVAILABLE and state_exists():
+            logger.info("=" * 30)
+            logger.info("WARM RESTART DETECTED")
+            logger.info("=" * 30)
+            saved_state = load_state()
+            if saved_state:
+                warm_restart = True
+                logger.info("State file found - will preserve PWM values")
+
+        # Initialize PWM controller (skip zero-init on warm restart)
+        if not self.pwm_controller.initialize(channels, skip_zero_init=warm_restart):
             logger.error("Failed to initialize PWM controller")
             return False
+
+        # Restore PWM values from saved state
+        if warm_restart and saved_state:
+            logger.info("Restoring PWM values from saved state...")
+            for ch_str, ch_data in saved_state.get('channels', {}).items():
+                channel = int(ch_str)
+                intensity = ch_data.get('intensity', 0)
+                if channel in self.pwm_controller.channels:
+                    # Setze PWM-Wert UND Tracking
+                    self.pwm_controller.set_intensity(channel, intensity)
+                    self.last_intensities[channel] = intensity
+                    logger.info(f"  Channel {channel}: {intensity}% (restored)")
+            logger.info("PWM state restored - Zero-Downtime active!")
 
         if self.mode == "fixed":
             # Set initial intensities from config
@@ -161,12 +196,16 @@ class GrowPiController:
             else:
                 logger.info("Mode: CURVE - Using legacy single sun curve (fallback)")
 
-            # CRITICAL: On startup, always apply curve values immediately
-            # This ensures lamps are set correctly after power outage/restart
+            # Apply curve values on startup
+            # Bei Warm Restart: Werte sind bereits korrekt von pigpiod gehalten
+            # Bei Cold Boot: Kurven müssen angewendet werden
             current_mode = _get_current_mode()
             logger.info(f"Startup mode: {current_mode}")
-            if current_mode == "auto":
-                logger.info("Applying curve values on startup...")
+
+            if warm_restart:
+                logger.info("Warm restart - PWM already correct, skipping curve application")
+            elif current_mode == "auto":
+                logger.info("Cold boot - Applying curve values...")
                 self._update_intensity_from_curve()
             else:
                 logger.info("Manual mode active - not applying curves on startup")
@@ -275,7 +314,7 @@ class GrowPiController:
             last_known_mode = _get_current_mode()  # Track mode changes
 
             while self.running:
-                time.sleep(1)
+                time.sleep(5)  # CPU-Optimierung: 5s statt 1s (Mode-Wechsel max 5s Verzögerung)
                 now = time.time()
 
                 # Get current mode from ModeManager (single source of truth)
@@ -311,16 +350,30 @@ class GrowPiController:
             logger.info("Keyboard interrupt received")
 
     def stop(self) -> None:
-        """Stop the controller gracefully."""
+        """
+        Stop the controller gracefully.
+
+        PWM-Werte bleiben IMMER erhalten (User-Entscheidung 2025-12-06).
+        Lampen werden nur über explizite API-Calls ausgeschaltet.
+
+        Siehe: Feature #0 PWM Zero-Downtime (ROADMAP.md)
+        """
         logger = logging.getLogger(__name__)
         logger.info("Stopping GrowPi Controller...")
 
         self.running = False
 
-        # Cleanup PWM (turns off lamps)
-        self.pwm_controller.cleanup()
+        # Speichere State für schnellen Restart (Zero-Downtime)
+        if STATE_PERSISTENCE_AVAILABLE:
+            current_mode = _get_current_mode()
+            save_state(self.pwm_controller, current_mode)
+            logger.info("PWM state saved for warm restart")
 
-        logger.info("GrowPi Controller stopped.")
+        # Nur trennen, PWM bleibt via pigpiod aktiv!
+        # NICHT cleanup() aufrufen - das würde all_off() triggern
+        self.pwm_controller.disconnect()
+
+        logger.info("GrowPi Controller stopped (PWM preserved).")
 
 
 def main(config_path: Optional[str] = None) -> int:

@@ -14,6 +14,33 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ---
 
+## ⚠️ CRITICAL REQUIREMENTS
+
+### Version Display (MANDATORY)
+
+**ALWAYS display the current version in the UI header!**
+
+This is **CRITICAL** for deployment verification. The user must be able to immediately see if the deployed code matches the expected version.
+
+**Implementation**:
+- Location: Header next to "Aktualisiert: HH:MM"
+- Format: `v6.8.0` or `GrowPi v6.8.0`
+- Source: Backend `/api/health` endpoint or hardcoded
+- Never remove this feature in any refactoring!
+
+**Example**:
+```html
+<header>
+    <h1>GrowPi Control</h1>
+    <div class="version-badge">v6.8.0</div>
+    <div class="last-update">Aktualisiert: 20:45</div>
+</header>
+```
+
+**Rationale**: User deploys code to Pi and needs instant verification that the correct version is running. Without version display, debugging deployment issues becomes extremely difficult.
+
+---
+
 ## Tech Stack
 
 ### Frontend (Production-Ready)
@@ -632,3 +659,4 @@ npm run typecheck
 **Last Updated**: 2025-12-04
 **Schema Version**: 20251203153352
 **Next.js Version**: 13.5.1
+- Bitte auf gar keinen Fall den Pi Neu starten oder GitHub hochladen. Auf gar keinen Fall. Erst wenn alles fertig ist, mir Bericht erstatten und ich muss ausdrücklich Erlaubnis erteilen, um den Server bzw. den Raspberry Pi Neu zu starten.

@@ -134,7 +134,7 @@ def load_lamp_channels():
 load_lamp_channels()
 
 # API Configuration
-API_VERSION = "1.2.0"  # Bumped for per-channel curves
+API_VERSION = "6.8.0"  # GrowPi production version
 API_PORT = 5000
 API_HOST = "0.0.0.0"
 
@@ -149,6 +149,20 @@ STATIC_DIR = os.path.join(os.path.dirname(__file__), 'static')
 app = Flask(__name__, static_folder=STATIC_DIR)
 CORS(app)
 
+# ============================================================================
+# Register Blueprints for new API endpoints
+# ============================================================================
+try:
+    from .blueprints.costs_bp import costs_bp
+    from .blueprints.dehumidifier_bp import dehumidifier_bp
+    from .blueprints.curves_bp import curves_bp, init_blueprint as init_curves_blueprint
+    app.register_blueprint(costs_bp)
+    app.register_blueprint(dehumidifier_bp)
+    app.register_blueprint(curves_bp)
+    logging.info("Registered costs_bp, dehumidifier_bp, and curves_bp blueprints")
+except ImportError as e:
+    logging.warning(f"Could not import blueprints: {e}")
+
 # Configure logging
 logging.basicConfig(
     level=logging.INFO,
@@ -162,14 +176,32 @@ logger = logging.getLogger(__name__)
 # ============================================================================
 
 # Initialize PWM Controller (use singleton)
+# BUGFIX 2025-12-07: Check for warm restart state BEFORE initializing
 pwm_controller = None
 try:
     pwm_controller = get_pwm_controller()  # Use singleton!
     # Initialize with channel configs (only if not already initialized)
     if not pwm_controller._initialized:
-        from config import load_config
+        try:
+            from ..config import load_config
+        except ImportError:
+            from grow_pi.config import load_config
         config = load_config()
-        pwm_controller.initialize(config.lamps.channels)
+
+        # Check for warm restart state - don't reset PWM to 0 if state exists
+        skip_zero = False
+        try:
+            try:
+                from ..utils.pwm_state import state_exists
+            except ImportError:
+                from grow_pi.utils.pwm_state import state_exists
+            skip_zero = state_exists()
+            if skip_zero:
+                logger.info("Warm restart detected - preserving PWM values")
+        except ImportError:
+            pass
+
+        pwm_controller.initialize(config.lamps.channels, skip_zero_init=skip_zero)
     logger.info("PWM Controller initialized successfully")
 except Exception as e:
     logger.error(f"Failed to initialize PWM Controller: {e}")
@@ -201,6 +233,13 @@ if CURVE_AVAILABLE and DB_AVAILABLE:
         curve_controller = get_curve_controller()
         curve_controller.initialize(channels)
         logger.info("CurveController initialized successfully")
+
+        # Initialize curves blueprint with dependencies
+        try:
+            init_curves_blueprint(curve_controller, data_logger, LAMP_CHANNELS)
+            logger.info("Curves blueprint initialized with dependencies")
+        except Exception as e:
+            logger.warning(f"Could not initialize curves blueprint: {e}")
     except Exception as e:
         logger.error(f"Failed to initialize CurveController: {e}")
 
@@ -211,6 +250,30 @@ if MODE_MANAGER_AVAILABLE:
         logger.info(f"ModeManager initialized (current mode: {mode_manager.get_mode()})")
     except Exception as e:
         logger.error(f"Failed to initialize ModeManager: {e}")
+
+# Initialize DehumidifierController and inject into blueprint
+dehumidifier_controller = None
+try:
+    try:
+        from ..utils.dehumidifier_controller import get_dehumidifier_controller
+    except ImportError:
+        from grow_pi.utils.dehumidifier_controller import get_dehumidifier_controller
+
+    dehumidifier_controller = get_dehumidifier_controller()
+
+    # Inject dependencies into dehumidifier blueprint
+    try:
+        from .blueprints.dehumidifier_bp import set_dehumidifier_controller, set_humidity_reader
+        set_dehumidifier_controller(dehumidifier_controller)
+
+        # Note: humidity_reader will be set after read_dht22 is defined
+        logger.info("DehumidifierController initialized and injected into blueprint")
+    except ImportError as e:
+        logger.warning(f"Could not inject dehumidifier dependencies: {e}")
+except ImportError as e:
+    logger.warning(f"DehumidifierController not available: {e}")
+except Exception as e:
+    logger.error(f"Failed to initialize DehumidifierController: {e}")
 
 
 # ============================================================================
@@ -229,7 +292,7 @@ def create_response(success: bool, data: Dict = None, error: str = None) -> Dict
 
 # Cache for DHT22 readings (sensor needs 2s between reads)
 _dht_cache = {"temp": None, "humidity": None, "timestamp": 0}
-DHT_CACHE_SECONDS = 3  # Minimum seconds between sensor reads
+DHT_CACHE_SECONDS = 30  # Minimum seconds between sensor reads (erhöht für CPU-Optimierung)
 
 
 def read_dht22() -> Tuple[Optional[float], Optional[float]]:
@@ -269,6 +332,19 @@ def read_dht22() -> Tuple[Optional[float], Optional[float]]:
         return (_dht_cache["temp"], _dht_cache["humidity"])
 
     return (None, None)
+
+
+# Set humidity reader for dehumidifier - BOTH controller AND blueprint need it!
+if dehumidifier_controller is not None:
+    # BUGFIX 2025-12-07: Controller needs humidity_reader for automation loop
+    dehumidifier_controller.set_humidity_reader(read_dht22)
+    logger.info("Humidity reader set for DehumidifierController")
+    try:
+        from .blueprints.dehumidifier_bp import set_humidity_reader
+        set_humidity_reader(read_dht22)
+        logger.info("Humidity reader set for dehumidifier blueprint")
+    except ImportError:
+        pass
 
 
 def get_lamp_states() -> Dict[int, Dict]:
@@ -847,6 +923,168 @@ def set_mode():
 
     except Exception as e:
         logger.error(f"Error in set_mode: {e}")
+        return jsonify(create_response(False, error=str(e))), 500
+
+
+# ============================================================================
+# Camera API Routes
+# ============================================================================
+
+# Try to import camera service
+CAMERA_AVAILABLE = False
+camera_service = None
+try:
+    try:
+        from ..utils.camera import get_camera_service
+    except ImportError:
+        from grow_pi.utils.camera import get_camera_service
+    CAMERA_AVAILABLE = True
+except ImportError as e:
+    logging.warning(f"CameraService not available: {e}")
+
+
+def _get_camera():
+    """Get or initialize camera service."""
+    global camera_service
+    if CAMERA_AVAILABLE and camera_service is None:
+        camera_service = get_camera_service()
+    return camera_service
+
+
+@app.route('/api/camera/snapshot', methods=['GET'])
+def get_camera_snapshot():
+    """Get a JPEG snapshot from the camera"""
+    camera = _get_camera()
+    if not camera or not camera.is_available:
+        return jsonify(create_response(False, error="Camera not available")), 503
+
+    try:
+        jpeg_data = camera.capture_snapshot()
+        if jpeg_data is None:
+            return jsonify(create_response(False, error="Failed to capture image")), 500
+
+        from flask import Response
+        return Response(
+            jpeg_data,
+            mimetype='image/jpeg',
+            headers={
+                'Cache-Control': 'no-cache, no-store, must-revalidate',
+                'Pragma': 'no-cache',
+                'Expires': '0'
+            }
+        )
+
+    except Exception as e:
+        logger.error(f"Error in get_camera_snapshot: {e}")
+        return jsonify(create_response(False, error=str(e))), 500
+
+
+@app.route('/api/camera/status', methods=['GET'])
+def get_camera_status():
+    """Get camera status and availability"""
+    camera = _get_camera()
+
+    try:
+        if camera:
+            status = camera.get_status()
+        else:
+            status = {
+                'available': False,
+                'opencv_available': False,
+                'error': 'Camera service not initialized'
+            }
+
+        return jsonify(create_response(True, status))
+
+    except Exception as e:
+        logger.error(f"Error in get_camera_status: {e}")
+        return jsonify(create_response(False, error=str(e))), 500
+
+
+@app.route('/api/camera/config', methods=['POST'])
+def update_camera_config():
+    """Update camera configuration"""
+    camera = _get_camera()
+    if not camera:
+        return jsonify(create_response(False, error="Camera not available")), 503
+
+    if not request.is_json:
+        return jsonify(create_response(False, error="Request must be JSON")), 400
+
+    try:
+        data = request.get_json()
+        status = camera.update_config(**data)
+
+        return jsonify(create_response(True, {
+            "message": "Camera configuration updated",
+            "status": status
+        }))
+
+    except Exception as e:
+        logger.error(f"Error in update_camera_config: {e}")
+        return jsonify(create_response(False, error=str(e))), 500
+
+
+@app.route('/api/camera/timelapse/config', methods=['GET'])
+def get_timelapse_config():
+    """Get timelapse configuration"""
+    camera = _get_camera()
+    if not camera:
+        return jsonify(create_response(False, error="Camera not available")), 503
+
+    try:
+        from dataclasses import asdict
+        return jsonify(create_response(True, {
+            "config": asdict(camera.timelapse_config)
+        }))
+
+    except Exception as e:
+        logger.error(f"Error in get_timelapse_config: {e}")
+        return jsonify(create_response(False, error=str(e))), 500
+
+
+@app.route('/api/camera/timelapse/config', methods=['POST'])
+def update_timelapse_config():
+    """Update timelapse configuration"""
+    camera = _get_camera()
+    if not camera:
+        return jsonify(create_response(False, error="Camera not available")), 503
+
+    if not request.is_json:
+        return jsonify(create_response(False, error="Request must be JSON")), 400
+
+    try:
+        data = request.get_json()
+        config = camera.update_timelapse_config(**data)
+
+        return jsonify(create_response(True, {
+            "message": "Timelapse configuration updated",
+            "config": config
+        }))
+
+    except Exception as e:
+        logger.error(f"Error in update_timelapse_config: {e}")
+        return jsonify(create_response(False, error=str(e))), 500
+
+
+@app.route('/api/camera/timelapse/images', methods=['GET'])
+def get_timelapse_images():
+    """Get list of timelapse images"""
+    camera = _get_camera()
+    if not camera:
+        return jsonify(create_response(False, error="Camera not available")), 503
+
+    try:
+        limit = int(request.args.get('limit', 50))
+        images = camera.get_timelapse_images(limit)
+
+        return jsonify(create_response(True, {
+            "images": images,
+            "count": len(images)
+        }))
+
+    except Exception as e:
+        logger.error(f"Error in get_timelapse_images: {e}")
         return jsonify(create_response(False, error=str(e))), 500
 
 

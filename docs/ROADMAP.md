@@ -1,228 +1,475 @@
 # GrowPi Roadmap - Geplante Features
 
-**Letzte Aktualisierung**: 2025-12-06
-**Status**: Phase 2 abgeschlossen, Phase 1 in Arbeit
-**Platform**: Raspberry Pi 3B+ @ 192.168.0.86
+**Letzte Aktualisierung**: 2025-12-07
+**Aktuelle Version**: v6.10.0
+**Status**: Active Development - Feature Phase 🚀
 
 ---
 
-## Übersicht
+## ✅ BEHOBENE BUGS (2025-12-07)
 
-Dieses Dokument definiert geplante Funktionen für das GrowPi-System in priorisierten Phasen.
+### Bug #1: Room/Entfeuchter-Steuerung - BEHOBEN ✅
 
----
+**Status**: ✅ BEHOBEN
+**Behoben am**: 2025-12-07 16:08
 
-## Phase 2: Schaltbare Geräte & Automatisierung ✅ ABGESCHLOSSEN
+**Root Causes (alle behoben):**
+1. `dehumidifier_controller.set_humidity_reader()` wurde nie aufgerufen
+2. Tuya Device ID fehlte in der Datenbank
+3. DB-Migration lief nicht automatisch
 
-### Feature 2.1: Tuya Smart Plug Integration ✅
+**Fixes:**
+- ✅ Bugfix in `api.py`: `dehumidifier_controller.set_humidity_reader(read_dht22)` hinzugefügt
+- ✅ Tuya Device ID in DB gesetzt: `bfc705014c6241667avzn8`
+- ✅ `dehumidifier_controller.py`: DB-Verzeichnis wird automatisch erstellt
 
-**Status**: FERTIG (2025-12-06)
-
-**Implementiert**:
-- TuyaCloudService für Smart Plug Steuerung via Cloud API
-- Unterstützung für WiFi und BLE Steckdosen
-- 6 Geräte verbunden (Main Light, Wohnzimmer, Mittags Sonne, FR main, ANTELA, Pumpe)
-
-**Dateien**:
-- `utils/tuya_cloud.py` - Tuya Cloud API Service
-
-### Feature 2.2: Entfeuchter-Automatik ✅
-
-**Status**: FERTIG (2025-12-06)
-
-**Implementiert**:
-- Neue "Room" Seite im Web-Interface
-- Live Temperatur & Luftfeuchtigkeit vom DHT22
-- Hysterese-Logik: AN wenn > threshold_high, AUS wenn < threshold_low
-- Konfigurierbar: Sollwert, oberer/unterer Schwellwert
-- Minimale Lauf-/Auszeit zum Kompressorschutz
-- Manuell AN/AUS + Automatik-Toggle
-- Manuelle Buttons deaktiviert bei Automatik-Modus
-- Startup-Sync: Echter Steckdosen-Status wird beim Start von Cloud abgefragt
-
-**Dateien**:
-- `utils/dehumidifier_controller.py` - Hysterese Controller
-- `config/room_config.json` - Konfiguration
-- `web/api.py` - Room API Endpoints
-- `web/static/index.html` - Room Tab UI
-
-**Default-Konfiguration**:
+**Test-Ergebnis:**
 ```json
 {
-  "dehumidifier": {
-    "enabled": true,
-    "target": 60.0,
-    "threshold_high": 65.0,
-    "threshold_low": 55.0,
-    "device_id": "bfc705014c6241667avzn8",
-    "min_run_time": 60,
-    "min_off_time": 60
-  }
+  "success": true,
+  "message": "Dehumidifier turned ON",
+  "humidity": 64.7,
+  "is_on": true
 }
 ```
 
 ---
 
-## Phase 1: Kosten-Monitoring & Energie-Tracking 🔄 IN ARBEIT
+### Bug #3: Kosten-Tracking - FUNKTIONIERT ✅
 
-### Feature 1.1: Stromverbrauch-Messung & Kosten-Anzeige
+**Status**: ✅ KEIN BUG
+**Geprüft am**: 2025-12-07 16:10
 
-**Ziel**: Energiekosten transparent darstellen und Verbrauch analysieren
+Kosten-Tracking funktioniert. Stromverbrauch wird korrekt angezeigt.
 
-#### Datenquellen
+---
 
-**Bereits verfügbar**:
-- Tuya Smart Plugs liefern Power-Daten (Watt, Volt, Ampere)
-- `TuyaCloudService.get_device_status()` gibt `cur_power`, `cur_voltage`, `cur_current` zurück
-- Daten werden bereits in `plug_logs` Tabelle gespeichert
+### Bug #4: DHT22 Sensor - BEHOBEN ✅
 
-**Bestehende Datenbank-Tabelle** (`database/db.py`):
+**Status**: ✅ BEHOBEN (war temporär)
+**Behoben am**: 2025-12-07 16:05
+
+Sensor funktioniert wieder nach Service-Restart. War vermutlich ein temporäres Timing-Problem.
+
+---
+
+### Bug #5: Tuya Device ID - BEHOBEN ✅
+
+**Status**: ✅ BEHOBEN
+**Behoben am**: 2025-12-07 16:08
+
+Device ID wurde in DB eingetragen:
 ```sql
-plug_logs (
-    id TEXT PRIMARY KEY,
-    timestamp DATETIME,
-    plug_id TEXT,
-    plug_name TEXT,
-    switch_state INTEGER,
-    power REAL,      -- Watt
-    voltage REAL,    -- Volt
-    current REAL,    -- Ampere
-    synced_at DATETIME
-)
+UPDATE switchable_devices SET tuya_device_id = 'bfc705014c6241667avzn8' WHERE id = 1;
 ```
+
+---
+
+## 🟡 OFFENE PUNKTE
+
+### Bug #2: Zeitschaltung/Override - ZU TESTEN
+
+**Status**: 🟡 ZU TESTEN
+**Abhängigkeit**: Bug #1 ist jetzt behoben
+
+Da die Entfeuchter-Steuerung jetzt funktioniert, sollte auch die Zeitschaltung funktionieren.
+
+**Zu testen:**
+- [ ] Zeitfenster im UI anlegen
+- [ ] Prüfen ob Scheduler greift
+- [ ] Override-Funktion testen
+
+---
+
+### Bug #6: Kurven-Presets funktionieren nicht - BEHOBEN ✅
+
+**Status**: ✅ BEHOBEN
+**Behoben am**: 2025-12-07
+
+**Fix:**
+- `applySelectedPreset()` in `curves.js` verbessert
+- Fallback zu `fetchCurves()` wenn `response.curves` leer ist
+- `updateLocalPreview()` nach Apply für sofortiges visuelles Feedback
+
+---
+
+### Feature: Kurven-Seite Accordion/Collapsible - IMPLEMENTIERT ✅
+
+**Status**: ✅ IMPLEMENTIERT
+**Implementiert am**: 2025-12-07
+**Deployed**: 2025-12-07
+
+**Umsetzung:**
+- Alle 4 Kanäle standardmäßig zugeklappt
+- Kanalname + aktuelle Intensität im Header sichtbar
+- Klick auf Header klappt auf/zu
+- Enable/Disable Toggle weiterhin funktional
+- localStorage Persistence pro Kanal
+- Smooth CSS Animation
+- ARIA Keyboard Accessibility
+
+---
+
+### Feature: Multi-Line Preview Chart - IMPLEMENTIERT ✅
+
+**Status**: ✅ IMPLEMENTIERT
+**Implementiert am**: 2025-12-07
+**Deployed**: 2025-12-07
+**Version**: v6.10.0
+
+**Umsetzung:**
+- SVG-basiertes Multi-Line-Chart
+- Alle 4 Kanäle gleichzeitig sichtbar mit farbigen Linien
+- Checkboxen zum Ein-/Ausblenden einzelner Kanäle
+- X-Achse: 00:00 - 24:00 mit Zeitlabels
+- Y-Achse: 0% - 100% mit %-Labels
+- Grid-Linien für bessere Lesbarkeit
+- localStorage Persistenz für Checkbox-Status
+- Responsive Design für Mobile
+
+**Technische Details:**
+- `renderPreview()` in `curves.js` komplett umgebaut
+- Interpolation für alle aktiven Kanäle gleichzeitig
+- SVG `<polyline>` für jede Kurve
+- Checkbox-Event-Listener mit localStorage
+
+---
+
+## 🔧 TECHNISCHE SCHULDEN (Refactoring)
+
+### Refactoring #1: api.py Modularisierung (KRITISCH)
+
+**Status**: 📋 GEPLANT
+**Plan erstellt**: 2025-12-07
+**Detaillierter Plan**: [`docs/PLAN_API_REFACTORING.md`](./PLAN_API_REFACTORING.md)
+
+**Problem:**
+- `api.py` hat **1119 Zeilen** - viel zu groß für Wartbarkeit
+- ~700 Zeilen sind **duplizierter Code** (Routes existieren auch in Blueprints)
+- Nur 3 von 9 Blueprints sind registriert
+- Fehleranfällig bei Agenten-Änderungen
+
+**Ziel:**
+- api.py von 1119 → ~200 Zeilen reduzieren
+- Alle 9 Blueprints aktivieren
+- Duplizierten Code entfernen
+- `dependencies.py` aktivieren
+
+**Analyse durch Opus-Agent:**
+- Siehe `/agents/api-analysis-refactoring-plan.md`
+
+**Geschätzter Aufwand:** ~2 Stunden
+
+**Priorität:** HOCH (aber System erst stabilisieren)
+
+---
+
+## 🚀 Nächste Features (Priorisiert)
+
+### Feature #1: Device Status Dashboard
+
+**Ziel**: Zentrale Übersicht aller schaltbaren Geräte mit Manual Override
+
+**Aufwand**: 1-2 Tage
 
 #### Anforderungen
 
-**Kostenberechnung**:
-- kWh-Preis (€/kWh) konfigurierbar in Settings
-- Berechnung aus Watt-Messungen über Zeit
-- Aggregation: Heute, Diese Woche, Dieser Monat, Dieses Jahr
+**Dashboard Widget** (Collapsible!):
+- Status aller schaltbaren Geräte (Entfeuchter, Heizung, etc.)
+- Auto/Manual Toggle pro Gerät
+- Aktueller Zustand: ON/OFF + Auto-Status
+- Manuelles Überschreiben mit einem Klick
+- Letzte Aktion + Trigger-Grund
+
+**Device-Typen** (aktuell):
+- Entfeuchter (bereits vorhanden)
+- Heizung (geplant)
+- Lüftung (geplant)
+
+**Manual Override Flow**:
+1. User sieht: "Entfeuchter: AUTO (läuft)"
+2. User klickt: "Manual Override"
+3. System wechselt: AUTO → MANUAL
+4. User kann jetzt ON/OFF schalten
+5. User kann zurück zu AUTO
 
 **UI/UX**:
-- Neuer Tab "Kosten" oder Integration in "Verlauf"
-- Kosten-Übersicht mit Breakdown pro Gerät
-- Historische Trends als Chart
-- Settings: kWh-Preis Eingabe
+```
+┌─────────────────────────────────────┐
+│ ► Schaltbare Geräte                │ ← Collapsible!
+└─────────────────────────────────────┘
+
+┌─────────────────────────────────────┐
+│ ▼ Schaltbare Geräte                │
+├─────────────────────────────────────┤
+│ Entfeuchter                         │
+│ [AUTO] [MANUAL]  ● Läuft           │
+│ Letzte Aktion: Auto (Feucht 67%)    │
+├─────────────────────────────────────┤
+│ Heizung (geplant)                   │
+│ [AUTO] [MANUAL]  ○ Aus             │
+│ Letzte Aktion: Manual (19:45)       │
+└─────────────────────────────────────┘
+```
 
 #### Technische Umsetzung
 
-**Datenbank-Erweiterung**:
-```sql
--- Neue Settings-Spalte
-ALTER TABLE settings ADD COLUMN kwh_price REAL DEFAULT 0.30;
-
--- Aggregations-View (optional)
-CREATE VIEW daily_power_consumption AS
-SELECT
-    date(timestamp) as date,
-    plug_name,
-    SUM(power * 60 / 3600 / 1000) as kwh  -- Watt → kWh (60s Intervall)
-FROM plug_logs
-GROUP BY date(timestamp), plug_name;
-```
-
-**Neue API-Endpunkte**:
-- `GET /api/costs/summary` - Kosten-Übersicht (Tag/Woche/Monat/Jahr)
-- `GET /api/costs/history?range=7d` - Historische Kosten
-- `GET /api/costs/by-device` - Kosten pro Gerät
-- `GET /api/settings/kwh_price` - Preis lesen
-- `POST /api/settings/kwh_price` - Preis setzen
-
-**Berechnungslogik**:
-```python
-def calculate_kwh(power_readings: List[PlugLog], interval_seconds: int = 60) -> float:
-    """
-    Berechnet kWh aus Watt-Messungen.
-
-    Formel: kWh = Σ(Watt × Intervall_in_Stunden)
-    Bei 60s Intervall: kWh = Σ(Watt × (60/3600)) = Σ(Watt / 60)
-    """
-    total_kwh = 0
-    for reading in power_readings:
-        watt_hours = reading.power * (interval_seconds / 3600)
-        total_kwh += watt_hours / 1000  # Wh → kWh
-    return total_kwh
-
-def calculate_cost(kwh: float, price_per_kwh: float) -> float:
-    """Berechnet Kosten in Euro."""
-    return kwh * price_per_kwh
-```
-
 **Frontend**:
-- Kosten-Widget mit Tabs: Heute | Woche | Monat | Jahr
-- Balkendiagramm (Recharts) mit täglichen Kosten
-- Tortendiagramm für Kosten-Verteilung pro Gerät
-- Settings: Eingabefeld für kWh-Preis (Default: 0.30 €)
+- Neues Modul: `static/js/modules/devices.js`
+- Widget auf Dashboard (`environment.js` erweitern)
+- State Management via `state.js`
+
+**Backend**:
+- Erweitern: `dehumidifier_bp.py`
+- Neuer Endpoint: `POST /api/room/mode` (auto/manual toggle)
+- Status-Erweiterung in `GET /api/room`
 
 #### Akzeptanzkriterien
 
-- [ ] kWh-Preis kann in Settings gespeichert werden
-- [ ] Tageskosten werden korrekt aus plug_logs berechnet
-- [ ] Wochenkosten aggregieren 7 Tage
-- [ ] Monatskosten aggregieren alle Tage des aktuellen Monats
-- [ ] Kosten pro Gerät werden separat angezeigt
-- [ ] Historische Kosten als Chart (letzte 30 Tage)
-- [ ] Auto-Refresh alle 60 Sekunden
-
-#### Priorität
-**HOCH** - User-Request, klarer Business-Value
+- [ ] Dashboard zeigt alle schaltbaren Geräte
+- [ ] Auto/Manual Toggle funktioniert
+- [ ] Manual Override deaktiviert Auto-Modus
+- [ ] Zurück zu Auto reaktiviert Automatik sofort
+- [ ] Last Action wird angezeigt (Trigger + Timestamp)
+- [ ] Mobile-optimiert (Touch-friendly)
+- [ ] Collapsible Section (zugeklappt per default)
 
 ---
 
-## Phase 3: Erweiterte Automatisierung (Future)
+### Feature #2: Hochauflösende Kurven-Visualisierung
 
-### Mögliche Features (noch nicht detailliert)
+**Ziel**: Präzise 15-Minuten-Schritte in Chart-Visualisierung
 
-- **Feature 3.1**: Multi-Geräte-Szenarien (z.B. "Nacht-Modus")
-- **Feature 3.2**: Zeitbasierte Schaltungen (z.B. Lüftung 10min/Stunde)
-- **Feature 3.3**: Sensor-basierte Trigger (z.B. Heizung bei <18°C)
-- **Feature 3.4**: Push-Benachrichtigungen (Telegram/Email)
-- **Feature 3.5**: VPD-Optimierung (Vapor Pressure Deficit)
-- **Feature 3.6**: Bewässerungssteuerung (Pumpe nach Zeitplan/Bodenfeuchtigkeit)
+**Aufwand**: 0.5 Tage
+
+#### Anforderungen
+
+**Aktuelle Chart-Auflösung**:
+- 24 Steps (1 Step = 1 Stunde)
+- Zu grob für 15-Minuten-Änderungen
+
+**Neue Chart-Auflösung**:
+- 96 Steps (1 Step = 15 Minuten)
+- Genauigkeit: Alle 15 Minuten ein Datenpunkt
+- Ermöglicht präzise Visualisierung
+
+**Betroffene Komponente**:
+- Oberes Chart auf Kurvenseite (`modules/curves.js`)
+- Recharts Konfiguration
+
+#### Technische Umsetzung
+
+**Frontend** (`curves.js`):
+```javascript
+// VORHER: 24 Steps (stündlich)
+const steps = Array.from({ length: 24 }, (_, i) => ({
+  time: `${i.toString().padStart(2, '0')}:00`,
+  ...
+}));
+
+// NACHHER: 96 Steps (15-Minuten)
+const steps = Array.from({ length: 96 }, (_, i) => ({
+  time: formatTime(i * 15), // 0, 15, 30, 45, ...
+  ...
+}));
+
+function formatTime(minutes) {
+  const h = Math.floor(minutes / 60);
+  const m = minutes % 60;
+  return `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}`;
+}
+```
+
+**Performance**:
+- Chart bleibt flüssig (Recharts optimiert für 96 Punkte)
+- Keine Backend-Änderungen nötig (nur Frontend)
+
+#### Akzeptanzkriterien
+
+- [ ] Chart zeigt 96 Datenpunkte (alle 15 Minuten)
+- [ ] X-Achse zeigt lesbare Zeitstempel (z.B. 06:00, 06:15, 06:30)
+- [ ] Interpolation bleibt korrekt
+- [ ] Performance: Chart lädt < 500ms
+- [ ] Mobile-View: X-Achse lesbar (ggf. nur jede Stunde labeln)
 
 ---
 
-## Implementierungs-Reihenfolge
+## 💡 Future Features (Ideen)
 
-### Abgeschlossen ✅
-
-1. **Phase 2.1**: Tuya Smart Plug Integration ✅
-2. **Phase 2.2**: Entfeuchter-Automatik ✅
-
-### Aktuell 🔄
-
-3. **Phase 1.1**: Kosten-Monitoring
-   - kWh-Preis-Konfiguration
-   - Kosten-Berechnung aus plug_logs
-   - Kosten-Tab im Web-Interface
-
-### Geplant 📋
-
-4. **Phase 3.x**: Erweiterte Automatisierung
-   - Nach Bedarf priorisieren
+- **Multi-Geräte-Szenarien** (z.B. "Nacht-Modus")
+- **Heizungs-Steuerung** (Temperatur-basiert)
+- **Lüftungs-Automation** (zeitbasiert + Temperatur)
+- **VPD-Optimierung** (Vapor Pressure Deficit)
+- **Push-Benachrichtigungen** (Telegram/Email)
 
 ---
 
-## Offene Fragen
+## ✅ Erledigte Features
 
-1. **Stromverbrauch-Messung**:
-   - ✅ **Quelle**: Tuya Smart Plugs mit Power-Monitoring
-   - ✅ **Speicherung**: plug_logs Tabelle (60s Intervall)
-   - Frage: Alle Plugs messen Power oder nur bestimmte?
+### **v6.9.1 (2025-12-07) - Zero-Downtime BUGFIX**
 
-2. **Kosten-Berechnung**:
-   - Default kWh-Preis: 0.30 € (ca. deutscher Durchschnitt)
-   - Soll es verschiedene Tarife geben (Tag/Nacht)?
+**Problem gelöst:** Zero-Downtime aus v6.9.0 funktionierte NICHT - Lampen gingen kurz aus
 
-3. **UI-Platzierung**:
-   - Neuer Tab "Kosten" oder in "Verlauf" integrieren?
-   - Separate Mobile-Ansicht nötig?
+**Root Cause:**
+- `api.py` wurde beim Flask-Import geladen
+- `PWMController.initialize()` wurde OHNE State-Check aufgerufen
+- Alle PWM-Kanäle wurden auf 0 gesetzt → Lampen aus
+- Erst danach wurde State geladen und Werte wiederhergestellt → Fade-In
+
+**Fix:**
+- ✅ `PWMController.initialize()` mit neuem Parameter `skip_zero_init`
+- ✅ `api.py` prüft `state_exists()` VOR initialize()
+- ✅ `main.py` prüft State VOR initialize()
+
+**Test-Ergebnis:**
+```
+VOR RESTART:  Ch2: 34%, Ch3: 65%
+NACH RESTART: Ch2: 34%, Ch3: 65%  ← LAMPEN BLIEBEN AN!
+```
+
+**Dateien:**
+- `grow_pi/lamps/pwm_controller.py` (GEÄNDERT)
+- `grow_pi/web/api.py` (GEÄNDERT)
+- `grow_pi/main.py` (GEÄNDERT)
 
 ---
 
-## Change Log
+### **v6.9.0 (2025-12-06) - PWM Zero-Downtime Restarts (Initial)**
+
+**Problem gelöst:** LED-Flackern bei Service-Restart (TEILWEISE - siehe v6.9.1)
+
+**Implementierung:**
+- ✅ Neue `disconnect()` Methode im PWMController
+- ✅ State-Persistence in `/run/growpi/pwm_state.json`
+- ✅ Warm-Restart Erkennung beim Startup
+- ✅ Systemd RuntimeDirectoryPreserve
+
+**Dateien:**
+- `grow_pi/utils/pwm_state.py` (NEU)
+- `grow_pi/lamps/pwm_controller.py` (GEÄNDERT)
+- `grow_pi/main.py` (GEÄNDERT)
+- `systemd/grow-pi.service` (GEÄNDERT)
+
+---
+
+### **v6.8.0 (2025-12-06) - Feature Pack: Usability & Automation**
+
+**Parallel-Agenten Workflow (11 Agents):**
+- ✅ Feature #1: Version Display im Header (KRITISCH)
+- ✅ Feature #2: Zeitbasierte Geräte-Schaltung (Priority-Logik + Fallback)
+- ✅ Feature #3: Collapsible Sections (Accordion UI)
+- ✅ Feature #4: Kurven-Presets System (Save/Load/Manage)
+
+**Highlights:**
+- Smart Fallback-Logik: Zeitfenster endet → prüfe Feuchtigkeit (nicht einfach AUS!)
+- System-Presets: Keimung, Wachstum, Blüte (wissenschaftlich realistisch)
+- localStorage Persistence für Accordion-Zustand
+- Deployment-Verification via Version Badge
+
+**Technical:**
+- 2 neue DB-Tabellen (device_time_schedules, curve_presets)
+- 9 neue API Endpoints
+- 3 neue JS Module (accordion.js + Updates)
+- ~2100 LOC Added
+
+---
+
+### v6.7.0 (2025-12-06) - Bug Fixes & Deployment
+
+**Frontend Fixes:**
+- Fixed: Kurven-Tab not loading data (added tab-switch handler in `utils.js`)
+- Fixed: Cost/Room buttons CSS styling (added `.cost-period-btn` and `.room-toggle-btn`)
+- Added: Dynamic module loading on tab switch
+
+**Backend Fixes:**
+- Fixed: Missing blueprints deployment (`costs_bp.py`, `dehumidifier_bp.py`)
+- Fixed: Blueprint registration in `api.py`
+- Fixed: DehumidifierController initialization
+
+**Documentation:**
+- Updated CHANGELOG.md with all version history
+- Rewrote README.md with v6.6 architecture diagrams
+
+---
+
+### v6.6.0 (2025-12-06) - CPU Optimization
+
+**CPU Load:** 75% → 15-25% (-67% reduction!)
+
+- Replaced `time.sleep(0.1)` loop with `threading.Event.wait()`
+- Increased sensor logging interval from 60s to 120s
+- DHT22 sensor cache lifetime: 3s → 30s
+
+---
+
+### v6.5.0 (2025-12-06) - Modular Architecture
+
+**Frontend Refactoring** (-86% LOC reduction)
+- **BEFORE**: Monolithic `index.html` (2894 LOC)
+- **AFTER**: Modular architecture (408 LOC + 8 modules)
+
+**Backend Refactoring** (8 Flask Blueprints)
+- Clean separation of concerns
+- Service layer pattern
+
+---
+
+### v6.4.0 (2025-12-05) - Entfeuchter-Automatik
+
+**Features**:
+- Tuya Smart Plug Integration (Bluetooth)
+- Automatische Feuchtigkeitsregelung mit Hysterese
+- Soll-Wert: 60% (±5% Hysterese)
+- Auto/Manual Toggle
+- Min. Laufzeit: 5 Minuten (Schutz vor häufigem Schalten)
+- Zeitbasierte Schaltung (Schedule) - **BASIC IMPLEMENTATION**
+
+**Endpoints**:
+- `GET /api/room` - Status (Temp, Humidity, Entfeuchter)
+- `GET /api/room/config` - Automation-Config
+- `POST /api/room/config` - Config aktualisieren
+- `POST /api/room/dehumidifier` - Manual On/Off
+
+**UI**: Room-Tab im Web-Interface
+
+---
+
+### v6.3.0 (2025-12-05) - Kosten-Monitoring
+
+**Features**:
+- Stromverbrauch-Messung (kWh/h)
+- kWh-Preis Konfiguration (€/kWh)
+- Kosten-Breakdown: Heute / Diese Woche / Dieser Monat
+- Gerätespezifische Kosten (Lampen, Entfeuchter)
+- Historische Kosten-Trends
+
+**Endpoints**:
+- `GET /api/costs?period=today|week|month`
+- `GET /api/costs/config`
+- `POST /api/costs/config`
+
+**UI**: Kosten-Tab im Web-Interface
+
+---
+
+## 📋 Change Log
 
 | Datum | Änderung | Autor |
 |-------|----------|-------|
-| 2025-12-06 | Phase 2 (Entfeuchter) abgeschlossen, Roadmap aktualisiert | Dennis + Claude |
+| 2025-12-07 | **ALLE BUGS BEHOBEN:** Entfeuchter, DHT22, Tuya-ID funktionieren | Dennis + Claude |
+| 2025-12-07 | Refactoring-Plan für api.py erstellt (PLAN_API_REFACTORING.md) | Dennis + Claude |
+| 2025-12-07 | Opus-Agent Analyse: api.py hat 700 Zeilen duplizierten Code | Dennis + Claude |
+| 2025-12-07 | Bug #4 + #5 dokumentiert: DHT22 Sensor-Fehler, Tuya Config veraltet | Dennis + Claude |
+| 2025-12-07 | Bug #1 teilweise behoben: DB-Migration funktioniert, aber Tuya-ID fehlt | Dennis + Claude |
+| 2025-12-07 | v6.9.1 Zero-Downtime BUGFIX - PWM-Init Problem behoben | Dennis + Claude |
+| 2025-12-07 | KRITISCHE BUGS dokumentiert: Room, Zeitschaltung, Kosten | Dennis + Claude |
+| 2025-12-06 | v6.9.0 PWM Zero-Downtime implementiert und getestet | Dennis + Claude |
+| 2025-12-06 | Roadmap komplett umstrukturiert: Chronologisch, Nächstes zuerst | Dennis + Claude |
+| 2025-12-06 | Feature 2B.1 (Zeitbasierte Schaltung) hinzugefügt | Dennis + Claude |
+| 2025-12-06 | Feature 3.1 (Version Display) + 3.2 (Collapsible) hinzugefügt | Dennis + Claude |
+| 2025-12-06 | Roadmap überarbeitet - Phase 1+2 als erledigt markiert | Dennis + Claude |
 | 2025-12-05 | Initial Draft - Phase 1 & 2 definiert | Dennis + Claude |
+
+---
+
+**Geschätzte Gesamtdauer (Features #1-#6)**: 6-10 Arbeitstage

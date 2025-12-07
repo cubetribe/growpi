@@ -128,7 +128,7 @@ def set_all_lamps(intensities: Dict[int, int]) -> None:
 
 # Cache for DHT22 readings (sensor needs 2s between reads)
 _dht_cache = {"temp": None, "humidity": None, "timestamp": 0}
-DHT_CACHE_SECONDS = 3  # Minimum seconds between sensor reads
+DHT_CACHE_SECONDS = 30  # Minimum seconds between sensor reads (erhöht für CPU-Optimierung)
 
 
 def initialize_dht22() -> bool:

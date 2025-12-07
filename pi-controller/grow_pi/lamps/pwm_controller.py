@@ -70,7 +70,7 @@ class PWMController:
         self.simulation_mode = not PIGPIO_AVAILABLE
         self._initialized = False
 
-    def initialize(self, channels_config: List[dict]) -> bool:
+    def initialize(self, channels_config: List[dict], skip_zero_init: bool = False) -> bool:
         """
         Initialize pigpio and configure PWM channels.
 
@@ -81,6 +81,8 @@ class PWMController:
                 - gpio_pin: int
                 - pwm_frequency: int (default 1000)
                 - software_pwm: bool (default False)
+            skip_zero_init: If True, don't set PWM to 0 on startup.
+                           Used for Zero-Downtime warm restarts.
 
         Returns:
             True if initialization successful
@@ -117,8 +119,9 @@ class PWMController:
                 # Set PWM range to 0-100 for easier percentage control
                 self.pi.set_PWM_range(channel.gpio_pin, 100)
 
-                # Start with 0% intensity
-                self.pi.set_PWM_dutycycle(channel.gpio_pin, 0)
+                # BUGFIX 2025-12-07: Bei Warm-Restart NICHT auf 0 setzen!
+                if not skip_zero_init:
+                    self.pi.set_PWM_dutycycle(channel.gpio_pin, 0)
 
                 logger.debug(
                     f"Configured channel {channel.channel} ({channel.name}) "
@@ -126,7 +129,8 @@ class PWMController:
                 )
 
             self._initialized = True
-            logger.info(f"PWM Controller initialized with {len(self.channels)} channels")
+            init_mode = "warm (PWM preserved)" if skip_zero_init else "cold (PWM reset to 0)"
+            logger.info(f"PWM Controller initialized with {len(self.channels)} channels ({init_mode})")
             return True
 
         except Exception as e:
@@ -241,15 +245,49 @@ class PWMController:
             for ch in self.channels.values()
         ]
 
-    def cleanup(self) -> None:
-        """Cleanup GPIO resources."""
+    def disconnect(self) -> None:
+        """
+        Trennt Verbindung zu pigpiod OHNE PWM-Werte zu ändern.
+
+        Für Service-Restarts: PWM bleibt via pigpiod stabil.
+        Dies ist die bevorzugte Methode für graceful shutdown,
+        da pigpiod die PWM-Signale weiter ausgibt.
+
+        Siehe: Feature #0 PWM Zero-Downtime (ROADMAP.md)
+        """
         if self.simulation_mode:
-            logger.info("Simulation mode: cleanup complete")
+            logger.info("Simulation mode: disconnect complete")
+            self._initialized = False
             return
 
         if self.pi and self.pi.connected:
-            # Turn all lamps off before cleanup
-            self.all_off()
+            # Nur trennen - PWM läuft weiter via pigpiod!
+            self.pi.stop()
+            logger.info("Disconnected from pigpiod (PWM preserved)")
+
+        self._initialized = False
+
+    def cleanup(self, turn_off_lamps: bool = True) -> None:
+        """
+        Cleanup GPIO resources.
+
+        Args:
+            turn_off_lamps: Wenn True, werden alle Lampen ausgeschaltet.
+                           Für Zero-Downtime Restart: False verwenden
+                           oder besser disconnect() aufrufen.
+
+        Hinweis: Für normale Service-Restarts sollte disconnect()
+        verwendet werden, um PWM-Werte zu erhalten.
+        """
+        if self.simulation_mode:
+            logger.info("Simulation mode: cleanup complete")
+            self._initialized = False
+            return
+
+        if self.pi and self.pi.connected:
+            if turn_off_lamps:
+                self.all_off()
+                logger.info("All lamps turned off")
             self.pi.stop()
             logger.info("PWM Controller cleaned up")
 

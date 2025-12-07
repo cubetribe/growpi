@@ -12,7 +12,7 @@ from datetime import datetime, timedelta
 from typing import Optional, List, Dict, Any
 from contextlib import contextmanager
 
-from .models import SensorReading, LampStateLog, SystemEvent, LampCurve, PlugLog
+from .models import SensorReading, LampStateLog, SystemEvent, LampCurve, PlugLog, CurvePreset
 
 logger = logging.getLogger(__name__)
 
@@ -113,6 +113,22 @@ CREATE TABLE IF NOT EXISTS plug_logs (
 
 CREATE INDEX IF NOT EXISTS idx_plug_logs_device_time
 ON plug_logs(device_id, created_at DESC);
+
+-- Curve Presets Table (saved lighting curve configurations)
+CREATE TABLE IF NOT EXISTS curve_presets (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT NOT NULL UNIQUE,
+    description TEXT,
+    curves_json TEXT NOT NULL,
+    is_system INTEGER DEFAULT 0,
+    created_at TEXT NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_curve_presets_name
+ON curve_presets(name);
+
+CREATE INDEX IF NOT EXISTS idx_curve_presets_system
+ON curve_presets(is_system);
 """
 
 
@@ -707,6 +723,271 @@ class Database:
 
         logger.info(f"Cleanup completed: {deleted}")
         return deleted
+
+    # =========================================================================
+    # Curve Presets
+    # =========================================================================
+
+    def insert_curve_preset(self, preset: CurvePreset) -> Optional[int]:
+        """
+        Insert a new curve preset.
+
+        Returns:
+            The ID of the inserted preset, or None if failed
+        """
+        import json
+        with self._cursor() as cursor:
+            try:
+                cursor.execute(
+                    """
+                    INSERT INTO curve_presets (name, description, curves_json, is_system, created_at)
+                    VALUES (?, ?, ?, ?, ?)
+                    """,
+                    (preset.name, preset.description, json.dumps(preset.curves_json),
+                     int(preset.is_system), preset.created_at)
+                )
+                return cursor.lastrowid
+            except sqlite3.IntegrityError:
+                logger.error(f"Preset with name '{preset.name}' already exists")
+                return None
+
+    def get_all_curve_presets(self) -> List[CurvePreset]:
+        """Get all curve presets."""
+        with self._cursor() as cursor:
+            cursor.execute(
+                """
+                SELECT id, name, description, curves_json, is_system, created_at
+                FROM curve_presets
+                ORDER BY is_system DESC, name ASC
+                """
+            )
+            return [CurvePreset.from_row(row) for row in cursor.fetchall()]
+
+    def get_curve_preset(self, preset_id: int) -> Optional[CurvePreset]:
+        """Get a specific curve preset by ID."""
+        with self._cursor() as cursor:
+            cursor.execute(
+                """
+                SELECT id, name, description, curves_json, is_system, created_at
+                FROM curve_presets
+                WHERE id = ?
+                """,
+                (preset_id,)
+            )
+            row = cursor.fetchone()
+            return CurvePreset.from_row(row) if row else None
+
+    def get_curve_preset_by_name(self, name: str) -> Optional[CurvePreset]:
+        """Get a specific curve preset by name."""
+        with self._cursor() as cursor:
+            cursor.execute(
+                """
+                SELECT id, name, description, curves_json, is_system, created_at
+                FROM curve_presets
+                WHERE name = ?
+                """,
+                (name,)
+            )
+            row = cursor.fetchone()
+            return CurvePreset.from_row(row) if row else None
+
+    def update_curve_preset(self, preset_id: int, name: str = None, description: str = None) -> bool:
+        """
+        Update a curve preset (rename or update description).
+
+        Args:
+            preset_id: ID of preset to update
+            name: New name (optional)
+            description: New description (optional)
+
+        Returns:
+            True if successful, False otherwise
+        """
+        preset = self.get_curve_preset(preset_id)
+        if not preset:
+            return False
+
+        # Check if it's a system preset - only allow description changes
+        if preset.is_system and name is not None and name != preset.name:
+            logger.warning(f"Cannot rename system preset: {preset.name}")
+            return False
+
+        updates = []
+        params = []
+
+        if name is not None:
+            updates.append("name = ?")
+            params.append(name)
+
+        if description is not None:
+            updates.append("description = ?")
+            params.append(description)
+
+        if not updates:
+            return True  # Nothing to update
+
+        params.append(preset_id)
+
+        with self._cursor() as cursor:
+            try:
+                cursor.execute(
+                    f"""
+                    UPDATE curve_presets
+                    SET {', '.join(updates)}
+                    WHERE id = ?
+                    """,
+                    params
+                )
+                return cursor.rowcount > 0
+            except sqlite3.IntegrityError:
+                logger.error(f"Preset with name '{name}' already exists")
+                return False
+
+    def delete_curve_preset(self, preset_id: int) -> bool:
+        """
+        Delete a curve preset.
+
+        System presets (is_system=1) cannot be deleted.
+
+        Returns:
+            True if deleted, False otherwise
+        """
+        preset = self.get_curve_preset(preset_id)
+        if not preset:
+            return False
+
+        if preset.is_system:
+            logger.warning(f"Cannot delete system preset: {preset.name}")
+            return False
+
+        with self._cursor() as cursor:
+            cursor.execute(
+                "DELETE FROM curve_presets WHERE id = ? AND is_system = 0",
+                (preset_id,)
+            )
+            return cursor.rowcount > 0
+
+    def initialize_default_presets(self) -> None:
+        """
+        Initialize default/system curve presets if they don't exist.
+
+        Creates 3 built-in presets: Keimung (Germination), Wachstum (Growth), Bluete (Flowering)
+        """
+        # Check if presets already exist
+        existing = self.get_all_curve_presets()
+        if any(p.is_system for p in existing):
+            logger.debug("System presets already exist")
+            return
+
+        # System preset definitions with realistic lighting curves
+        presets = [
+            {
+                "name": "Keimung",
+                "description": "Optimale Beleuchtung fuer Keimung und Samlinge - sanftes Licht, kurzer Tag",
+                "curves_json": {
+                    "1": [  # Far Red - minimal
+                        {"time": "08:00", "intensity": 0},
+                        {"time": "08:30", "intensity": 10},
+                        {"time": "18:00", "intensity": 10},
+                        {"time": "18:30", "intensity": 0}
+                    ],
+                    "2": [  # Warm White - low intensity
+                        {"time": "08:00", "intensity": 0},
+                        {"time": "09:00", "intensity": 30},
+                        {"time": "17:00", "intensity": 30},
+                        {"time": "18:00", "intensity": 0}
+                    ],
+                    "3": [  # Cool White - main light source
+                        {"time": "08:00", "intensity": 0},
+                        {"time": "09:00", "intensity": 40},
+                        {"time": "17:00", "intensity": 40},
+                        {"time": "18:00", "intensity": 0}
+                    ],
+                    "4": [  # UV - off
+                        {"time": "00:00", "intensity": 0},
+                        {"time": "12:00", "intensity": 0}
+                    ]
+                },
+                "is_system": True
+            },
+            {
+                "name": "Wachstum",
+                "description": "Vegetative Wachstumsphase - hohe Lichtintensitaet, langer Tag (18h)",
+                "curves_json": {
+                    "1": [  # Far Red - sunrise/sunset effect
+                        {"time": "05:45", "intensity": 0},
+                        {"time": "06:15", "intensity": 50},
+                        {"time": "06:30", "intensity": 100},
+                        {"time": "22:30", "intensity": 100},
+                        {"time": "23:00", "intensity": 50},
+                        {"time": "23:30", "intensity": 0}
+                    ],
+                    "2": [  # Warm White - full power
+                        {"time": "06:00", "intensity": 0},
+                        {"time": "07:00", "intensity": 80},
+                        {"time": "22:00", "intensity": 80},
+                        {"time": "23:00", "intensity": 0}
+                    ],
+                    "3": [  # Cool White - full power (blue promotes vegetative growth)
+                        {"time": "06:00", "intensity": 0},
+                        {"time": "07:00", "intensity": 100},
+                        {"time": "22:00", "intensity": 100},
+                        {"time": "23:00", "intensity": 0}
+                    ],
+                    "4": [  # UV - slight exposure midday
+                        {"time": "10:00", "intensity": 0},
+                        {"time": "11:00", "intensity": 15},
+                        {"time": "15:00", "intensity": 15},
+                        {"time": "16:00", "intensity": 0}
+                    ]
+                },
+                "is_system": True
+            },
+            {
+                "name": "Bluete",
+                "description": "Bluete- und Fruchtphase - warmes Spektrum, kurzer Tag (12h)",
+                "curves_json": {
+                    "1": [  # Far Red - high for flowering
+                        {"time": "07:00", "intensity": 0},
+                        {"time": "08:00", "intensity": 100},
+                        {"time": "18:00", "intensity": 100},
+                        {"time": "19:00", "intensity": 0}
+                    ],
+                    "2": [  # Warm White - high (red spectrum promotes flowering)
+                        {"time": "07:00", "intensity": 0},
+                        {"time": "08:00", "intensity": 100},
+                        {"time": "18:00", "intensity": 100},
+                        {"time": "19:00", "intensity": 0}
+                    ],
+                    "3": [  # Cool White - reduced
+                        {"time": "07:00", "intensity": 0},
+                        {"time": "08:00", "intensity": 50},
+                        {"time": "18:00", "intensity": 50},
+                        {"time": "19:00", "intensity": 0}
+                    ],
+                    "4": [  # UV - brief exposure for terpene/resin production
+                        {"time": "11:00", "intensity": 0},
+                        {"time": "12:00", "intensity": 20},
+                        {"time": "14:00", "intensity": 20},
+                        {"time": "15:00", "intensity": 0}
+                    ]
+                },
+                "is_system": True
+            }
+        ]
+
+        for preset_data in presets:
+            preset = CurvePreset(
+                name=preset_data["name"],
+                description=preset_data["description"],
+                curves_json=preset_data["curves_json"],
+                is_system=preset_data["is_system"]
+            )
+            result = self.insert_curve_preset(preset)
+            if result:
+                logger.info(f"Created system preset: {preset.name}")
+            else:
+                logger.warning(f"Failed to create system preset: {preset.name}")
 
 
 # Global database instance

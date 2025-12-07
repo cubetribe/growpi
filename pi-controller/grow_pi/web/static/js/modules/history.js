@@ -8,6 +8,8 @@
  * - System logs table with color-coded severity
  */
 
+import { GrowPiAPI } from '../api.js';
+
 export class HistoryModule {
     constructor() {
         // Chart instances
@@ -286,29 +288,24 @@ export class HistoryModule {
 
         // Load chart data
         try {
-            // Fetch sensor data in parallel
-            const [tempRes, humRes, plugRes] = await Promise.all([
-                fetch(`/api/logs/sensors?type=temperature&hours=${hours}&limit=1000`),
-                fetch(`/api/logs/sensors?type=humidity&hours=${hours}&limit=1000`),
-                fetch(`/api/logs/plugs?hours=${hours}&limit=1000`)
+            // Use GrowPiAPI instead of direct fetch()
+            const [temps, hums, plugs] = await Promise.all([
+                GrowPiAPI.getSensorLogs('temperature', hours, 1000),
+                GrowPiAPI.getSensorLogs('humidity', hours, 1000),
+                GrowPiAPI.getPlugLogs(hours, 1000)
             ]);
-
-            const temps = await tempRes.json();
-            const hums = await humRes.json();
-            const plugs = await plugRes.json();
 
             // Update sensor chart
             if (temps.success && hums.success) {
                 this.updateSensorChart(temps.readings, hums.readings);
             }
 
-            // Fetch lamp data for all channels in parallel
-            const lampPromises = [1, 2, 3, 4].map(channel =>
-                fetch(`/api/logs/lamps?channel=${channel}&hours=${hours}&limit=1000`)
-                    .then(res => res.json())
+            // Fetch lamp data for all channels in parallel (use GrowPiAPI)
+            const lampResults = await Promise.all(
+                [1, 2, 3, 4].map(channel =>
+                    GrowPiAPI.getLampLogs(channel, hours, 1000)
+                )
             );
-
-            const lampResults = await Promise.all(lampPromises);
             this.updateLampChart(...lampResults);
 
             // Update plug chart
@@ -482,8 +479,8 @@ export class HistoryModule {
      */
     async loadSystemLogs(hours) {
         try {
-            const logsRes = await fetch(`/api/logs/events?hours=${hours}&limit=100`);
-            const logsData = await logsRes.json();
+            // Use GrowPiAPI instead of direct fetch()
+            const logsData = await GrowPiAPI.getEventLogs(hours, 100);
 
             if (logsData.success) {
                 this.updateLogTable(logsData.events);
