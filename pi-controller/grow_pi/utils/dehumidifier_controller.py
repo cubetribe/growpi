@@ -14,13 +14,18 @@ Key Features:
 - Automatic fallback from time schedule to humidity automation
 - Comprehensive logging of all state changes
 
-Version: 6.9.1
+Version: 6.9.2
 Date: 2025-12-07
 
 Bugfix 6.9.1: Status-Desync Fix
 - Added _sync_device_status() to synchronize internal state with actual Tuya device
 - Modified _ensure_state() to sync before state checks
 - Prevents issues when device is manually switched or state drifts
+
+Bugfix 6.9.2: Manual Control Skip-Bug Fix
+- MANUAL triggers now ALWAYS send commands, even if internal state appears correct
+- Bypasses min_run_time/min_off_time constraints for manual overrides
+- Fixes issue where user clicks "ON" but nothing happens due to stale state
 """
 
 import logging
@@ -615,6 +620,12 @@ class DehumidifierController:
         """
         Ensure device is in the target state, respecting min run/off times.
 
+        BUGFIX 6.9.2: For MANUAL triggers, ALWAYS send the command even if the
+        internal state appears correct. This handles cases where:
+        - Device was manually switched and status is stale
+        - User explicitly wants to force the command
+        - Status sync failed or returned incorrect data
+
         Returns:
             True if turned ON, False if turned OFF, None if blocked by min time
         """
@@ -622,8 +633,8 @@ class DehumidifierController:
         # This prevents issues when device was manually switched externally
         self._sync_device_status()
 
-        # Check minimum time constraints
-        if self._last_toggle_time:
+        # Check minimum time constraints (skip for MANUAL triggers - user override)
+        if trigger != TriggerType.MANUAL and self._last_toggle_time:
             elapsed = (datetime.now() - self._last_toggle_time).total_seconds()
 
             if target_on and not self._is_on:
@@ -637,9 +648,22 @@ class DehumidifierController:
                     logger.debug(f"Blocked: min_run_time ({elapsed:.0f}s < {self._config.min_run_time}s)")
                     return None
 
-        # State is already correct
-        if target_on == self._is_on:
-            return None
+        # BUGFIX 6.9.2: For MANUAL triggers, ALWAYS send the command
+        # Reason: User explicitly clicked the button, so we must honor the request
+        # even if our internal state thinks the device is already in that state.
+        # The internal state could be wrong due to stale cache, sync failure, etc.
+        if trigger == TriggerType.MANUAL:
+            if target_on == self._is_on:
+                logger.info(
+                    f"MANUAL override: forcing {'ON' if target_on else 'OFF'} command "
+                    f"even though internal state is already {self._is_on}"
+                )
+            # Continue to execute command regardless of current state
+        else:
+            # For automation triggers: Skip if state is already correct
+            if target_on == self._is_on:
+                logger.debug(f"State already {'ON' if target_on else 'OFF'}, skipping (trigger: {trigger.value})")
+                return None
 
         # Execute state change
         success = self._set_plug_state(target_on)

@@ -1,0 +1,510 @@
+/**
+ * curve-editor.css - Interactive Bezier Curve Editor Styles
+ *
+ * Styling for the visual curve editor with:
+ * - Dark theme matching GrowPi design
+ * - Glassmorphism effects
+ * - Touch-friendly hit areas
+ * - Fullscreen mode for mobile
+ * - Smooth animations
+ */
+
+/* ============================================================================
+   CONTAINER & WRAPPER
+   ============================================================================ */
+
+.curve-editor-container {
+    width: 100%;
+    margin: 12px 0;
+}
+
+.curve-editor-wrapper {
+    background: rgba(0, 0, 0, 0.4);
+    border-radius: 12px;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    overflow: hidden;
+}
+
+/* ============================================================================
+   SVG EDITOR
+   ============================================================================ */
+
+.curve-editor-svg {
+    width: 100%;
+    height: auto;
+    min-height: 180px;
+    display: block;
+    cursor: crosshair;
+    touch-action: none; /* Prevent browser handling of touch events */
+    user-select: none;
+    -webkit-user-select: none;
+    -webkit-tap-highlight-color: transparent;
+}
+
+.curve-editor-svg.is-dragging {
+    cursor: grabbing;
+}
+
+/* ============================================================================
+   GRID & AXES
+   ============================================================================ */
+
+.curve-editor-grid .grid-line {
+    stroke: rgba(255, 255, 255, 0.08);
+    stroke-width: 1;
+}
+
+.curve-editor-grid .grid-line.horizontal:first-child,
+.curve-editor-grid .grid-line.horizontal:last-child {
+    stroke: rgba(255, 255, 255, 0.15);
+}
+
+.curve-editor-grid .grid-line.vertical:first-child,
+.curve-editor-grid .grid-line.vertical:last-child {
+    stroke: rgba(255, 255, 255, 0.15);
+}
+
+.curve-editor-grid .grid-border {
+    fill: none;
+    stroke: rgba(255, 255, 255, 0.2);
+    stroke-width: 1;
+}
+
+/* Axis Labels */
+.curve-editor-labels .axis-label {
+    fill: #666;
+    font-size: 9px;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+}
+
+.curve-editor-labels .y-label {
+    text-anchor: end;
+}
+
+.curve-editor-labels .x-label {
+    text-anchor: middle;
+}
+
+/* ============================================================================
+   CURVE LINE & FILL
+   ============================================================================ */
+
+.curve-editor-curve .curve-line {
+    fill: none;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    transition: stroke-width 0.15s ease;
+}
+
+.curve-editor-svg:hover .curve-line {
+    stroke-width: 3;
+}
+
+.curve-editor-fill .curve-fill {
+    opacity: 0.6;
+    transition: opacity 0.2s ease;
+}
+
+.curve-editor-svg:hover .curve-fill {
+    opacity: 0.8;
+}
+
+/* ============================================================================
+   KEYFRAME POINTS
+   ============================================================================ */
+
+.curve-editor-points .keyframe-group {
+    transition: transform 0.05s ease-out;
+}
+
+.curve-editor-points .keyframe-group:not(.dragging):hover {
+    transform-origin: center;
+}
+
+.curve-editor-points .keyframe-glow {
+    transition: opacity 0.2s ease, r 0.2s ease;
+}
+
+.curve-editor-points .keyframe-group:hover .keyframe-glow {
+    opacity: 0.4;
+    r: 18;
+}
+
+.curve-editor-points .keyframe-circle {
+    transition: r 0.15s ease, fill 0.15s ease;
+}
+
+.curve-editor-points .keyframe-group:hover .keyframe-circle {
+    r: 12;
+}
+
+.curve-editor-points .keyframe-group.dragging .keyframe-circle {
+    r: 14;
+    fill: #fff;
+}
+
+.curve-editor-points .keyframe-inner {
+    transition: r 0.15s ease;
+}
+
+.curve-editor-points .keyframe-group:hover .keyframe-inner {
+    r: 5;
+}
+
+.curve-editor-points .keyframe-group.dragging .keyframe-inner {
+    r: 6;
+}
+
+/* Tooltip */
+.curve-editor-points .keyframe-tooltip {
+    fill: #fff;
+    font-size: 9px;
+    font-family: 'Monaco', 'Menlo', 'Consolas', monospace;
+    text-anchor: middle;
+    opacity: 0;
+    transition: opacity 0.2s ease;
+    pointer-events: none;
+    text-shadow: 0 1px 3px rgba(0, 0, 0, 0.8);
+}
+
+.curve-editor-points .keyframe-group:hover .keyframe-tooltip,
+.curve-editor-points .keyframe-group.dragging .keyframe-tooltip {
+    opacity: 1;
+}
+
+/* ============================================================================
+   TOOLBAR
+   ============================================================================ */
+
+.curve-editor-toolbar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 10px 14px;
+    background: rgba(255, 255, 255, 0.03);
+    border-top: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.curve-editor-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 14px;
+    background: rgba(255, 255, 255, 0.08);
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    border-radius: 8px;
+    color: #ccc;
+    font-size: 12px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    -webkit-tap-highlight-color: transparent;
+}
+
+.curve-editor-btn:hover {
+    background: rgba(17, 255, 85, 0.15);
+    border-color: rgba(17, 255, 85, 0.4);
+    color: #11ff55;
+}
+
+.curve-editor-btn:active {
+    transform: scale(0.97);
+}
+
+.curve-editor-btn svg {
+    flex-shrink: 0;
+}
+
+.curve-editor-hint {
+    font-size: 11px;
+    color: #666;
+    text-align: right;
+}
+
+/* Hide hint on small screens */
+@media (max-width: 480px) {
+    .curve-editor-hint {
+        display: none;
+    }
+
+    .curve-editor-toolbar {
+        justify-content: flex-end;
+    }
+}
+
+/* ============================================================================
+   FULLSCREEN MODE
+   ============================================================================ */
+
+.curve-editor-fullscreen-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.95);
+    z-index: 10000;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    padding: 16px;
+    animation: fadeIn 0.2s ease;
+}
+
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+    }
+    to {
+        opacity: 1;
+    }
+}
+
+.curve-editor-fullscreen-content {
+    width: 100%;
+    max-width: 900px;
+    max-height: 100%;
+    display: flex;
+    flex-direction: column;
+    background: linear-gradient(135deg, #1a1a1a 0%, #0d0d0d 100%);
+    border-radius: 16px;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    overflow: hidden;
+    animation: slideUp 0.25s ease;
+}
+
+@keyframes slideUp {
+    from {
+        opacity: 0;
+        transform: translateY(20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.curve-editor-fullscreen-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 16px 20px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.curve-editor-fullscreen-title {
+    font-size: 18px;
+    font-weight: 600;
+}
+
+.curve-editor-fullscreen-close {
+    width: 40px;
+    height: 40px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 10px;
+    color: #888;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.curve-editor-fullscreen-close:hover {
+    background: rgba(255, 68, 68, 0.15);
+    border-color: rgba(255, 68, 68, 0.3);
+    color: #ff4444;
+}
+
+.curve-editor-fullscreen-svg-container {
+    flex: 1;
+    padding: 20px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+}
+
+.curve-editor-fullscreen-svg {
+    width: 100%;
+    height: auto;
+    max-height: 100%;
+}
+
+/* Larger elements in fullscreen */
+.curve-editor-fullscreen-svg .axis-label {
+    font-size: 11px;
+}
+
+.curve-editor-fullscreen-svg .keyframe-tooltip {
+    font-size: 11px;
+}
+
+.curve-editor-fullscreen-instructions {
+    display: flex;
+    justify-content: center;
+    gap: 24px;
+    padding: 14px 20px;
+    background: rgba(255, 255, 255, 0.03);
+    border-top: 1px solid rgba(255, 255, 255, 0.05);
+    font-size: 12px;
+    color: #666;
+}
+
+.curve-editor-fullscreen-instructions span {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+/* Fullscreen on small screens */
+@media (max-width: 600px) {
+    .curve-editor-fullscreen-content {
+        max-width: 100%;
+        max-height: 100%;
+        border-radius: 0;
+    }
+
+    .curve-editor-fullscreen-instructions {
+        flex-wrap: wrap;
+        gap: 12px;
+        font-size: 11px;
+    }
+}
+
+/* Lock body scroll when fullscreen active */
+body.curve-editor-fullscreen-active {
+    overflow: hidden;
+}
+
+/* ============================================================================
+   INTEGRATION WITH EXISTING CURVE CHANNEL
+   ============================================================================ */
+
+/* When embedded in .curve-channel, adjust spacing */
+.curve-channel .curve-editor-container {
+    margin-top: 8px;
+    margin-bottom: 0;
+}
+
+/* When preview section uses editor, add some visual separation */
+.preview-section .curve-editor-container {
+    margin-top: 12px;
+}
+
+/* ============================================================================
+   TOUCH OPTIMIZATIONS
+   ============================================================================ */
+
+@media (hover: none) and (pointer: coarse) {
+    /* Larger hit areas for touch */
+    .curve-editor-svg {
+        min-height: 200px;
+    }
+
+    .curve-editor-points .keyframe-circle {
+        r: 14;
+    }
+
+    .curve-editor-points .keyframe-glow {
+        r: 20;
+        opacity: 0.25;
+    }
+
+    .curve-editor-btn {
+        padding: 12px 18px;
+        font-size: 14px;
+    }
+
+    /* Always show fullscreen button prominently on mobile */
+    .curve-editor-toolbar {
+        justify-content: center;
+    }
+
+    .fullscreen-btn {
+        background: rgba(17, 255, 85, 0.15);
+        border-color: rgba(17, 255, 85, 0.3);
+        color: #11ff55;
+    }
+}
+
+/* ============================================================================
+   ANIMATION STATES
+   ============================================================================ */
+
+/* Point being added */
+.curve-editor-points .keyframe-group.adding {
+    animation: popIn 0.2s ease;
+}
+
+@keyframes popIn {
+    0% {
+        transform: scale(0);
+        opacity: 0;
+    }
+    60% {
+        transform: scale(1.2);
+    }
+    100% {
+        transform: scale(1);
+        opacity: 1;
+    }
+}
+
+/* Point being removed */
+.curve-editor-points .keyframe-group.removing {
+    animation: popOut 0.15s ease forwards;
+}
+
+@keyframes popOut {
+    from {
+        transform: scale(1);
+        opacity: 1;
+    }
+    to {
+        transform: scale(0);
+        opacity: 0;
+    }
+}
+
+/* ============================================================================
+   DARK MODE ADJUSTMENTS (already in dark mode, this ensures consistency)
+   ============================================================================ */
+
+.curve-editor-container,
+.curve-editor-wrapper,
+.curve-editor-toolbar,
+.curve-editor-fullscreen-overlay,
+.curve-editor-fullscreen-content {
+    color-scheme: dark;
+}
+
+/* ============================================================================
+   ACCESSIBILITY
+   ============================================================================ */
+
+.curve-editor-svg:focus {
+    outline: 2px solid rgba(17, 255, 85, 0.5);
+    outline-offset: 2px;
+}
+
+.curve-editor-svg:focus:not(:focus-visible) {
+    outline: none;
+}
+
+/* Reduced motion preference */
+@media (prefers-reduced-motion: reduce) {
+    .curve-editor-points .keyframe-group,
+    .curve-editor-points .keyframe-circle,
+    .curve-editor-points .keyframe-glow,
+    .curve-editor-points .keyframe-inner,
+    .curve-editor-points .keyframe-tooltip,
+    .curve-editor-curve .curve-line,
+    .curve-editor-fill .curve-fill,
+    .curve-editor-fullscreen-overlay,
+    .curve-editor-fullscreen-content {
+        transition: none;
+        animation: none;
+    }
+}

@@ -158,47 +158,139 @@ class SmartPlugController:
         return None
 
     def turn_on(self, device_id: str) -> bool:
-        """Turn plug on"""
-        # 1. WiFi
+        """
+        Turn plug on with verification.
+
+        After sending the command, waits briefly and verifies the device
+        actually switched to the ON state before returning True.
+
+        Returns:
+            True if device is verified ON, False if command failed or verification failed
+        """
+        # 1. WiFi (Local)
         device = self.devices.get(device_id)
         if device:
             try:
                 device.turn_on()
-                if device_id in self.last_update: del self.last_update[device_id]
-                return True
+                time.sleep(0.4)  # Wait for device to process command
+
+                # Verify the state change
+                status = device.status()
+                if status and status.get('dps', {}).get('1') == True:
+                    if device_id in self.last_update:
+                        del self.last_update[device_id]
+                    if device_id in self.cache:
+                        del self.cache[device_id]
+                    logger.info(f"Successfully turned ON {device_id} (Local, verified)")
+                    return True
+                else:
+                    logger.error(
+                        f"turn_on verification FAILED for {device_id} (Local): "
+                        f"expected dps['1']=True, got status={status}"
+                    )
+                    return False
             except Exception as e:
                 logger.error(f"Error turning on {device_id} (Local): {e}")
 
-        # 2. Cloud
+        # 2. Cloud (BLE devices)
         if self.cloud:
             try:
                 self.cloud.sendcommand(device_id, {'commands': [{'code': 'switch_1', 'value': True}]})
-                if device_id in self.last_update: del self.last_update[device_id]
-                return True
+                time.sleep(0.5)  # Cloud needs slightly longer
+
+                # Verify via Cloud API
+                status = self.cloud.getstatus(device_id)
+                if status and 'result' in status:
+                    result_data = {item['code']: item['value'] for item in status['result']}
+                    if result_data.get('switch_1') == True:
+                        if device_id in self.last_update:
+                            del self.last_update[device_id]
+                        if device_id in self.cache:
+                            del self.cache[device_id]
+                        logger.info(f"Successfully turned ON {device_id} (Cloud, verified)")
+                        return True
+                    else:
+                        logger.error(
+                            f"turn_on verification FAILED for {device_id} (Cloud): "
+                            f"expected switch_1=True, got {result_data.get('switch_1')}"
+                        )
+                        return False
+                else:
+                    logger.error(
+                        f"turn_on verification FAILED for {device_id} (Cloud): "
+                        f"could not get status, response={status}"
+                    )
+                    return False
             except Exception as e:
                 logger.error(f"Error turning on {device_id} (Cloud): {e}")
-        
+
         return False
 
     def turn_off(self, device_id: str) -> bool:
-        """Turn plug off"""
-        # 1. WiFi
+        """
+        Turn plug off with verification.
+
+        After sending the command, waits briefly and verifies the device
+        actually switched to the OFF state before returning True.
+
+        Returns:
+            True if device is verified OFF, False if command failed or verification failed
+        """
+        # 1. WiFi (Local)
         device = self.devices.get(device_id)
         if device:
             try:
                 device.turn_off()
-                if device_id in self.last_update: del self.last_update[device_id]
-                return True
+                time.sleep(0.4)  # Wait for device to process command
+
+                # Verify the state change
+                status = device.status()
+                if status and status.get('dps', {}).get('1') == False:
+                    if device_id in self.last_update:
+                        del self.last_update[device_id]
+                    if device_id in self.cache:
+                        del self.cache[device_id]
+                    logger.info(f"Successfully turned OFF {device_id} (Local, verified)")
+                    return True
+                else:
+                    logger.error(
+                        f"turn_off verification FAILED for {device_id} (Local): "
+                        f"expected dps['1']=False, got status={status}"
+                    )
+                    return False
             except Exception as e:
                 logger.error(f"Error turning off {device_id} (Local): {e}")
 
-        # 2. Cloud
+        # 2. Cloud (BLE devices)
         if self.cloud:
             try:
                 self.cloud.sendcommand(device_id, {'commands': [{'code': 'switch_1', 'value': False}]})
-                if device_id in self.last_update: del self.last_update[device_id]
-                return True
+                time.sleep(0.5)  # Cloud needs slightly longer
+
+                # Verify via Cloud API
+                status = self.cloud.getstatus(device_id)
+                if status and 'result' in status:
+                    result_data = {item['code']: item['value'] for item in status['result']}
+                    if result_data.get('switch_1') == False:
+                        if device_id in self.last_update:
+                            del self.last_update[device_id]
+                        if device_id in self.cache:
+                            del self.cache[device_id]
+                        logger.info(f"Successfully turned OFF {device_id} (Cloud, verified)")
+                        return True
+                    else:
+                        logger.error(
+                            f"turn_off verification FAILED for {device_id} (Cloud): "
+                            f"expected switch_1=False, got {result_data.get('switch_1')}"
+                        )
+                        return False
+                else:
+                    logger.error(
+                        f"turn_off verification FAILED for {device_id} (Cloud): "
+                        f"could not get status, response={status}"
+                    )
+                    return False
             except Exception as e:
                 logger.error(f"Error turning off {device_id} (Cloud): {e}")
-        
+
         return False

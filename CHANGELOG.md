@@ -7,6 +7,61 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [v6.15.0] - 2025-12-07
+
+### Added
+- **Interactive Bezier Curve Editor** 🎨
+  - Ersetzt statische 24h-Vorschau durch interaktiven Editor
+  - Draggable Keyframe Anchor Points
+  - Catmull-Rom zu Bezier Konvertierung für glatte Kurven
+  - Touch + Mouse Support
+  - Fullscreen-Modus für Mobile
+
+### New Files
+- `curve-editor.js` (~950 Zeilen) - Editor-Logik
+- `curve-editor.css` (~400 Zeilen) - Styles
+
+### Known Issues
+- 🟡 Smartphone UI-Probleme - Layout muss noch optimiert werden
+
+### Deployment
+- ✅ Deployed auf Pi @ 192.168.0.86
+- ✅ Grundfunktionalität getestet
+
+---
+
+## [v6.14.0] - 2025-12-07
+
+### Fixed
+- **KRITISCH: Bug #9 + #10 - Room Steuerung funktioniert jetzt zuverlässig** 🎉
+  - Bug #9: `SmartPlugController.turn_on()/turn_off()` verifiziert jetzt den Erfolg
+    - Nach Schaltbefehl wird 0.4s gewartet und Status abgefragt
+    - Nur bei verifiziertem Status wird `True` zurückgegeben
+    - Gilt für WiFi (Local) und Cloud (BLE) Geräte
+  - Bug #10: Manuelle Steuerung sendet jetzt IMMER den Befehl
+    - Vorher: `if target_on == self._is_on: return None` blockierte Befehle
+    - Jetzt: Bei `TriggerType.MANUAL` wird IMMER geschaltet
+    - `min_run_time`/`min_off_time` werden bei MANUAL übersprungen
+
+### Changed
+- `smart_plug_controller.py`: `turn_on()`/`turn_off()` mit Verifikation
+- `dehumidifier_controller.py`: `_ensure_state()` mit MANUAL Override-Logik
+
+### Logs
+```
+Successfully turned ON bfc705014c6241667avzn8 (Cloud, verified)
+Dehumidifier ON (trigger: manual, manual on)
+Successfully turned OFF bfc705014c6241667avzn8 (Cloud, verified)
+Dehumidifier OFF (trigger: manual, manual off)
+```
+
+### Deployment
+- ✅ Deployed auf Pi @ 192.168.0.86
+- ✅ Service neugestartet
+- ✅ Manuelles Schalten funktioniert
+
+---
+
 ## [v6.13.0] - 2025-12-07
 
 ### Fixed

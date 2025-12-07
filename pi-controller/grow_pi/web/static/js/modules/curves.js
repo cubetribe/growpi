@@ -4,19 +4,22 @@
  * This module handles the complete lamp curve editing functionality:
  * - Fetching and rendering curve data for all 4 channels
  * - 24h preview chart with linear interpolation
+ * - Interactive Bezier curve editor for visual editing
  * - Point-based curve editing (add, remove, move, modify)
  * - JSON import/export functionality
  * - Enable/disable toggle per channel
  * - Real-time local preview updates
  *
- * This is the most complex module (~450 lines) due to:
+ * This is the most complex module due to:
  * - Multiple channels with independent curves
  * - Curve interpolation algorithm (midnight wrap-around)
+ * - Interactive Bezier curve editor integration
  * - JSON editor with validation
  * - Preview generation for 24h (96 bars at 15-min resolution)
  */
 
 import { GrowPiAPI } from '../api.js';
+import { BezierCurveEditor, createCurveEditor } from './curve-editor.js';
 
 // ============================================================================
 // MODULE STATE
@@ -26,6 +29,9 @@ let curvesData = {}; // { channel: { name, channel, enabled, curve: [{ time, int
 let previewData = []; // [{ time: "HH:MM", intensities: { channel: intensity } }]
 let activeChannel = 1; // Currently selected channel for preview
 let presetsData = []; // [{ id, name, description, curves_json, is_system, created_at }]
+
+// Bezier curve editors for each channel
+let curveEditors = {}; // { channel: BezierCurveEditor }
 
 // Channel colors matching the UI
 const channelColors = {
@@ -195,9 +201,18 @@ export async function fetchCurves() {
 /**
  * Render all curve channels with their control points
  * Creates UI for each of the 4 lamp channels with collapsible accordion
+ * Now includes interactive Bezier curve editor for each channel
  */
 export function renderCurves(data) {
     if (!curvesContainer) return;
+
+    // Destroy existing editors before clearing
+    Object.values(curveEditors).forEach(editor => {
+        if (editor && typeof editor.destroy === 'function') {
+            editor.destroy();
+        }
+    });
+    curveEditors = {};
 
     curvesContainer.innerHTML = "";
 
@@ -229,37 +244,67 @@ export function renderCurves(data) {
                     </div>
                 </div>
                 <div class="collapsible-content">
-                    <div class="curve-points" data-channel="${curve.channel}">
-                        ${curve.curve
-                            .map(
-                                (p, i) => `
-                            <div class="curve-point">
-                                <input type="text" value="${
-                                    p.time
-                                }" data-idx="${i}" data-field="time" placeholder="HH:MM" maxlength="5" pattern="[0-9]{2}:[0-9]{2}">
-                                <input type="number" min="0" max="100" value="${
-                                    p.intensity
-                                }" data-idx="${i}" data-field="intensity" placeholder="%">
-                                <div class="point-actions">
-                                    <button class="btn-move btn-up" data-idx="${i}" ${
-                                    i === 0 ? "disabled" : ""
-                                }>↑</button>
-                                    <button class="btn-move btn-down" data-idx="${i}" ${
-                                    i === curve.curve.length - 1 ? "disabled" : ""
-                                }>↓</button>
-                                    <button class="btn-remove" data-idx="${i}">×</button>
+                    <!-- Interactive Bezier Curve Editor -->
+                    <div class="curve-editor-mount" data-channel="${curve.channel}"></div>
+
+                    <!-- Points Table (synchronized with editor) -->
+                    <div class="curve-points-table-wrapper" style="margin-top: 12px;">
+                        <div class="curve-points-table-header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                            <span style="font-size: 12px; color: #888; text-transform: uppercase; letter-spacing: 0.5px;">Punkte-Tabelle</span>
+                            <button class="btn-add" data-channel="${curve.channel}" style="width: auto; margin: 0; padding: 6px 12px; font-size: 12px;">+ Punkt</button>
+                        </div>
+                        <div class="curve-points" data-channel="${curve.channel}">
+                            ${curve.curve
+                                .map(
+                                    (p, i) => `
+                                <div class="curve-point">
+                                    <input type="text" value="${
+                                        p.time
+                                    }" data-idx="${i}" data-field="time" placeholder="HH:MM" maxlength="5" pattern="[0-9]{2}:[0-9]{2}">
+                                    <input type="number" min="0" max="100" value="${
+                                        p.intensity
+                                    }" data-idx="${i}" data-field="intensity" placeholder="%">
+                                    <div class="point-actions">
+                                        <button class="btn-move btn-up" data-idx="${i}" ${
+                                        i === 0 ? "disabled" : ""
+                                    }>↑</button>
+                                        <button class="btn-move btn-down" data-idx="${i}" ${
+                                        i === curve.curve.length - 1 ? "disabled" : ""
+                                    }>↓</button>
+                                        <button class="btn-remove" data-idx="${i}">×</button>
+                                    </div>
                                 </div>
-                            </div>
-                        `
-                            )
-                            .join("")}
+                            `
+                                )
+                                .join("")}
+                        </div>
                     </div>
-                    <button class="btn-add" data-channel="${
-                        curve.channel
-                    }">+ Punkt hinzufugen</button>
                 </div>
             `;
             curvesContainer.appendChild(div);
+
+            // Initialize Bezier curve editor for this channel
+            const editorMount = div.querySelector(`.curve-editor-mount[data-channel="${curve.channel}"]`);
+            if (editorMount) {
+                const editor = createCurveEditor(editorMount, curve.channel, curve.curve || []);
+                if (editor) {
+                    // Handle changes during drag (update preview)
+                    editor.onChange((points) => {
+                        curvesData[curve.channel].curve = points;
+                        updateLocalPreview(curve.channel);
+                    });
+
+                    // Handle save on release (sync table)
+                    editor.onSave((points) => {
+                        curvesData[curve.channel].curve = points;
+                        // Re-render just the points table for this channel
+                        renderPointsTable(curve.channel);
+                        updateLocalPreview(curve.channel);
+                    });
+
+                    curveEditors[curve.channel] = editor;
+                }
+            }
         });
 
     // Setup event listeners for newly created elements
@@ -270,7 +315,103 @@ export function renderCurves(data) {
 }
 
 /**
+ * Render just the points table for a specific channel
+ * Used when editor updates points to avoid full re-render
+ * @param {number} channel - Channel number (1-4)
+ */
+function renderPointsTable(channel) {
+    const pointsContainer = document.querySelector(`.curve-points[data-channel="${channel}"]`);
+    if (!pointsContainer) return;
+
+    const curve = curvesData[channel];
+    if (!curve) return;
+
+    pointsContainer.innerHTML = curve.curve
+        .map(
+            (p, i) => `
+            <div class="curve-point">
+                <input type="text" value="${p.time}" data-idx="${i}" data-field="time" placeholder="HH:MM" maxlength="5" pattern="[0-9]{2}:[0-9]{2}">
+                <input type="number" min="0" max="100" value="${p.intensity}" data-idx="${i}" data-field="intensity" placeholder="%">
+                <div class="point-actions">
+                    <button class="btn-move btn-up" data-idx="${i}" ${i === 0 ? "disabled" : ""}>↑</button>
+                    <button class="btn-move btn-down" data-idx="${i}" ${i === curve.curve.length - 1 ? "disabled" : ""}>↓</button>
+                    <button class="btn-remove" data-idx="${i}">×</button>
+                </div>
+            </div>
+        `
+        )
+        .join("");
+
+    // Re-attach event listeners for this points container
+    setupPointsEventListeners(pointsContainer, channel);
+}
+
+/**
+ * Setup event listeners for a specific points container
+ * @param {HTMLElement} container - Points container element
+ * @param {number} channel - Channel number
+ */
+function setupPointsEventListeners(container, channel) {
+    // Input changes (time and intensity)
+    container.querySelectorAll("input").forEach((input) => {
+        input.addEventListener("change", (e) => {
+            const idx = parseInt(e.target.dataset.idx);
+            const field = e.target.dataset.field;
+            let value = e.target.value;
+
+            if (field === "intensity") {
+                value = parseInt(value);
+            }
+
+            if (!curvesData[channel]?.curve?.[idx]) {
+                console.warn(`Channel ${channel} or point ${idx} not found`);
+                return;
+            }
+            curvesData[channel].curve[idx][field] = value;
+
+            // Update the visual editor
+            if (curveEditors[channel]) {
+                curveEditors[channel].setPoints(curvesData[channel].curve);
+            }
+
+            updateLocalPreview(channel);
+        });
+
+        // Focus sets active channel for preview
+        input.addEventListener("focus", () => {
+            activeChannel = channel;
+            updateLocalPreview(channel);
+        });
+    });
+
+    // Remove point buttons
+    container.querySelectorAll(".btn-remove").forEach((btn) => {
+        btn.addEventListener("click", (e) => {
+            const idx = parseInt(e.target.dataset.idx);
+            removePoint(channel, idx);
+        });
+    });
+
+    // Move up buttons
+    container.querySelectorAll(".btn-up").forEach((btn) => {
+        btn.addEventListener("click", (e) => {
+            const idx = parseInt(e.target.dataset.idx);
+            movePoint(channel, idx, "up");
+        });
+    });
+
+    // Move down buttons
+    container.querySelectorAll(".btn-down").forEach((btn) => {
+        btn.addEventListener("click", (e) => {
+            const idx = parseInt(e.target.dataset.idx);
+            movePoint(channel, idx, "down");
+        });
+    });
+}
+
+/**
  * Setup all event listeners for curve editing controls
+ * Now includes synchronization with Bezier curve editors
  */
 function setupCurveEventListeners() {
     // Toggle enable/disable
@@ -286,7 +427,7 @@ function setupCurveEventListeners() {
         });
     });
 
-    // Input changes (time and intensity)
+    // Input changes (time and intensity) - with editor sync
     document.querySelectorAll(".curve-points input").forEach((input) => {
         input.addEventListener("change", (e) => {
             const container = e.target.closest(".curve-points");
@@ -304,6 +445,12 @@ function setupCurveEventListeners() {
                 return;
             }
             curvesData[ch].curve[idx][field] = value;
+
+            // Sync with visual editor
+            if (curveEditors[ch]) {
+                curveEditors[ch].setPoints(curvesData[ch].curve);
+            }
+
             updateLocalPreview(ch);
         });
 

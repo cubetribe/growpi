@@ -1,7 +1,7 @@
 # GrowPi Roadmap - Geplante Features
 
 **Letzte Aktualisierung**: 2025-12-07
-**Aktuelle Version**: v6.13.0
+**Aktuelle Version**: v6.15.0
 **Status**: Active Development - Feature Phase 🚀
 
 ---
@@ -135,22 +135,133 @@ Da die Entfeuchter-Steuerung jetzt funktioniert, sollte auch die Zeitschaltung f
 
 ---
 
-### Bug #8: Room Automation - Status-Desync - BEHOBEN ✅
+### Bug #8: Room Automation - Status-Desync - TEILWEISE BEHOBEN 🟡
 
-**Status**: ✅ BEHOBEN
-**Behoben am**: 2025-12-07
+**Status**: 🟡 TEILWEISE BEHOBEN - WEITERE FIXES NÖTIG
+**Erste Fixes**: 2025-12-07
 **Version**: v6.13.0
 
-**Problem war:**
+**Problem 1 (behoben):**
 - Controller speicherte `self._is_on` intern, synchronisierte aber nie mit echtem Tuya-Status
-- Wenn Gerät manuell/physisch geschaltet wurde, wusste der Controller nichts davon
+- ✅ FIX: `_sync_device_status()` fragt echten Tuya-Status ab
 
-**Lösung implementiert:**
-- Neue Methode `_sync_device_status()` fragt echten Tuya-Status ab
-- `_ensure_state()` ruft Sync ZUERST auf, bevor Status-Check
-- `get_status()` synchronisiert auch vor API-Response
+**Problem 2 (NEU ENTDECKT - KRITISCH):**
+- `SmartPlugController.turn_on()/turn_off()` gibt IMMER `True` zurück
+- Es wird NICHT geprüft, ob der Befehl tatsächlich erfolgreich war!
+- Wenn `device.turn_off()` fehlschlägt, meldet der Code trotzdem Erfolg
+
+**Problem 3 (NEU ENTDECKT):**
+- In `_ensure_state()` (Zeile 641): `if target_on == self._is_on: return None`
+- Bei manueller Steuerung sollte der Befehl IMMER gesendet werden
+- Aktuell: Wenn Status-Sync sagt "Gerät ist an", wird beim Einschalten nichts gemacht
+
+**Symptome:**
+- User drückt "Einschalten" → Gerät schaltet nicht ein (kein Befehl gesendet)
+- User drückt "Ausschalten" → Log sagt "OFF", aber Gerät bleibt an
+- Status-Sync zeigt dann: `internal=False, actual=True -> updating`
+
+**Zu beheben:**
+1. `SmartPlugController`: Erfolg von `turn_on()/turn_off()` verifizieren
+2. `DehumidifierController`: Bei manueller Steuerung IMMER Befehl senden (kein Early-Return)
 
 **Bericht:** `/agents/bug8-status-desync-fix-report.md`
+
+---
+
+### Bug #9: SmartPlugController - Keine Erfolgsverifikation - BEHOBEN ✅
+
+**Status**: ✅ BEHOBEN
+**Entdeckt**: 2025-12-07 19:55
+**Behoben**: 2025-12-07 20:00
+**Version**: v6.14.0
+
+**Problem:**
+`SmartPlugController.turn_on()` und `turn_off()` in `smart_plug_controller.py`:
+
+```python
+def turn_on(self, device_id: str) -> bool:
+    device = self.devices.get(device_id)
+    if device:
+        try:
+            device.turn_on()  # ← Keine Prüfung ob erfolgreich!
+            return True       # ← IMMER True!
+        except Exception as e:
+            logger.error(...)
+```
+
+**Root Cause:**
+- `tinytuya.OutletDevice.turn_on()` gibt keinen Return-Wert
+- Es wird nie geprüft, ob das Gerät tatsächlich geschaltet wurde
+- Fehler werden nur bei Exceptions geloggt
+
+**Lösung (zu implementieren):**
+Nach dem Schaltbefehl den Status abfragen und verifizieren:
+
+```python
+def turn_on(self, device_id: str) -> bool:
+    device = self.devices.get(device_id)
+    if device:
+        try:
+            device.turn_on()
+            time.sleep(0.5)  # Kurz warten
+            # Verifizieren
+            status = device.status()
+            if status and status.get('dps', {}).get('1') == True:
+                return True
+            else:
+                logger.error(f"turn_on failed verification for {device_id}")
+                return False
+        except Exception as e:
+            logger.error(...)
+            return False
+```
+
+**Betroffene Dateien:**
+- `/pi-controller/grow_pi/lamps/smart_plug_controller.py`
+
+---
+
+### Bug #10: DehumidifierController - Manuelle Steuerung Skip-Bug - BEHOBEN ✅
+
+**Status**: ✅ BEHOBEN
+**Entdeckt**: 2025-12-07 19:55
+**Behoben**: 2025-12-07 20:00
+**Version**: v6.14.0
+
+**Problem:**
+In `dehumidifier_controller.py`, Methode `_ensure_state()`, Zeile 641:
+
+```python
+# State is already correct
+if target_on == self._is_on:
+    return None  # ← PROBLEM: Bei manueller Steuerung trotzdem senden!
+```
+
+**Symptom:**
+1. User drückt "Einschalten"
+2. `_sync_device_status()` läuft, setzt `self._is_on = True` (Gerät war schon an)
+3. `target_on == self._is_on` (True == True) → `return None`
+4. KEIN BEFEHL wird gesendet!
+5. User denkt es hat geklappt, aber nichts passiert
+
+**Lösung (zu implementieren):**
+Bei manueller Steuerung (TriggerType.MANUAL) IMMER den Befehl senden:
+
+```python
+def _ensure_state(self, target_on: bool, trigger: TriggerType, details: str = "") -> Optional[bool]:
+    self._sync_device_status()
+
+    # Bei manueller Steuerung: IMMER Befehl senden (User will explizit schalten)
+    if trigger != TriggerType.MANUAL:
+        # Nur bei Automation den Early-Return machen
+        if target_on == self._is_on:
+            return None
+
+    # ... Rest der Logik
+```
+
+**Betroffene Dateien:**
+- `/pi-controller/grow_pi/utils/dehumidifier_controller.py`
 
 ---
 
@@ -229,6 +340,130 @@ Da die Entfeuchter-Steuerung jetzt funktioniert, sollte auch die Zeitschaltung f
 ---
 
 ## 🚀 Nächste Features (Priorisiert)
+
+### Feature #0: Interactive Bezier Curve Editor (PRIORITÄT) 🎯
+
+**Status**: 🟡 FUNKTIONIERT - UI POLISH NÖTIG
+**Erstellt**: 2025-12-07
+**Deployed**: 2025-12-07
+**Version**: v6.15.0
+
+**Aktueller Stand**:
+- ✅ Grundfunktionalität implementiert und deployed
+- ✅ Keyframes können gesetzt/verschoben werden
+- 🟡 **Smartphone UI-Probleme** - muss noch angepasst werden
+
+**TODO (UI Polish)**:
+- [ ] Mobile Layout verbessern
+- [ ] Touch-Targets größer machen
+- [ ] Fullscreen-Modus auf Mobile optimieren
+- [ ] Responsive Design überarbeiten
+
+**Priorität**: UI-Fixes für Mobile
+
+**Ziel**: Kurvensteuerung wie Cubase Automation Curve / BIOS-Lüfterkurve - direkt zeichnen statt Zahlen tippen
+
+#### Funktionalität
+
+**Interaktiver Graph:**
+- X-Achse = Zeit (00:00–24:00)
+- Y-Achse = Intensität (0–100%)
+- Draggable Keyframe Anchor Points
+- Live Bezier/Spline Interpolation
+- Touch + Mouse Support
+
+**Keyframe-Bearbeitung:**
+- Punkt setzen: Klick/Touch auf Kurve
+- Punkt verschieben: Drag & Drop
+- Punkt löschen: Doppelklick oder Long-Press
+- Automatische Tabellen-Synchronisation unten
+
+**Datenspeicherung:**
+- State nur lokal im Frontend während Bearbeitung
+- Bei Release (onMouseUp/onTouchEnd) → JSON an Backend
+
+#### Mobile First / Fullscreen
+
+**Mobile Verhalten:**
+- Antippen der Grafik → automatischer Fullscreen im Querformat
+- Touch-Gesten für Draggable Points
+- Pinch-to-Zoom (optional)
+
+**Desktop Verhalten:**
+- Klick auf Grafik → vergrößerte Edit-Ansicht (Modal/Overlay)
+- Keine Bildschirmrotation
+
+#### Tech Stack
+
+**Frontend:**
+- React + D3.js oder Konva.js oder React-Flow
+- KEIN Canvas mit dauerhafter 60fps-Loop
+- SVG-basiert für Performance
+
+**Backend:**
+- Bestehender `/api/curves` Endpoint
+- JSON-Format: `[{time: "HH:MM", intensity: number}, ...]`
+
+#### UI Mockup
+
+```
+┌────────────────────────────────────────────────────────┐
+│  ▼ Far Red (39%)                              [✓] Aktiv │
+├────────────────────────────────────────────────────────┤
+│ 100% ┤                      ●────────●                  │
+│      │                    ╱          ╲                 │
+│  80% ┤                  ╱              ╲               │
+│      │                ╱                  ╲             │
+│  60% ┤              ╱                      ╲           │
+│      │            ╱                          ╲         │
+│  40% ┤          ●                              ●       │
+│      │        ╱                                  ╲     │
+│  20% ┤      ╱                                      ╲   │
+│      │    ╱                                          ╲ │
+│   0% ┼──●────────────────────────────────────────────●─┤
+│      └──┬────┬────┬────┬────┬────┬────┬────┬────┬────┬─┘
+│       00:00 03:00 06:00 09:00 12:00 15:00 18:00 21:00 24:00
+│                                                          │
+│  [📱 Vollbild bearbeiten]                               │
+└────────────────────────────────────────────────────────┘
+
+Keyframes: (automatisch generiert)
+┌──────────┬───────────┐
+│ Zeit     │ Intensität│
+├──────────┼───────────┤
+│ 00:00    │ 0%        │
+│ 06:00    │ 40%       │
+│ 10:00    │ 100%      │
+│ 14:00    │ 100%      │
+│ 18:00    │ 40%       │
+│ 24:00    │ 0%        │
+└──────────┴───────────┘
+```
+
+#### Akzeptanzkriterien
+
+- [ ] Keyframes können per Drag & Drop gesetzt/verschoben werden
+- [ ] Bezier-Interpolation zwischen Punkten
+- [ ] Mobile: Fullscreen-Modus im Querformat
+- [ ] Desktop: Vergrößerte Bearbeitungsansicht
+- [ ] Automatische Tabellen-Synchronisation
+- [ ] JSON wird bei Release an Backend gesendet
+- [ ] Alle 4 Kanäle unterstützt (Far Red, Warm White, Cool White, UV)
+- [ ] Performance: Kein 60fps-Loop, nur Event-basierte Updates
+
+#### Technische Umsetzung
+
+**Dateien:**
+- `static/js/modules/curve-editor.js` (NEU)
+- `static/css/curve-editor.css` (NEU)
+- `curves.js` (Integration)
+
+**Bibliotheken (Auswahl):**
+- Option A: D3.js (bewährt, flexibel)
+- Option B: Konva.js (Canvas mit Touch-Support)
+- Option C: Vanilla SVG + Event Handlers
+
+---
 
 ### Feature #1: Device Status Dashboard
 
