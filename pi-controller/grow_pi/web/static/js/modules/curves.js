@@ -35,6 +35,25 @@ const channelColors = {
     4: "#cc66ff", // UV
 };
 
+// Channel names for display
+const channelNames = {
+    1: "Far Red",
+    2: "Warm White",
+    3: "Cool White",
+    4: "UV",
+};
+
+// Preview channel visibility state (loaded from localStorage)
+let previewChannelVisibility = {
+    1: true,
+    2: true,
+    3: true,
+    4: true,
+};
+
+// Storage key for preview channel visibility
+const PREVIEW_STORAGE_KEY = 'growpi-preview-channels';
+
 // ============================================================================
 // DOM REFERENCES
 // ============================================================================
@@ -70,6 +89,9 @@ let managePresetsModal;
  * Sets up DOM references and event listeners
  */
 export function initCurvesTab() {
+    // Load preview channel visibility from localStorage
+    loadPreviewChannelVisibility();
+
     // Get DOM elements
     curvesContainer = document.getElementById("curvesContainer");
     previewChart = document.getElementById("previewChart");
@@ -156,6 +178,8 @@ export async function fetchCurves() {
 
         if (previewJson.success) {
             previewData = previewJson.preview;
+            // Create checkboxes first, then render
+            createPreviewCheckboxes();
             renderPreview();
         }
     } catch (error) {
@@ -170,7 +194,7 @@ export async function fetchCurves() {
 
 /**
  * Render all curve channels with their control points
- * Creates UI for each of the 4 lamp channels
+ * Creates UI for each of the 4 lamp channels with collapsible accordion
  */
 export function renderCurves(data) {
     if (!curvesContainer) return;
@@ -180,10 +204,14 @@ export function renderCurves(data) {
     Object.values(curvesData)
         .sort((a, b) => a.channel - b.channel)
         .forEach((curve) => {
+            const sectionId = `curve-channel-${curve.channel}`;
+            const isCollapsed = getCurveChannelState(sectionId);
+
             const div = document.createElement("div");
-            div.className = "curve-channel";
+            div.className = `curve-channel collapsible-section${isCollapsed ? ' collapsed' : ''}`;
+            div.dataset.sectionId = sectionId;
             div.innerHTML = `
-                <div class="curve-header">
+                <div class="collapsible-header curve-header">
                     <div class="curve-name">
                         <span class="curve-dot" style="background: ${
                             channelColors[curve.channel]
@@ -193,44 +221,52 @@ export function renderCurves(data) {
                             channelColors[curve.channel]
                         }">${curve.current_intensity}%</span>
                     </div>
-                    <div class="curve-toggle ${
-                        curve.enabled ? "enabled" : ""
-                    }" data-channel="${curve.channel}"></div>
+                    <div class="curve-header-actions">
+                        <div class="curve-toggle ${
+                            curve.enabled ? "enabled" : ""
+                        }" data-channel="${curve.channel}"></div>
+                        <span class="collapse-icon">&#9660;</span>
+                    </div>
                 </div>
-                <div class="curve-points" data-channel="${curve.channel}">
-                    ${curve.curve
-                        .map(
-                            (p, i) => `
-                        <div class="curve-point">
-                            <input type="text" value="${
-                                p.time
-                            }" data-idx="${i}" data-field="time" placeholder="HH:MM" maxlength="5" pattern="[0-9]{2}:[0-9]{2}">
-                            <input type="number" min="0" max="100" value="${
-                                p.intensity
-                            }" data-idx="${i}" data-field="intensity" placeholder="%">
-                            <div class="point-actions">
-                                <button class="btn-move btn-up" data-idx="${i}" ${
-                                i === 0 ? "disabled" : ""
-                            }>↑</button>
-                                <button class="btn-move btn-down" data-idx="${i}" ${
-                                i === curve.curve.length - 1 ? "disabled" : ""
-                            }>↓</button>
-                                <button class="btn-remove" data-idx="${i}">×</button>
+                <div class="collapsible-content">
+                    <div class="curve-points" data-channel="${curve.channel}">
+                        ${curve.curve
+                            .map(
+                                (p, i) => `
+                            <div class="curve-point">
+                                <input type="text" value="${
+                                    p.time
+                                }" data-idx="${i}" data-field="time" placeholder="HH:MM" maxlength="5" pattern="[0-9]{2}:[0-9]{2}">
+                                <input type="number" min="0" max="100" value="${
+                                    p.intensity
+                                }" data-idx="${i}" data-field="intensity" placeholder="%">
+                                <div class="point-actions">
+                                    <button class="btn-move btn-up" data-idx="${i}" ${
+                                    i === 0 ? "disabled" : ""
+                                }>↑</button>
+                                    <button class="btn-move btn-down" data-idx="${i}" ${
+                                    i === curve.curve.length - 1 ? "disabled" : ""
+                                }>↓</button>
+                                    <button class="btn-remove" data-idx="${i}">×</button>
+                                </div>
                             </div>
-                        </div>
-                    `
-                        )
-                        .join("")}
+                        `
+                            )
+                            .join("")}
+                    </div>
+                    <button class="btn-add" data-channel="${
+                        curve.channel
+                    }">+ Punkt hinzufugen</button>
                 </div>
-                <button class="btn-add" data-channel="${
-                    curve.channel
-                }">+ Punkt hinzufügen</button>
             `;
             curvesContainer.appendChild(div);
         });
 
     // Setup event listeners for newly created elements
     setupCurveEventListeners();
+
+    // Setup accordion event listeners for curve channels
+    setupCurveAccordionListeners();
 }
 
 /**
@@ -319,69 +355,199 @@ function setupCurveEventListeners() {
 }
 
 /**
- * Render the 24h preview chart
- * Shows intensity bars for the active channel across 24 hours
+ * Render the 24h preview chart as Multi-Line SVG
+ * Shows intensity lines for all visible channels across 24 hours
  */
 export function renderPreview() {
     if (!previewChart) return;
 
-    previewChart.innerHTML = "";
-    previewData.forEach((p) => {
-        const intensity = p.intensities[activeChannel] || 0;
-        const bar = document.createElement("div");
-        bar.className = "preview-bar";
-        bar.style.height = `${Math.max(intensity, 2)}%`;
-        bar.style.background = `linear-gradient(to top, ${
-            channelColors[activeChannel]
-        }, ${channelColors[activeChannel]}44)`;
-        bar.title = `${p.time}: ${intensity}%`;
-        previewChart.appendChild(bar);
+    // Calculate all channels preview data if not available
+    const allChannelData = calculateAllChannelsPreview();
+
+    // SVG dimensions
+    const width = previewChart.offsetWidth || 400;
+    const height = 120;
+    const padding = { top: 10, right: 10, bottom: 5, left: 35 };
+    const chartWidth = width - padding.left - padding.right;
+    const chartHeight = height - padding.top - padding.bottom;
+
+    // Create SVG
+    let svg = `<svg class="preview-svg" viewBox="0 0 ${width} ${height}" preserveAspectRatio="xMidYMid meet">`;
+
+    // Add gradient definitions for each channel
+    svg += '<defs>';
+    Object.entries(channelColors).forEach(([ch, color]) => {
+        svg += `
+            <linearGradient id="lineGradient${ch}" x1="0%" y1="0%" x2="0%" y2="100%">
+                <stop offset="0%" style="stop-color:${color};stop-opacity:1" />
+                <stop offset="100%" style="stop-color:${color};stop-opacity:0.3" />
+            </linearGradient>
+        `;
+    });
+    svg += '</defs>';
+
+    // Draw Y-axis labels (0%, 50%, 100%)
+    svg += `<text x="${padding.left - 5}" y="${padding.top + 5}" class="preview-axis-label" text-anchor="end">100%</text>`;
+    svg += `<text x="${padding.left - 5}" y="${padding.top + chartHeight / 2 + 3}" class="preview-axis-label" text-anchor="end">50%</text>`;
+    svg += `<text x="${padding.left - 5}" y="${padding.top + chartHeight}" class="preview-axis-label" text-anchor="end">0%</text>`;
+
+    // Draw horizontal grid lines
+    svg += `<line x1="${padding.left}" y1="${padding.top}" x2="${padding.left + chartWidth}" y2="${padding.top}" class="preview-grid-line"/>`;
+    svg += `<line x1="${padding.left}" y1="${padding.top + chartHeight / 2}" x2="${padding.left + chartWidth}" y2="${padding.top + chartHeight / 2}" class="preview-grid-line"/>`;
+    svg += `<line x1="${padding.left}" y1="${padding.top + chartHeight}" x2="${padding.left + chartWidth}" y2="${padding.top + chartHeight}" class="preview-grid-line"/>`;
+
+    // Draw vertical grid lines for time markers (00:00, 06:00, 12:00, 18:00, 24:00)
+    for (let i = 0; i <= 4; i++) {
+        const x = padding.left + (chartWidth * i) / 4;
+        svg += `<line x1="${x}" y1="${padding.top}" x2="${x}" y2="${padding.top + chartHeight}" class="preview-grid-line"/>`;
+    }
+
+    // Draw lines for each visible channel
+    [1, 2, 3, 4].forEach((channel) => {
+        if (!previewChannelVisibility[channel]) return;
+
+        const color = channelColors[channel];
+        const points = allChannelData.map((p, i) => {
+            const x = padding.left + (i / (allChannelData.length - 1)) * chartWidth;
+            const intensity = p.intensities[channel] || 0;
+            const y = padding.top + chartHeight - (intensity / 100) * chartHeight;
+            return `${x},${y}`;
+        }).join(' ');
+
+        // Draw filled area under the line (optional, adds depth)
+        const firstPoint = `${padding.left},${padding.top + chartHeight}`;
+        const lastPoint = `${padding.left + chartWidth},${padding.top + chartHeight}`;
+        svg += `<polygon points="${firstPoint} ${points} ${lastPoint}" fill="url(#lineGradient${channel})" opacity="0.15"/>`;
+
+        // Draw the line
+        svg += `<polyline points="${points}" class="preview-line" style="stroke: ${color};" data-channel="${channel}"/>`;
+    });
+
+    svg += '</svg>';
+
+    previewChart.innerHTML = svg;
+}
+
+/**
+ * Calculate preview data for all channels
+ * Used by the multi-line preview chart
+ * @returns {Array} Array of { time, intensities: { channel: intensity } }
+ */
+function calculateAllChannelsPreview() {
+    const result = [];
+
+    for (let i = 0; i < 96; i++) {
+        const hour = Math.floor(i / 4);
+        const min = (i % 4) * 15;
+        const time = `${hour.toString().padStart(2, "0")}:${min.toString().padStart(2, "0")}`;
+        const intensities = {};
+
+        [1, 2, 3, 4].forEach((channel) => {
+            const curve = curvesData[channel]?.curve || [];
+            if (curve.length === 0) {
+                intensities[channel] = 0;
+            } else {
+                intensities[channel] = interpolateLocalMinutes(curve, hour * 60 + min);
+            }
+        });
+
+        result.push({ time, intensities });
+    }
+
+    return result;
+}
+
+/**
+ * Load preview channel visibility from localStorage
+ */
+function loadPreviewChannelVisibility() {
+    try {
+        const stored = localStorage.getItem(PREVIEW_STORAGE_KEY);
+        if (stored) {
+            const parsed = JSON.parse(stored);
+            previewChannelVisibility = { ...previewChannelVisibility, ...parsed };
+        }
+    } catch (e) {
+        console.warn('Failed to load preview channel visibility:', e);
+    }
+}
+
+/**
+ * Save preview channel visibility to localStorage
+ */
+function savePreviewChannelVisibility() {
+    try {
+        localStorage.setItem(PREVIEW_STORAGE_KEY, JSON.stringify(previewChannelVisibility));
+    } catch (e) {
+        console.warn('Failed to save preview channel visibility:', e);
+    }
+}
+
+/**
+ * Toggle visibility of a channel in the preview chart
+ * @param {number} channel - Channel number (1-4)
+ */
+function togglePreviewChannel(channel) {
+    previewChannelVisibility[channel] = !previewChannelVisibility[channel];
+    savePreviewChannelVisibility();
+    renderPreview();
+}
+
+/**
+ * Create the channel visibility checkboxes above the preview chart
+ * Called once during initialization
+ */
+function createPreviewCheckboxes() {
+    const previewSection = document.querySelector('.preview-section');
+    if (!previewSection) return;
+
+    // Check if checkboxes already exist
+    if (document.getElementById('previewChannelCheckboxes')) return;
+
+    const checkboxContainer = document.createElement('div');
+    checkboxContainer.id = 'previewChannelCheckboxes';
+    checkboxContainer.className = 'preview-channel-checkboxes';
+
+    [1, 2, 3, 4].forEach((channel) => {
+        const label = document.createElement('label');
+        label.className = 'preview-channel-checkbox';
+        label.innerHTML = `
+            <input type="checkbox" data-channel="${channel}" ${previewChannelVisibility[channel] ? 'checked' : ''}>
+            <span class="preview-channel-dot" style="background: ${channelColors[channel]}"></span>
+            <span class="preview-channel-name">${channelNames[channel]}</span>
+        `;
+        checkboxContainer.appendChild(label);
+    });
+
+    // Insert before the preview-title
+    const previewTitle = previewSection.querySelector('.preview-title');
+    if (previewTitle) {
+        previewSection.insertBefore(checkboxContainer, previewTitle);
+    } else {
+        previewSection.insertBefore(checkboxContainer, previewSection.firstChild);
+    }
+
+    // Setup event listeners
+    checkboxContainer.querySelectorAll('input[type="checkbox"]').forEach((checkbox) => {
+        checkbox.addEventListener('change', (e) => {
+            const channel = parseInt(e.target.dataset.channel);
+            togglePreviewChannel(channel);
+        });
     });
 }
 
 /**
  * Update preview locally based on current curve edits
- * Generates 96 preview bars (15-minute resolution)
- * @param {number} channel - Channel number (1-4)
+ * Generates multi-line preview chart for all channels
+ * @param {number} channel - Channel number that was edited (1-4)
  */
 export function updateLocalPreview(channel) {
     activeChannel = channel;
-    const curve = curvesData[channel]?.curve || [];
 
-    if (curve.length === 0) {
-        // No curve data - fill with zeros
-        previewData = Array(96)
-            .fill(null)
-            .map((_, i) => {
-                const hour = Math.floor(i / 4);
-                const min = (i % 4) * 15;
-                return {
-                    time: `${hour.toString().padStart(2, "0")}:${min
-                        .toString()
-                        .padStart(2, "0")}`,
-                    intensities: { [channel]: 0 },
-                };
-            });
-    } else {
-        // Calculate interpolated values for 96 intervals (15 min each)
-        previewData = Array(96)
-            .fill(null)
-            .map((_, i) => {
-                const hour = Math.floor(i / 4);
-                const min = (i % 4) * 15;
-                const intensity = interpolateLocalMinutes(
-                    curve,
-                    hour * 60 + min
-                );
-                return {
-                    time: `${hour.toString().padStart(2, "0")}:${min
-                        .toString()
-                        .padStart(2, "0")}`,
-                    intensities: { [channel]: intensity },
-                };
-            });
-    }
+    // Ensure checkboxes are created
+    createPreviewCheckboxes();
 
+    // Simply re-render the preview - calculateAllChannelsPreview will recalculate all channels
     renderPreview();
 }
 
@@ -878,13 +1044,17 @@ async function applySelectedPreset() {
     try {
         const response = await GrowPiAPI.applyCurvePreset(presetId);
         if (response.success) {
-            // Update local curves data
-            if (response.curves) {
+            // Update local curves data from response OR re-fetch
+            if (response.curves && response.curves.length > 0) {
                 curvesData = {};
                 response.curves.forEach((c) => {
                     curvesData[c.channel] = c;
                 });
                 renderCurves();
+                updateLocalPreview(activeChannel);
+            } else {
+                // Fallback: Re-fetch curves from server if not in response
+                await fetchCurves();
             }
             window.showSuccess?.(`Preset "${response.preset?.name}" angewendet!`);
         } else {
@@ -1160,4 +1330,98 @@ function escapeHtml(text) {
     const div = document.createElement("div");
     div.textContent = text;
     return div.innerHTML;
+}
+
+// ============================================================================
+// CURVE CHANNEL ACCORDION FUNCTIONALITY
+// ============================================================================
+
+// Storage key prefix for curve channel accordion state
+const CURVE_STORAGE_PREFIX = 'growpi-curve-';
+
+/**
+ * Get the collapsed state for a curve channel from localStorage
+ * @param {string} sectionId - The section identifier (e.g., "curve-channel-1")
+ * @returns {boolean} - True if collapsed, false if expanded
+ */
+function getCurveChannelState(sectionId) {
+    const stored = localStorage.getItem(CURVE_STORAGE_PREFIX + sectionId);
+    // Default: ALL channels are COLLAPSED (closed) - user must click to expand
+    return stored !== 'expanded';
+}
+
+/**
+ * Save the collapsed state for a curve channel to localStorage
+ * @param {string} sectionId - The section identifier
+ * @param {boolean} isCollapsed - Whether the section is collapsed
+ */
+function saveCurveChannelState(sectionId, isCollapsed) {
+    if (isCollapsed) {
+        localStorage.removeItem(CURVE_STORAGE_PREFIX + sectionId);
+    } else {
+        localStorage.setItem(CURVE_STORAGE_PREFIX + sectionId, 'expanded');
+    }
+}
+
+/**
+ * Toggle a curve channel's collapsed state
+ * @param {HTMLElement} section - The section element
+ */
+function toggleCurveChannel(section) {
+    const sectionId = section.dataset.sectionId;
+    const isCurrentlyCollapsed = section.classList.contains('collapsed');
+
+    if (isCurrentlyCollapsed) {
+        // Expand
+        section.classList.remove('collapsed');
+        saveCurveChannelState(sectionId, false);
+    } else {
+        // Collapse
+        section.classList.add('collapsed');
+        saveCurveChannelState(sectionId, true);
+    }
+
+    // Update ARIA attribute
+    const header = section.querySelector('.collapsible-header');
+    if (header) {
+        header.setAttribute('aria-expanded', !section.classList.contains('collapsed'));
+    }
+}
+
+/**
+ * Setup accordion event listeners for curve channels
+ * Called after renderCurves() to attach click handlers
+ */
+function setupCurveAccordionListeners() {
+    const curveSections = document.querySelectorAll('.curve-channel.collapsible-section');
+
+    curveSections.forEach(section => {
+        const header = section.querySelector('.collapsible-header');
+        if (!header) return;
+
+        // Set initial ARIA state
+        header.setAttribute('role', 'button');
+        header.setAttribute('tabindex', '0');
+        header.setAttribute('aria-expanded', !section.classList.contains('collapsed'));
+
+        // Click handler - but only on header, not on toggle switch
+        header.addEventListener('click', (e) => {
+            // Don't toggle if clicking on the enable/disable toggle
+            if (e.target.closest('.curve-toggle')) {
+                return;
+            }
+            e.preventDefault();
+            toggleCurveChannel(section);
+        });
+
+        // Keyboard accessibility
+        header.addEventListener('keydown', (e) => {
+            if ((e.key === 'Enter' || e.key === ' ') && !e.target.closest('.curve-toggle')) {
+                e.preventDefault();
+                toggleCurveChannel(section);
+            }
+        });
+    });
+
+    console.log(`Curve accordion: Initialized ${curveSections.length} collapsible channels`);
 }

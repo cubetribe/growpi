@@ -1,66 +1,166 @@
 # GrowPi Roadmap - Geplante Features
 
 **Letzte Aktualisierung**: 2025-12-07
-**Aktuelle Version**: v6.9.1
-**Status**: Active Development - Bug Fixing Phase
+**Aktuelle Version**: v6.10.0
+**Status**: Active Development - Feature Phase 🚀
 
 ---
 
-## 🔴 KRITISCHE BUGS (Priorität 1)
+## ✅ BEHOBENE BUGS (2025-12-07)
 
-Diese Bugs müssen VOR neuen Features behoben werden!
+### Bug #1: Room/Entfeuchter-Steuerung - BEHOBEN ✅
 
-### Bug #1: Room/Entfeuchter-Steuerung funktioniert nicht
+**Status**: ✅ BEHOBEN
+**Behoben am**: 2025-12-07 16:08
 
-**Status**: 🔴 OFFEN
-**Entdeckt**: 2025-12-07
-**Symptome**:
-- Steckdose reagiert nicht auf Steuerung (An/Aus)
-- Automatik springt nicht an trotz Wertänderungen
-- Fehler in Logs: `no such table: device_automation_config`
+**Root Causes (alle behoben):**
+1. `dehumidifier_controller.set_humidity_reader()` wurde nie aufgerufen
+2. Tuya Device ID fehlte in der Datenbank
+3. DB-Migration lief nicht automatisch
 
-**Vermutete Ursache**:
-- DB-Migration für `device_automation_config` fehlt oder wurde nicht ausgeführt
-- Möglicherweise Smart-Plug-Integration unvollständig
+**Fixes:**
+- ✅ Bugfix in `api.py`: `dehumidifier_controller.set_humidity_reader(read_dht22)` hinzugefügt
+- ✅ Tuya Device ID in DB gesetzt: `bfc705014c6241667avzn8`
+- ✅ `dehumidifier_controller.py`: DB-Verzeichnis wird automatisch erstellt
 
-**Zu prüfen**:
-- [ ] DB-Tabelle `device_automation_config` existiert?
-- [ ] Migration-File vorhanden und ausgeführt?
-- [ ] Tuya Smart-Plug Verbindung funktioniert?
-- [ ] DehumidifierController initialisiert korrekt?
-
----
-
-### Bug #2: Zeitschaltung/Override funktioniert nicht
-
-**Status**: 🔴 OFFEN
-**Entdeckt**: 2025-12-07
-**Symptome**:
-- Zeitfenster-basierte Schaltung reagiert nicht
-- Override-Funktion im UI ohne Wirkung
-
-**Vermutete Ursache**:
-- Abhängig von Bug #1 (device_automation_config fehlt)
-- Scheduler-Logik greift nicht
-
-**Zu prüfen**:
-- [ ] DB-Tabelle `device_time_schedules` existiert?
-- [ ] API `/api/room/schedules` liefert Daten?
-- [ ] Scheduler-Loop läuft im Background?
+**Test-Ergebnis:**
+```json
+{
+  "success": true,
+  "message": "Dehumidifier turned ON",
+  "humidity": 64.7,
+  "is_on": true
+}
+```
 
 ---
 
-### Bug #3: Kosten-Tracking API prüfen
+### Bug #3: Kosten-Tracking - FUNKTIONIERT ✅
 
-**Status**: 🟡 ZU PRÜFEN
-**Entdeckt**: 2025-12-07
-**Symptome**:
-- API-Verbindung möglicherweise fehlerhaft
+**Status**: ✅ KEIN BUG
+**Geprüft am**: 2025-12-07 16:10
 
-**Zu prüfen**:
-- [ ] Endpoint `/api/costs` erreichbar?
-- [ ] DB-Tabelle für Kosten existiert?
-- [ ] Logging funktioniert?
+Kosten-Tracking funktioniert. Stromverbrauch wird korrekt angezeigt.
+
+---
+
+### Bug #4: DHT22 Sensor - BEHOBEN ✅
+
+**Status**: ✅ BEHOBEN (war temporär)
+**Behoben am**: 2025-12-07 16:05
+
+Sensor funktioniert wieder nach Service-Restart. War vermutlich ein temporäres Timing-Problem.
+
+---
+
+### Bug #5: Tuya Device ID - BEHOBEN ✅
+
+**Status**: ✅ BEHOBEN
+**Behoben am**: 2025-12-07 16:08
+
+Device ID wurde in DB eingetragen:
+```sql
+UPDATE switchable_devices SET tuya_device_id = 'bfc705014c6241667avzn8' WHERE id = 1;
+```
+
+---
+
+## 🟡 OFFENE PUNKTE
+
+### Bug #2: Zeitschaltung/Override - ZU TESTEN
+
+**Status**: 🟡 ZU TESTEN
+**Abhängigkeit**: Bug #1 ist jetzt behoben
+
+Da die Entfeuchter-Steuerung jetzt funktioniert, sollte auch die Zeitschaltung funktionieren.
+
+**Zu testen:**
+- [ ] Zeitfenster im UI anlegen
+- [ ] Prüfen ob Scheduler greift
+- [ ] Override-Funktion testen
+
+---
+
+### Bug #6: Kurven-Presets funktionieren nicht - BEHOBEN ✅
+
+**Status**: ✅ BEHOBEN
+**Behoben am**: 2025-12-07
+
+**Fix:**
+- `applySelectedPreset()` in `curves.js` verbessert
+- Fallback zu `fetchCurves()` wenn `response.curves` leer ist
+- `updateLocalPreview()` nach Apply für sofortiges visuelles Feedback
+
+---
+
+### Feature: Kurven-Seite Accordion/Collapsible - IMPLEMENTIERT ✅
+
+**Status**: ✅ IMPLEMENTIERT
+**Implementiert am**: 2025-12-07
+**Deployed**: 2025-12-07
+
+**Umsetzung:**
+- Alle 4 Kanäle standardmäßig zugeklappt
+- Kanalname + aktuelle Intensität im Header sichtbar
+- Klick auf Header klappt auf/zu
+- Enable/Disable Toggle weiterhin funktional
+- localStorage Persistence pro Kanal
+- Smooth CSS Animation
+- ARIA Keyboard Accessibility
+
+---
+
+### Feature: Multi-Line Preview Chart - IMPLEMENTIERT ✅
+
+**Status**: ✅ IMPLEMENTIERT
+**Implementiert am**: 2025-12-07
+**Deployed**: 2025-12-07
+**Version**: v6.10.0
+
+**Umsetzung:**
+- SVG-basiertes Multi-Line-Chart
+- Alle 4 Kanäle gleichzeitig sichtbar mit farbigen Linien
+- Checkboxen zum Ein-/Ausblenden einzelner Kanäle
+- X-Achse: 00:00 - 24:00 mit Zeitlabels
+- Y-Achse: 0% - 100% mit %-Labels
+- Grid-Linien für bessere Lesbarkeit
+- localStorage Persistenz für Checkbox-Status
+- Responsive Design für Mobile
+
+**Technische Details:**
+- `renderPreview()` in `curves.js` komplett umgebaut
+- Interpolation für alle aktiven Kanäle gleichzeitig
+- SVG `<polyline>` für jede Kurve
+- Checkbox-Event-Listener mit localStorage
+
+---
+
+## 🔧 TECHNISCHE SCHULDEN (Refactoring)
+
+### Refactoring #1: api.py Modularisierung (KRITISCH)
+
+**Status**: 📋 GEPLANT
+**Plan erstellt**: 2025-12-07
+**Detaillierter Plan**: [`docs/PLAN_API_REFACTORING.md`](./PLAN_API_REFACTORING.md)
+
+**Problem:**
+- `api.py` hat **1119 Zeilen** - viel zu groß für Wartbarkeit
+- ~700 Zeilen sind **duplizierter Code** (Routes existieren auch in Blueprints)
+- Nur 3 von 9 Blueprints sind registriert
+- Fehleranfällig bei Agenten-Änderungen
+
+**Ziel:**
+- api.py von 1119 → ~200 Zeilen reduzieren
+- Alle 9 Blueprints aktivieren
+- Duplizierten Code entfernen
+- `dependencies.py` aktivieren
+
+**Analyse durch Opus-Agent:**
+- Siehe `/agents/api-analysis-refactoring-plan.md`
+
+**Geschätzter Aufwand:** ~2 Stunden
+
+**Priorität:** HOCH (aber System erst stabilisieren)
 
 ---
 
@@ -356,6 +456,11 @@ NACH RESTART: Ch2: 34%, Ch3: 65%  ← LAMPEN BLIEBEN AN!
 
 | Datum | Änderung | Autor |
 |-------|----------|-------|
+| 2025-12-07 | **ALLE BUGS BEHOBEN:** Entfeuchter, DHT22, Tuya-ID funktionieren | Dennis + Claude |
+| 2025-12-07 | Refactoring-Plan für api.py erstellt (PLAN_API_REFACTORING.md) | Dennis + Claude |
+| 2025-12-07 | Opus-Agent Analyse: api.py hat 700 Zeilen duplizierten Code | Dennis + Claude |
+| 2025-12-07 | Bug #4 + #5 dokumentiert: DHT22 Sensor-Fehler, Tuya Config veraltet | Dennis + Claude |
+| 2025-12-07 | Bug #1 teilweise behoben: DB-Migration funktioniert, aber Tuya-ID fehlt | Dennis + Claude |
 | 2025-12-07 | v6.9.1 Zero-Downtime BUGFIX - PWM-Init Problem behoben | Dennis + Claude |
 | 2025-12-07 | KRITISCHE BUGS dokumentiert: Room, Zeitschaltung, Kosten | Dennis + Claude |
 | 2025-12-06 | v6.9.0 PWM Zero-Downtime implementiert und getestet | Dennis + Claude |

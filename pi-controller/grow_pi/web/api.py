@@ -333,8 +333,11 @@ def read_dht22() -> Tuple[Optional[float], Optional[float]]:
     return (None, None)
 
 
-# Set humidity reader for dehumidifier blueprint now that read_dht22 is defined
+# Set humidity reader for dehumidifier - BOTH controller AND blueprint need it!
 if dehumidifier_controller is not None:
+    # BUGFIX 2025-12-07: Controller needs humidity_reader for automation loop
+    dehumidifier_controller.set_humidity_reader(read_dht22)
+    logger.info("Humidity reader set for DehumidifierController")
     try:
         from .blueprints.dehumidifier_bp import set_humidity_reader
         set_humidity_reader(read_dht22)

@@ -134,14 +134,18 @@ class DehumidifierController:
     def _load_config(self) -> None:
         """Load configuration from database"""
         try:
-            if not os.path.exists(self._db_path):
-                logger.warning(f"Database not found at {self._db_path}, using defaults")
-                return
+            # BUGFIX 2025-12-07: Create database directory and file if they don't exist
+            # This ensures migration can always run on fresh installations
+            db_dir = os.path.dirname(self._db_path)
+            if not os.path.exists(db_dir):
+                logger.info(f"Creating database directory: {db_dir}")
+                os.makedirs(db_dir, exist_ok=True)
 
+            # Connect to database (creates file if not exists)
             conn = sqlite3.connect(self._db_path)
             cursor = conn.cursor()
 
-            # Check if tables exist
+            # Check if tables exist - ALWAYS run migration if missing
             cursor.execute("""
                 SELECT name FROM sqlite_master
                 WHERE type='table' AND name='device_automation_config'

@@ -7,6 +7,46 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [v6.10.0] - 2025-12-07
+
+### Added
+- **Multi-Line Preview Chart** für Kurven-Seite 🎉
+  - SVG-basiertes Linien-Chart statt Balken-Chart
+  - Alle 4 Kanäle gleichzeitig sichtbar (Far Red, Warm White, Cool White, UV)
+  - Farbige Linien mit Kanalfarben
+  - Checkboxen zum Ein-/Ausblenden einzelner Kanäle
+  - X-Achse: 00:00 - 24:00 mit Zeitlabels
+  - Y-Achse: 0% - 100% mit %-Labels
+  - Grid-Linien für bessere Lesbarkeit
+  - localStorage Persistenz für Checkbox-Status
+  - Responsive Design für Mobile
+
+- **Kurven-Accordion** für bessere Übersicht
+  - Alle 4 Lampen-Kanäle standardmäßig zugeklappt
+  - Kanalname + aktuelle Intensität im Header sichtbar
+  - Klick auf Header klappt auf/zu
+  - Enable/Disable Toggle weiterhin funktional
+  - localStorage Persistenz pro Kanal
+  - Smooth CSS Animation
+  - ARIA Keyboard Accessibility
+
+### Fixed
+- **Bug #6: Kurven-Presets** - `applySelectedPreset()` verbessert
+  - Fallback zu `fetchCurves()` wenn Response leer
+  - `updateLocalPreview()` nach Apply für sofortiges Feedback
+
+### Changed
+- Preview-Section Titel: "24h Vorschau" statt "Vorschau"
+- Checkbox-basierte Kanalauswahl statt Tab-Wechsel
+
+### Deployment
+- ✅ Deployed auf Pi @ 192.168.0.86
+- ✅ Multi-Line Chart funktioniert
+- ✅ Accordion funktioniert
+- ✅ Preset-Fix deployed
+
+---
+
 ## [v6.9.1] - 2025-12-07
 
 ### Fixed
