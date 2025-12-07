@@ -7,6 +7,85 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [v6.13.0] - 2025-12-07
+
+### Fixed
+- **KRITISCH: Bug #8 - Room Automation Status-Desync** 🔧
+  - Problem: Controller speicherte internen Status, synchronisierte aber nie mit echtem Tuya-Gerätestatus
+  - Wenn Gerät manuell/physisch geschaltet wurde, wusste der Controller nichts davon
+  - Automation schaltete nicht zuverlässig
+
+### Added
+- **Neue Methode `_sync_device_status()`** in DehumidifierController
+  - Fragt echten Tuya-Status vor jedem Schaltvorgang ab
+  - Synchronisiert internen State mit echtem Gerätestatus
+  - Loggt erkannte Desyncs
+
+### Changed
+- `_ensure_state()`: Ruft jetzt `_sync_device_status()` ZUERST auf
+- `get_status()`: Synchronisiert auch vor API-Response
+- Automation sollte jetzt zuverlässig funktionieren
+
+### Deployment
+- ✅ Deployed auf Pi @ 192.168.0.86
+- ✅ Service neugestartet
+
+---
+
+## [v6.12.0] - 2025-12-07
+
+### Added
+- **Data Aggregation / Downsampling** für unendliche Datenspeicherung 🎉
+  - Alle historischen Daten werden jetzt OHNE Limit gespeichert
+  - Intelligentes Downsampling bei Abfrage (Query-Time):
+    - 0-4h: Minutengenau (Rohdaten)
+    - 4-24h: 5-Min-Durchschnitt (AVG)
+    - 1-7 Tage: 15-Min-Durchschnitt (AVG)
+    - 7-30 Tage: 30-Min-Durchschnitt (AVG)
+    - >30 Tage: Stündlicher Durchschnitt (AVG)
+  - Gilt für alle 3 Datentypen: Klima, Beleuchtung, Stromverbrauch
+  - Ermöglicht Jahresansichten ohne Performance-Probleme
+
+### Changed
+- `db.py`: 3 neue Methoden für Downsampling-Queries
+- `logs_bp.py`: Alle Endpoints nutzen automatisches Downsampling
+- `api.js` + `history.js`: Limit-Parameter entfernt
+
+### Fixed
+- Stromverbrauch-Chart auf Verlauf-Seite zeigt jetzt alle historischen Daten
+
+### Deployment
+- ✅ Deployed auf Pi @ 192.168.0.86
+- ✅ Service neugestartet
+
+---
+
+## [v6.11.0] - 2025-12-07
+
+### Added
+- **Verlauf-Seite: Synchronisierte Zeitfilter** 🎉
+  - Alle 3 Charts (Klima, Beleuchtung, Stromverbrauch) zeigen jetzt dieselbe Zeitspanne
+  - Neuer "1h" Zeitfilter für Echtzeit-Debugging
+  - Chart.js Date-Adapter für echte Zeit-Achsen
+  - Automatische Zeiteinheit (Stunden ≤24h, Tage >24h)
+  - Fehlende historische Daten als Lücken dargestellt
+
+- **Steckdosen-Namen auf Verlauf-Seite**
+  - Zeigt jetzt richtige Namen statt Tuya-IDs (Power, BF, AD1 etc.)
+  - Namen werden aus `/api/costs/config` geladen
+
+### Fixed
+- **Bug #7: Zeitfilter funktionierten nicht für alle Charts**
+  - Vorher: Nur Klima-Chart reagierte auf Zeitfilter
+  - Jetzt: Alle 3 Charts synchron mit gleicher X-Achse
+
+### Deployment
+- ✅ Deployed auf Pi @ 192.168.0.86
+- ✅ history.js komplett überarbeitet
+- ✅ Chart.js Date-Adapter hinzugefügt
+
+---
+
 ## [v6.10.0] - 2025-12-07
 
 ### Added

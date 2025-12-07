@@ -219,35 +219,38 @@ export const GrowPiAPI = {
     },
 
     /**
-     * Get sensor logs
+     * Get sensor logs with automatic downsampling
+     * Backend applies intelligent downsampling based on time range:
+     * - 0-4h: raw data, 4-24h: 5min avg, 1-7d: 15min avg, 7-30d: 30min avg, >30d: 1h avg
      * @param {string} type - Sensor type ('temperature' | 'humidity')
-     * @param {number} hours - Hours of history to fetch (default: 24)
-     * @param {number} limit - Maximum number of records (default: 1000)
-     * @returns {Promise<Object>} Sensor readings
+     * @param {number} hours - Hours of history to fetch (default: 24, no limit!)
+     * @returns {Promise<Object>} Sensor readings (downsampled)
      */
-    async getSensorLogs(type, hours = 24, limit = 1000) {
-        return await get(`/api/logs/sensors?type=${type}&hours=${hours}&limit=${limit}`);
+    async getSensorLogs(type, hours = 24) {
+        return await get(`/api/logs/sensors?type=${type}&hours=${hours}`);
     },
 
     /**
-     * Get lamp logs for a specific channel
+     * Get lamp logs for a specific channel with automatic downsampling
+     * Backend applies intelligent downsampling based on time range:
+     * - 0-4h: raw data, 4-24h: 5min avg, 1-7d: 15min avg, 7-30d: 30min avg, >30d: 1h avg
      * @param {number} channel - Channel number (1-4)
-     * @param {number} hours - Hours of history (default: 24)
-     * @param {number} limit - Maximum records (default: 1000)
-     * @returns {Promise<Object>} Lamp intensity logs
+     * @param {number} hours - Hours of history (default: 24, no limit!)
+     * @returns {Promise<Object>} Lamp intensity logs (downsampled)
      */
-    async getLampLogs(channel, hours = 24, limit = 1000) {
-        return await get(`/api/logs/lamps?channel=${channel}&hours=${hours}&limit=${limit}`);
+    async getLampLogs(channel, hours = 24) {
+        return await get(`/api/logs/lamps?channel=${channel}&hours=${hours}`);
     },
 
     /**
-     * Get smart plug logs
-     * @param {number} hours - Hours of history (default: 24)
-     * @param {number} limit - Maximum records (default: 1000)
-     * @returns {Promise<Object>} Plug power consumption logs
+     * Get smart plug logs with automatic downsampling
+     * Backend applies intelligent downsampling based on time range:
+     * - 0-4h: raw data, 4-24h: 5min avg, 1-7d: 15min avg, 7-30d: 30min avg, >30d: 1h avg
+     * @param {number} hours - Hours of history (default: 24, no limit!)
+     * @returns {Promise<Object>} Plug power consumption logs (downsampled)
      */
-    async getPlugLogs(hours = 24, limit = 1000) {
-        return await get(`/api/logs/plugs?hours=${hours}&limit=${limit}`);
+    async getPlugLogs(hours = 24) {
+        return await get(`/api/logs/plugs?hours=${hours}`);
     },
 
     /**

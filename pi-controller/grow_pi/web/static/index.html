@@ -9,6 +9,8 @@
         <title>GrowPi Control</title>
 <link rel="stylesheet" href="css/main.css">
         <script src="chart.js"></script>
+        <!-- Date adapter for Chart.js time scale (required for fixed X-axis time range) -->
+        <script src="chartjs-adapter-date-fns.bundle.min.js"></script>
     </head>
     <body>
         <div class="container">
@@ -387,6 +389,9 @@
                 <div class="section">
                     <div class="section-title">Zeitraum</div>
                     <div class="range-selector">
+                        <button class="range-btn" data-range="1">
+                            1h
+                        </button>
                         <button class="range-btn active" data-range="24">
                             24h
                         </button>

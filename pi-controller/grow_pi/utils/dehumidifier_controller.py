@@ -14,8 +14,13 @@ Key Features:
 - Automatic fallback from time schedule to humidity automation
 - Comprehensive logging of all state changes
 
-Version: 6.8.0
-Date: 2025-12-06
+Version: 6.9.1
+Date: 2025-12-07
+
+Bugfix 6.9.1: Status-Desync Fix
+- Added _sync_device_status() to synchronize internal state with actual Tuya device
+- Modified _ensure_state() to sync before state checks
+- Prevents issues when device is manually switched or state drifts
 """
 
 import logging
@@ -613,6 +618,10 @@ class DehumidifierController:
         Returns:
             True if turned ON, False if turned OFF, None if blocked by min time
         """
+        # BUGFIX 6.9.1: Sync with actual device status BEFORE checking state
+        # This prevents issues when device was manually switched externally
+        self._sync_device_status()
+
         # Check minimum time constraints
         if self._last_toggle_time:
             elapsed = (datetime.now() - self._last_toggle_time).total_seconds()
@@ -671,6 +680,36 @@ class DehumidifierController:
         except Exception as e:
             logger.error(f"Error controlling plug: {e}")
             return False
+
+    def _sync_device_status(self) -> None:
+        """
+        Synchronize internal state with actual Tuya device status.
+
+        BUGFIX 6.9.1: This prevents status desync when the device is manually
+        switched (physically or via Tuya app) without the controller knowing.
+
+        Called before _ensure_state() checks to ensure we're working with
+        the real device state, not a potentially stale internal state.
+        """
+        if self._plug_controller is None or not self._tuya_device_id:
+            return  # No controller or device ID - skip sync
+
+        try:
+            status = self._plug_controller.get_status(self._tuya_device_id)
+            if status is not None:
+                # get_status returns {'on': bool, 'power': ..., 'voltage': ..., ...}
+                actual_is_on = status.get('on', False)
+
+                if actual_is_on != self._is_on:
+                    logger.info(
+                        f"Status sync: internal={self._is_on}, actual={actual_is_on} "
+                        f"-> updating internal state"
+                    )
+                    self._is_on = actual_is_on
+                    # Note: We don't update _last_toggle_time here because
+                    # we don't know when the external change happened
+        except Exception as e:
+            logger.warning(f"Could not sync device status: {e}")
 
     def _log_state_change(self, on: bool, trigger: TriggerType, details: str) -> None:
         """Log state change to database"""
@@ -780,6 +819,10 @@ class DehumidifierController:
 
     def get_status(self) -> Dict:
         """Get current status"""
+        # BUGFIX 6.9.1: Sync with actual device status before returning
+        # This ensures API always returns the real device state
+        self._sync_device_status()
+
         humidity = self.get_humidity()
 
         # Get active schedule if any

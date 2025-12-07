@@ -276,6 +276,183 @@ class Database:
 
             return [SensorReading.from_row(row) for row in cursor.fetchall()]
 
+    def get_sensor_readings_downsampled(
+        self,
+        sensor_type: Optional[str] = None,
+        hours: int = 24
+    ) -> List[Dict[str, Any]]:
+        """
+        Get sensor readings with intelligent downsampling based on time range.
+
+        Downsampling rules:
+        - 0-4 hours: Raw data (every minute)
+        - 4-24 hours: 5-minute averages
+        - 1-7 days: 15-minute averages
+        - 7-30 days: 30-minute averages
+        - >30 days: 1-hour averages
+
+        Args:
+            sensor_type: Filter by sensor type (None = all)
+            hours: Get readings from last N hours
+
+        Returns:
+            List of dicts with sensor reading data (averaged where applicable)
+        """
+        now = datetime.now()
+        results = []
+
+        # Define time boundaries
+        boundary_4h = (now - timedelta(hours=4)).isoformat()
+        boundary_24h = (now - timedelta(hours=24)).isoformat()
+        boundary_7d = (now - timedelta(hours=168)).isoformat()
+        boundary_30d = (now - timedelta(hours=720)).isoformat()
+        start_time = (now - timedelta(hours=hours)).isoformat()
+
+        with self._cursor() as cursor:
+            # Build type filter
+            type_filter = "AND sensor_type = ?" if sensor_type else ""
+            base_params = [sensor_type] if sensor_type else []
+
+            # 1. Raw data for last 4 hours (or less if hours < 4)
+            if hours > 0:
+                raw_end = now.isoformat()
+                raw_start = max(start_time, boundary_4h)
+
+                query = f"""
+                    SELECT sensor_type, value, unit, created_at
+                    FROM sensor_readings
+                    WHERE created_at >= ? AND created_at <= ? {type_filter}
+                    ORDER BY created_at DESC
+                """
+                params = [raw_start, raw_end] + base_params
+                cursor.execute(query, params)
+
+                for row in cursor.fetchall():
+                    results.append({
+                        'sensor_type': row[0],
+                        'value': row[1],
+                        'unit': row[2],
+                        'created_at': row[3]
+                    })
+
+            # 2. 5-minute averages for 4-24 hours
+            if hours > 4:
+                agg_start = max(start_time, boundary_24h)
+                agg_end = boundary_4h
+
+                query = f"""
+                    SELECT
+                        sensor_type,
+                        AVG(value) as avg_value,
+                        unit,
+                        strftime('%Y-%m-%dT%H:', created_at) ||
+                            printf('%02d', (CAST(strftime('%M', created_at) AS INTEGER) / 5) * 5) ||
+                            ':00' as time_bucket
+                    FROM sensor_readings
+                    WHERE created_at >= ? AND created_at < ? {type_filter}
+                    GROUP BY sensor_type, time_bucket, unit
+                    ORDER BY time_bucket DESC
+                """
+                params = [agg_start, agg_end] + base_params
+                cursor.execute(query, params)
+
+                for row in cursor.fetchall():
+                    results.append({
+                        'sensor_type': row[0],
+                        'value': round(row[1], 2),
+                        'unit': row[2],
+                        'created_at': row[3]
+                    })
+
+            # 3. 15-minute averages for 1-7 days
+            if hours > 24:
+                agg_start = max(start_time, boundary_7d)
+                agg_end = boundary_24h
+
+                query = f"""
+                    SELECT
+                        sensor_type,
+                        AVG(value) as avg_value,
+                        unit,
+                        strftime('%Y-%m-%dT%H:', created_at) ||
+                            printf('%02d', (CAST(strftime('%M', created_at) AS INTEGER) / 15) * 15) ||
+                            ':00' as time_bucket
+                    FROM sensor_readings
+                    WHERE created_at >= ? AND created_at < ? {type_filter}
+                    GROUP BY sensor_type, time_bucket, unit
+                    ORDER BY time_bucket DESC
+                """
+                params = [agg_start, agg_end] + base_params
+                cursor.execute(query, params)
+
+                for row in cursor.fetchall():
+                    results.append({
+                        'sensor_type': row[0],
+                        'value': round(row[1], 2),
+                        'unit': row[2],
+                        'created_at': row[3]
+                    })
+
+            # 4. 30-minute averages for 7-30 days
+            if hours > 168:
+                agg_start = max(start_time, boundary_30d)
+                agg_end = boundary_7d
+
+                query = f"""
+                    SELECT
+                        sensor_type,
+                        AVG(value) as avg_value,
+                        unit,
+                        strftime('%Y-%m-%dT%H:', created_at) ||
+                            printf('%02d', (CAST(strftime('%M', created_at) AS INTEGER) / 30) * 30) ||
+                            ':00' as time_bucket
+                    FROM sensor_readings
+                    WHERE created_at >= ? AND created_at < ? {type_filter}
+                    GROUP BY sensor_type, time_bucket, unit
+                    ORDER BY time_bucket DESC
+                """
+                params = [agg_start, agg_end] + base_params
+                cursor.execute(query, params)
+
+                for row in cursor.fetchall():
+                    results.append({
+                        'sensor_type': row[0],
+                        'value': round(row[1], 2),
+                        'unit': row[2],
+                        'created_at': row[3]
+                    })
+
+            # 5. Hourly averages for >30 days
+            if hours > 720:
+                agg_start = start_time
+                agg_end = boundary_30d
+
+                query = f"""
+                    SELECT
+                        sensor_type,
+                        AVG(value) as avg_value,
+                        unit,
+                        strftime('%Y-%m-%dT%H:00:00', created_at) as time_bucket
+                    FROM sensor_readings
+                    WHERE created_at >= ? AND created_at < ? {type_filter}
+                    GROUP BY sensor_type, time_bucket, unit
+                    ORDER BY time_bucket DESC
+                """
+                params = [agg_start, agg_end] + base_params
+                cursor.execute(query, params)
+
+                for row in cursor.fetchall():
+                    results.append({
+                        'sensor_type': row[0],
+                        'value': round(row[1], 2),
+                        'unit': row[2],
+                        'created_at': row[3]
+                    })
+
+        # Sort all results by created_at descending
+        results.sort(key=lambda x: x['created_at'], reverse=True)
+        return results
+
     def get_latest_sensor_reading(self, sensor_type: str) -> Optional[SensorReading]:
         """Get the most recent reading for a sensor type."""
         with self._cursor() as cursor:
@@ -350,6 +527,193 @@ class Database:
                 )
 
             return [LampStateLog.from_row(row) for row in cursor.fetchall()]
+
+    def get_lamp_state_log_downsampled(
+        self,
+        channel: Optional[int] = None,
+        hours: int = 24
+    ) -> List[Dict[str, Any]]:
+        """
+        Get lamp state log entries with intelligent downsampling based on time range.
+
+        Downsampling rules:
+        - 0-4 hours: Raw data (every minute)
+        - 4-24 hours: 5-minute averages
+        - 1-7 days: 15-minute averages
+        - 7-30 days: 30-minute averages
+        - >30 days: 1-hour averages
+
+        Args:
+            channel: Filter by channel (None = all)
+            hours: Get entries from last N hours
+
+        Returns:
+            List of dicts with lamp state data (averaged intensities where applicable)
+        """
+        now = datetime.now()
+        results = []
+
+        # Define time boundaries
+        boundary_4h = (now - timedelta(hours=4)).isoformat()
+        boundary_24h = (now - timedelta(hours=24)).isoformat()
+        boundary_7d = (now - timedelta(hours=168)).isoformat()
+        boundary_30d = (now - timedelta(hours=720)).isoformat()
+        start_time = (now - timedelta(hours=hours)).isoformat()
+
+        with self._cursor() as cursor:
+            # Build channel filter
+            channel_filter = "AND channel = ?" if channel else ""
+            base_params = [channel] if channel else []
+
+            # 1. Raw data for last 4 hours
+            if hours > 0:
+                raw_end = now.isoformat()
+                raw_start = max(start_time, boundary_4h)
+
+                query = f"""
+                    SELECT channel, name, intensity, source, curve_time, created_at
+                    FROM lamp_state_log
+                    WHERE created_at >= ? AND created_at <= ? {channel_filter}
+                    ORDER BY created_at DESC
+                """
+                params = [raw_start, raw_end] + base_params
+                cursor.execute(query, params)
+
+                for row in cursor.fetchall():
+                    results.append({
+                        'channel': row[0],
+                        'name': row[1],
+                        'intensity': row[2],
+                        'source': row[3],
+                        'curve_time': row[4],
+                        'created_at': row[5]
+                    })
+
+            # 2. 5-minute averages for 4-24 hours
+            if hours > 4:
+                agg_start = max(start_time, boundary_24h)
+                agg_end = boundary_4h
+
+                query = f"""
+                    SELECT
+                        channel,
+                        name,
+                        ROUND(AVG(intensity)) as avg_intensity,
+                        strftime('%Y-%m-%dT%H:', created_at) ||
+                            printf('%02d', (CAST(strftime('%M', created_at) AS INTEGER) / 5) * 5) ||
+                            ':00' as time_bucket
+                    FROM lamp_state_log
+                    WHERE created_at >= ? AND created_at < ? {channel_filter}
+                    GROUP BY channel, name, time_bucket
+                    ORDER BY time_bucket DESC
+                """
+                params = [agg_start, agg_end] + base_params
+                cursor.execute(query, params)
+
+                for row in cursor.fetchall():
+                    results.append({
+                        'channel': row[0],
+                        'name': row[1],
+                        'intensity': int(row[2]),
+                        'source': 'aggregated',
+                        'curve_time': None,
+                        'created_at': row[3]
+                    })
+
+            # 3. 15-minute averages for 1-7 days
+            if hours > 24:
+                agg_start = max(start_time, boundary_7d)
+                agg_end = boundary_24h
+
+                query = f"""
+                    SELECT
+                        channel,
+                        name,
+                        ROUND(AVG(intensity)) as avg_intensity,
+                        strftime('%Y-%m-%dT%H:', created_at) ||
+                            printf('%02d', (CAST(strftime('%M', created_at) AS INTEGER) / 15) * 15) ||
+                            ':00' as time_bucket
+                    FROM lamp_state_log
+                    WHERE created_at >= ? AND created_at < ? {channel_filter}
+                    GROUP BY channel, name, time_bucket
+                    ORDER BY time_bucket DESC
+                """
+                params = [agg_start, agg_end] + base_params
+                cursor.execute(query, params)
+
+                for row in cursor.fetchall():
+                    results.append({
+                        'channel': row[0],
+                        'name': row[1],
+                        'intensity': int(row[2]),
+                        'source': 'aggregated',
+                        'curve_time': None,
+                        'created_at': row[3]
+                    })
+
+            # 4. 30-minute averages for 7-30 days
+            if hours > 168:
+                agg_start = max(start_time, boundary_30d)
+                agg_end = boundary_7d
+
+                query = f"""
+                    SELECT
+                        channel,
+                        name,
+                        ROUND(AVG(intensity)) as avg_intensity,
+                        strftime('%Y-%m-%dT%H:', created_at) ||
+                            printf('%02d', (CAST(strftime('%M', created_at) AS INTEGER) / 30) * 30) ||
+                            ':00' as time_bucket
+                    FROM lamp_state_log
+                    WHERE created_at >= ? AND created_at < ? {channel_filter}
+                    GROUP BY channel, name, time_bucket
+                    ORDER BY time_bucket DESC
+                """
+                params = [agg_start, agg_end] + base_params
+                cursor.execute(query, params)
+
+                for row in cursor.fetchall():
+                    results.append({
+                        'channel': row[0],
+                        'name': row[1],
+                        'intensity': int(row[2]),
+                        'source': 'aggregated',
+                        'curve_time': None,
+                        'created_at': row[3]
+                    })
+
+            # 5. Hourly averages for >30 days
+            if hours > 720:
+                agg_start = start_time
+                agg_end = boundary_30d
+
+                query = f"""
+                    SELECT
+                        channel,
+                        name,
+                        ROUND(AVG(intensity)) as avg_intensity,
+                        strftime('%Y-%m-%dT%H:00:00', created_at) as time_bucket
+                    FROM lamp_state_log
+                    WHERE created_at >= ? AND created_at < ? {channel_filter}
+                    GROUP BY channel, name, time_bucket
+                    ORDER BY time_bucket DESC
+                """
+                params = [agg_start, agg_end] + base_params
+                cursor.execute(query, params)
+
+                for row in cursor.fetchall():
+                    results.append({
+                        'channel': row[0],
+                        'name': row[1],
+                        'intensity': int(row[2]),
+                        'source': 'aggregated',
+                        'curve_time': None,
+                        'created_at': row[3]
+                    })
+
+        # Sort all results by created_at descending
+        results.sort(key=lambda x: x['created_at'], reverse=True)
+        return results
 
     def get_latest_lamp_state(self, channel: int) -> Optional[LampStateLog]:
         """Get the most recent state for a lamp channel."""
@@ -633,6 +997,192 @@ class Database:
                     (since, limit)
                 )
             return [PlugLog.from_row(row) for row in cursor.fetchall()]
+
+    def get_plug_logs_downsampled(
+        self,
+        device_id: Optional[str] = None,
+        hours: int = 24
+    ) -> List[Dict[str, Any]]:
+        """
+        Get plug logs with intelligent downsampling based on time range.
+
+        Downsampling rules:
+        - 0-4 hours: Raw data (every minute)
+        - 4-24 hours: 5-minute averages
+        - 1-7 days: 15-minute averages
+        - 7-30 days: 30-minute averages
+        - >30 days: 1-hour averages
+
+        Args:
+            device_id: Filter by device ID (None = all)
+            hours: Get logs from last N hours
+
+        Returns:
+            List of dicts with plug log data (averaged power values where applicable)
+        """
+        now = datetime.now()
+        results = []
+
+        # Define time boundaries
+        boundary_4h = (now - timedelta(hours=4)).isoformat()
+        boundary_24h = (now - timedelta(hours=24)).isoformat()
+        boundary_7d = (now - timedelta(hours=168)).isoformat()
+        boundary_30d = (now - timedelta(hours=720)).isoformat()
+        start_time = (now - timedelta(hours=hours)).isoformat()
+
+        with self._cursor() as cursor:
+            # Build device filter
+            device_filter = "AND device_id = ?" if device_id else ""
+            base_params = [device_id] if device_id else []
+
+            # 1. Raw data for last 4 hours
+            if hours > 0:
+                raw_end = now.isoformat()
+                raw_start = max(start_time, boundary_4h)
+
+                query = f"""
+                    SELECT device_id, voltage, current, power, created_at
+                    FROM plug_logs
+                    WHERE created_at >= ? AND created_at <= ? {device_filter}
+                    ORDER BY created_at DESC
+                """
+                params = [raw_start, raw_end] + base_params
+                cursor.execute(query, params)
+
+                for row in cursor.fetchall():
+                    results.append({
+                        'device_id': row[0],
+                        'voltage': row[1],
+                        'current': row[2],
+                        'power': row[3],
+                        'created_at': row[4]
+                    })
+
+            # 2. 5-minute averages for 4-24 hours
+            if hours > 4:
+                agg_start = max(start_time, boundary_24h)
+                agg_end = boundary_4h
+
+                query = f"""
+                    SELECT
+                        device_id,
+                        AVG(voltage) as avg_voltage,
+                        AVG(current) as avg_current,
+                        AVG(power) as avg_power,
+                        strftime('%Y-%m-%dT%H:', created_at) ||
+                            printf('%02d', (CAST(strftime('%M', created_at) AS INTEGER) / 5) * 5) ||
+                            ':00' as time_bucket
+                    FROM plug_logs
+                    WHERE created_at >= ? AND created_at < ? {device_filter}
+                    GROUP BY device_id, time_bucket
+                    ORDER BY time_bucket DESC
+                """
+                params = [agg_start, agg_end] + base_params
+                cursor.execute(query, params)
+
+                for row in cursor.fetchall():
+                    results.append({
+                        'device_id': row[0],
+                        'voltage': round(row[1], 1) if row[1] else None,
+                        'current': round(row[2], 3) if row[2] else None,
+                        'power': round(row[3], 1) if row[3] else None,
+                        'created_at': row[4]
+                    })
+
+            # 3. 15-minute averages for 1-7 days
+            if hours > 24:
+                agg_start = max(start_time, boundary_7d)
+                agg_end = boundary_24h
+
+                query = f"""
+                    SELECT
+                        device_id,
+                        AVG(voltage) as avg_voltage,
+                        AVG(current) as avg_current,
+                        AVG(power) as avg_power,
+                        strftime('%Y-%m-%dT%H:', created_at) ||
+                            printf('%02d', (CAST(strftime('%M', created_at) AS INTEGER) / 15) * 15) ||
+                            ':00' as time_bucket
+                    FROM plug_logs
+                    WHERE created_at >= ? AND created_at < ? {device_filter}
+                    GROUP BY device_id, time_bucket
+                    ORDER BY time_bucket DESC
+                """
+                params = [agg_start, agg_end] + base_params
+                cursor.execute(query, params)
+
+                for row in cursor.fetchall():
+                    results.append({
+                        'device_id': row[0],
+                        'voltage': round(row[1], 1) if row[1] else None,
+                        'current': round(row[2], 3) if row[2] else None,
+                        'power': round(row[3], 1) if row[3] else None,
+                        'created_at': row[4]
+                    })
+
+            # 4. 30-minute averages for 7-30 days
+            if hours > 168:
+                agg_start = max(start_time, boundary_30d)
+                agg_end = boundary_7d
+
+                query = f"""
+                    SELECT
+                        device_id,
+                        AVG(voltage) as avg_voltage,
+                        AVG(current) as avg_current,
+                        AVG(power) as avg_power,
+                        strftime('%Y-%m-%dT%H:', created_at) ||
+                            printf('%02d', (CAST(strftime('%M', created_at) AS INTEGER) / 30) * 30) ||
+                            ':00' as time_bucket
+                    FROM plug_logs
+                    WHERE created_at >= ? AND created_at < ? {device_filter}
+                    GROUP BY device_id, time_bucket
+                    ORDER BY time_bucket DESC
+                """
+                params = [agg_start, agg_end] + base_params
+                cursor.execute(query, params)
+
+                for row in cursor.fetchall():
+                    results.append({
+                        'device_id': row[0],
+                        'voltage': round(row[1], 1) if row[1] else None,
+                        'current': round(row[2], 3) if row[2] else None,
+                        'power': round(row[3], 1) if row[3] else None,
+                        'created_at': row[4]
+                    })
+
+            # 5. Hourly averages for >30 days
+            if hours > 720:
+                agg_start = start_time
+                agg_end = boundary_30d
+
+                query = f"""
+                    SELECT
+                        device_id,
+                        AVG(voltage) as avg_voltage,
+                        AVG(current) as avg_current,
+                        AVG(power) as avg_power,
+                        strftime('%Y-%m-%dT%H:00:00', created_at) as time_bucket
+                    FROM plug_logs
+                    WHERE created_at >= ? AND created_at < ? {device_filter}
+                    GROUP BY device_id, time_bucket
+                    ORDER BY time_bucket DESC
+                """
+                params = [agg_start, agg_end] + base_params
+                cursor.execute(query, params)
+
+                for row in cursor.fetchall():
+                    results.append({
+                        'device_id': row[0],
+                        'voltage': round(row[1], 1) if row[1] else None,
+                        'current': round(row[2], 3) if row[2] else None,
+                        'power': round(row[3], 1) if row[3] else None,
+                        'created_at': row[4]
+                    })
+
+        # Sort all results by created_at descending
+        results.sort(key=lambda x: x['created_at'], reverse=True)
+        return results
 
     # =========================================================================
     # Statistics & Maintenance

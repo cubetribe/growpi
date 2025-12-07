@@ -1,7 +1,7 @@
 # GrowPi Roadmap - Geplante Features
 
 **Letzte Aktualisierung**: 2025-12-07
-**Aktuelle Version**: v6.10.0
+**Aktuelle Version**: v6.13.0
 **Status**: Active Development - Feature Phase 🚀
 
 ---
@@ -132,6 +132,70 @@ Da die Entfeuchter-Steuerung jetzt funktioniert, sollte auch die Zeitschaltung f
 - Interpolation für alle aktiven Kanäle gleichzeitig
 - SVG `<polyline>` für jede Kurve
 - Checkbox-Event-Listener mit localStorage
+
+---
+
+### Bug #8: Room Automation - Status-Desync - BEHOBEN ✅
+
+**Status**: ✅ BEHOBEN
+**Behoben am**: 2025-12-07
+**Version**: v6.13.0
+
+**Problem war:**
+- Controller speicherte `self._is_on` intern, synchronisierte aber nie mit echtem Tuya-Status
+- Wenn Gerät manuell/physisch geschaltet wurde, wusste der Controller nichts davon
+
+**Lösung implementiert:**
+- Neue Methode `_sync_device_status()` fragt echten Tuya-Status ab
+- `_ensure_state()` ruft Sync ZUERST auf, bevor Status-Check
+- `get_status()` synchronisiert auch vor API-Response
+
+**Bericht:** `/agents/bug8-status-desync-fix-report.md`
+
+---
+
+### Bug #7: Verlauf-Seite - Teilweise behoben ✅
+
+**Status**: 🟡 TEILWEISE BEHOBEN
+**Behoben am**: 2025-12-07
+**Version**: v6.11.0
+
+**Behoben:**
+- ✅ Steckdosen-Namen werden korrekt angezeigt
+- ✅ Zeitfilter funktioniert für alle 3 Charts synchron
+- ✅ "1h" Button hinzugefügt
+- ✅ Chart.js Date-Adapter für echte Zeit-Achsen
+
+**Noch offen:**
+- ✅ Stromverbrauch-Daten werden jetzt angezeigt (Fix: API-Response-Format)
+
+---
+
+### Feature: Data Aggregation / Downsampling - IMPLEMENTIERT ✅
+
+**Status**: ✅ IMPLEMENTIERT
+**Implementiert am**: 2025-12-07
+**Version**: v6.12.0
+
+**Umsetzung (Option A - Query-Time Aggregation):**
+
+- Alle Rohdaten bleiben erhalten (unendliche Speicherung)
+- Intelligentes Downsampling bei API-Abfrage mit AVG():
+
+| Zeitraum | Auflösung | Aggregation |
+|----------|-----------|-------------|
+| 0-4h | Minutengenau | Rohdaten |
+| 4-24h | 5-Min-Intervalle | AVG() |
+| 1-7 Tage | 15-Min-Intervalle | AVG() |
+| 7-30 Tage | 30-Min-Intervalle | AVG() |
+| >30 Tage | Stündlich | AVG() |
+
+**Geänderte Dateien:**
+- `db.py`: 3 neue Downsampling-Methoden
+- `logs_bp.py`: Alle Endpoints mit automatischem Downsampling
+- `api.js` + `history.js`: Limit-Parameter entfernt
+
+**Bericht:** `/agents/data-aggregation-report.md`
 
 ---
 

@@ -6,6 +6,9 @@
  * - Time range selection (24h, 7d, 30d)
  * - Data fetching and chart updates
  * - System logs table with color-coded severity
+ *
+ * FIX 2025-12-07: X-Achse wird jetzt auf die gewählte Zeitspanne fixiert,
+ * auch wenn weniger Daten vorhanden sind.
  */
 
 import { GrowPiAPI } from '../api.js';
@@ -20,6 +23,9 @@ export class HistoryModule {
         // State
         this.currentRangeHours = 24;
 
+        // Device name mapping (loaded from config)
+        this.deviceNames = {};
+
         // Color scheme
         this.channelColors = {
             1: '#ff4444', // Far Red
@@ -28,7 +34,17 @@ export class HistoryModule {
             4: '#cc66ff'  // UV
         };
 
-        this.plugColors = ['#11ff55', '#ff4444', '#ffbb44', '#88ddff'];
+        this.plugColors = ['#11ff55', '#ff4444', '#ffbb44', '#88ddff', '#cc66ff', '#ff88aa'];
+    }
+
+    /**
+     * Calculate time range boundaries for X-axis
+     * @returns {Object} { min: Date, max: Date }
+     */
+    getTimeRangeBounds() {
+        const now = new Date();
+        const startTime = new Date(now.getTime() - (this.currentRangeHours * 60 * 60 * 1000));
+        return { min: startTime, max: now };
     }
 
     /**
@@ -38,11 +54,43 @@ export class HistoryModule {
     initHistoryTab() {
         console.log('[History] Initializing History Tab');
 
+        // Load device names from config
+        this.loadDeviceNames();
+
         // Range selector event listeners
         this.setupRangeSelectors();
 
         // Tab switch detection
         this.setupTabSwitchListener();
+    }
+
+    /**
+     * Load device names from costs config API
+     * Maps device IDs to human-readable names
+     */
+    async loadDeviceNames() {
+        try {
+            const config = await GrowPiAPI.getCostsConfig();
+            if (config.success && config.devices) {
+                this.deviceNames = config.devices;
+                console.log('[History] Loaded device names:', this.deviceNames);
+            }
+        } catch (e) {
+            console.error('[History] Error loading device names:', e);
+        }
+    }
+
+    /**
+     * Get device display name from ID
+     * @param {string} deviceId - Tuya device ID
+     * @returns {string} Human-readable device name or truncated ID
+     */
+    getDeviceName(deviceId) {
+        if (this.deviceNames[deviceId]) {
+            return this.deviceNames[deviceId];
+        }
+        // Fallback: return truncated ID
+        return deviceId.substr(0, 8) + '...';
     }
 
     /**
@@ -104,15 +152,15 @@ export class HistoryModule {
 
     /**
      * Initialize the sensor chart (Temperature + Humidity)
-     * Uses dual Y-axes for different units
+     * Uses dual Y-axes for different units and time-based X-axis
      */
     initSensorChart(commonOptions) {
         const ctx = document.getElementById('sensorChart').getContext('2d');
+        const bounds = this.getTimeRangeBounds();
 
         this.sensorChartInstance = new Chart(ctx, {
             type: 'line',
             data: {
-                labels: [],
                 datasets: [
                     {
                         label: 'Temperatur (°C)',
@@ -122,7 +170,8 @@ export class HistoryModule {
                         fill: true,
                         tension: 0.4,
                         yAxisID: 'y',
-                        data: []
+                        data: [],
+                        spanGaps: true
                     },
                     {
                         label: 'Feuchtigkeit (%)',
@@ -132,14 +181,34 @@ export class HistoryModule {
                         fill: true,
                         tension: 0.4,
                         yAxisID: 'y1',
-                        data: []
+                        data: [],
+                        spanGaps: true
                     }
                 ]
             },
             options: {
                 ...commonOptions,
                 scales: {
-                    ...commonOptions.scales,
+                    x: {
+                        type: 'time',
+                        time: {
+                            unit: this.currentRangeHours <= 24 ? 'hour' : 'day',
+                            displayFormats: {
+                                hour: 'HH:mm',
+                                day: 'dd.MM.'
+                            },
+                            tooltipFormat: 'dd.MM. HH:mm'
+                        },
+                        min: bounds.min,
+                        max: bounds.max,
+                        grid: {
+                            color: 'rgba(255, 255, 255, 0.05)'
+                        },
+                        ticks: {
+                            color: '#666',
+                            maxTicksLimit: 8
+                        }
+                    },
                     y: {
                         type: 'linear',
                         display: true,
@@ -175,14 +244,15 @@ export class HistoryModule {
 
     /**
      * Initialize the lamp chart (4 channels)
+     * Uses time-based X-axis for consistent time range display
      */
     initLampChart(commonOptions) {
         const ctx = document.getElementById('lampChart').getContext('2d');
+        const bounds = this.getTimeRangeBounds();
 
         this.lampChartInstance = new Chart(ctx, {
             type: 'line',
             data: {
-                labels: [],
                 datasets: [
                     {
                         label: 'Far Red',
@@ -190,7 +260,8 @@ export class HistoryModule {
                         borderWidth: 2,
                         tension: 0.2,
                         pointRadius: 0,
-                        data: []
+                        data: [],
+                        spanGaps: true
                     },
                     {
                         label: 'Warm White',
@@ -198,7 +269,8 @@ export class HistoryModule {
                         borderWidth: 2,
                         tension: 0.2,
                         pointRadius: 0,
-                        data: []
+                        data: [],
+                        spanGaps: true
                     },
                     {
                         label: 'Cool White',
@@ -206,7 +278,8 @@ export class HistoryModule {
                         borderWidth: 2,
                         tension: 0.2,
                         pointRadius: 0,
-                        data: []
+                        data: [],
+                        spanGaps: true
                     },
                     {
                         label: 'UV',
@@ -214,14 +287,34 @@ export class HistoryModule {
                         borderWidth: 2,
                         tension: 0.2,
                         pointRadius: 0,
-                        data: []
+                        data: [],
+                        spanGaps: true
                     }
                 ]
             },
             options: {
                 ...commonOptions,
                 scales: {
-                    ...commonOptions.scales,
+                    x: {
+                        type: 'time',
+                        time: {
+                            unit: this.currentRangeHours <= 24 ? 'hour' : 'day',
+                            displayFormats: {
+                                hour: 'HH:mm',
+                                day: 'dd.MM.'
+                            },
+                            tooltipFormat: 'dd.MM. HH:mm'
+                        },
+                        min: bounds.min,
+                        max: bounds.max,
+                        grid: {
+                            color: 'rgba(255, 255, 255, 0.05)'
+                        },
+                        ticks: {
+                            color: '#666',
+                            maxTicksLimit: 8
+                        }
+                    },
                     y: {
                         min: 0,
                         max: 100,
@@ -243,20 +336,40 @@ export class HistoryModule {
     /**
      * Initialize the plug chart
      * This chart is dynamically created based on available devices
+     * Uses time-based X-axis for consistent time range display
      */
     initPlugChart(commonOptions) {
         const ctx = document.getElementById('plugChart').getContext('2d');
+        const bounds = this.getTimeRangeBounds();
 
         this.plugChartInstance = new Chart(ctx, {
             type: 'line',
             data: {
-                labels: [],
                 datasets: []
             },
             options: {
                 ...commonOptions,
                 scales: {
-                    ...commonOptions.scales,
+                    x: {
+                        type: 'time',
+                        time: {
+                            unit: this.currentRangeHours <= 24 ? 'hour' : 'day',
+                            displayFormats: {
+                                hour: 'HH:mm',
+                                day: 'dd.MM.'
+                            },
+                            tooltipFormat: 'dd.MM. HH:mm'
+                        },
+                        min: bounds.min,
+                        max: bounds.max,
+                        grid: {
+                            color: 'rgba(255, 255, 255, 0.05)'
+                        },
+                        ticks: {
+                            color: '#666',
+                            maxTicksLimit: 8
+                        }
+                    },
                     y: {
                         min: 0,
                         grid: {
@@ -276,23 +389,29 @@ export class HistoryModule {
 
     /**
      * Load all history data for a given time range
-     * @param {number} hours - Time range in hours (24, 168, 720)
+     * Backend automatically applies intelligent downsampling:
+     * - 0-4h: raw data (1min)
+     * - 4-24h: 5min averages
+     * - 1-7d: 15min averages
+     * - 7-30d: 30min averages
+     * - >30d: 1h averages
+     * @param {number} hours - Time range in hours (24, 168, 720, etc.)
      */
     async loadHistoryData(hours) {
-        console.log(`[History] Loading data for ${hours} hours`);
+        console.log(`[History] Loading data for ${hours} hours (downsampled)`);
 
         this.currentRangeHours = hours;
 
         // Load logs (independent)
         this.loadSystemLogs(hours);
 
-        // Load chart data
+        // Load chart data - no limit needed, backend handles downsampling
         try {
-            // Use GrowPiAPI instead of direct fetch()
+            // Use GrowPiAPI - limit parameter removed, backend auto-aggregates
             const [temps, hums, plugs] = await Promise.all([
-                GrowPiAPI.getSensorLogs('temperature', hours, 1000),
-                GrowPiAPI.getSensorLogs('humidity', hours, 1000),
-                GrowPiAPI.getPlugLogs(hours, 1000)
+                GrowPiAPI.getSensorLogs('temperature', hours),
+                GrowPiAPI.getSensorLogs('humidity', hours),
+                GrowPiAPI.getPlugLogs(hours)
             ]);
 
             // Update sensor chart
@@ -301,20 +420,24 @@ export class HistoryModule {
             }
 
             // Fetch lamp data for all channels in parallel (use GrowPiAPI)
+            // No limit needed - backend auto-downsamples based on time range
             const lampResults = await Promise.all(
                 [1, 2, 3, 4].map(channel =>
-                    GrowPiAPI.getLampLogs(channel, hours, 1000)
+                    GrowPiAPI.getLampLogs(channel, hours)
                 )
             );
             this.updateLampChart(...lampResults);
 
             // Update plug chart
+            // API returns { count: N, data: [...] } format
             if (plugs && Array.isArray(plugs)) {
                 this.updatePlugChart(plugs);
-            } else if (plugs && plugs.success && Array.isArray(plugs.data)) {
+            } else if (plugs && Array.isArray(plugs.data)) {
+                // Handle { count: N, data: [...] } format from /api/logs/plugs
                 this.updatePlugChart(plugs.data);
             } else {
-                this.updatePlugChart(plugs);
+                console.warn('[History] Unexpected plugs format:', plugs);
+                this.updatePlugChart([]);
             }
 
         } catch (e) {
@@ -325,6 +448,7 @@ export class HistoryModule {
 
     /**
      * Update the sensor chart with temperature and humidity data
+     * Uses {x: Date, y: value} format for time-based X-axis
      * @param {Array} tempReadings - Temperature readings
      * @param {Array} humReadings - Humidity readings
      */
@@ -334,19 +458,32 @@ export class HistoryModule {
         const temps = (tempReadings || []).reverse();
         const hums = (humReadings || []).reverse();
 
-        // Generate labels from temperature data
-        const labels = temps.map(r => this.formatTimestamp(new Date(r.created_at)));
+        // Convert to {x, y} format for time scale
+        const tempData = temps.map(r => ({
+            x: new Date(r.created_at),
+            y: r.value
+        }));
+        const humData = hums.map(r => ({
+            x: new Date(r.created_at),
+            y: r.value
+        }));
+
+        // Update time range bounds
+        const bounds = this.getTimeRangeBounds();
+        this.sensorChartInstance.options.scales.x.min = bounds.min;
+        this.sensorChartInstance.options.scales.x.max = bounds.max;
+        this.sensorChartInstance.options.scales.x.time.unit = this.currentRangeHours <= 24 ? 'hour' : 'day';
 
         // Update chart data
-        this.sensorChartInstance.data.labels = labels;
-        this.sensorChartInstance.data.datasets[0].data = temps.map(r => r.value);
-        this.sensorChartInstance.data.datasets[1].data = hums.map(r => r.value);
+        this.sensorChartInstance.data.datasets[0].data = tempData;
+        this.sensorChartInstance.data.datasets[1].data = humData;
 
         this.sensorChartInstance.update();
     }
 
     /**
      * Update the lamp chart with data from all 4 channels
+     * Uses {x: Date, y: value} format for time-based X-axis
      * @param {Object} ch1 - Channel 1 data
      * @param {Object} ch2 - Channel 2 data
      * @param {Object} ch3 - Channel 3 data
@@ -357,16 +494,19 @@ export class HistoryModule {
 
         const lampResults = [ch1, ch2, ch3, ch4];
 
-        // Use Channel 1 timestamps for labels
-        const ch1Logs = (lampResults[0].logs || []).reverse();
-        const labels = ch1Logs.map(r => this.formatTimestamp(new Date(r.created_at)));
+        // Update time range bounds
+        const bounds = this.getTimeRangeBounds();
+        this.lampChartInstance.options.scales.x.min = bounds.min;
+        this.lampChartInstance.options.scales.x.max = bounds.max;
+        this.lampChartInstance.options.scales.x.time.unit = this.currentRangeHours <= 24 ? 'hour' : 'day';
 
-        // Update chart data
-        this.lampChartInstance.data.labels = labels;
-
+        // Update chart data with {x, y} format for each channel
         lampResults.forEach((res, index) => {
             const logs = (res.logs || []).reverse();
-            this.lampChartInstance.data.datasets[index].data = logs.map(r => r.intensity);
+            this.lampChartInstance.data.datasets[index].data = logs.map(r => ({
+                x: new Date(r.created_at),
+                y: r.intensity
+            }));
         });
 
         this.lampChartInstance.update();
@@ -374,10 +514,25 @@ export class HistoryModule {
 
     /**
      * Update the plug chart with power consumption data
+     * Uses time-based X-axis with fixed time range bounds
      * @param {Array} logs - Plug log data
      */
     updatePlugChart(logs) {
         if (!this.plugChartInstance) return;
+
+        const bounds = this.getTimeRangeBounds();
+
+        // Handle empty data - still show chart with correct time range
+        if (!logs || logs.length === 0) {
+            console.log('[History] No plug data available');
+            // Update time bounds but keep empty datasets
+            this.plugChartInstance.options.scales.x.min = bounds.min;
+            this.plugChartInstance.options.scales.x.max = bounds.max;
+            this.plugChartInstance.options.scales.x.time.unit = this.currentRangeHours <= 24 ? 'hour' : 'day';
+            this.plugChartInstance.data.datasets = [];
+            this.plugChartInstance.update();
+            return;
+        }
 
         // Group by device
         const devices = {};
@@ -401,22 +556,22 @@ export class HistoryModule {
                 y: l.power
             }));
 
+            // Use device name from config instead of truncated ID
+            const deviceName = this.getDeviceName(deviceId);
+
             datasets.push({
-                label: `Power (${deviceId.substr(0, 5)}...)`,
+                label: deviceName,
                 data: data,
                 borderColor: this.plugColors[colorIdx % this.plugColors.length],
                 backgroundColor: this.plugColors[colorIdx % this.plugColors.length] + '20',
                 borderWidth: 2,
                 tension: 0.4,
                 fill: true,
-                pointRadius: 0
+                pointRadius: 0,
+                spanGaps: true
             });
             colorIdx++;
         }
-
-        // Create labels from all timestamps
-        const allDates = logs.map(l => new Date(l.created_at)).sort((a, b) => a - b);
-        const labels = allDates.map(d => this.formatTimestamp(d));
 
         // Destroy old chart and create new one (to handle dynamic datasets)
         if (this.plugChartInstance) {
@@ -427,7 +582,6 @@ export class HistoryModule {
         this.plugChartInstance = new Chart(ctx, {
             type: 'line',
             data: {
-                labels: labels,
                 datasets: datasets
             },
             options: {
@@ -438,6 +592,26 @@ export class HistoryModule {
                     intersect: false
                 },
                 scales: {
+                    x: {
+                        type: 'time',
+                        time: {
+                            unit: this.currentRangeHours <= 24 ? 'hour' : 'day',
+                            displayFormats: {
+                                hour: 'HH:mm',
+                                day: 'dd.MM.'
+                            },
+                            tooltipFormat: 'dd.MM. HH:mm'
+                        },
+                        min: bounds.min,
+                        max: bounds.max,
+                        grid: {
+                            color: 'rgba(255, 255, 255, 0.05)'
+                        },
+                        ticks: {
+                            color: '#888',
+                            maxTicksLimit: 8
+                        }
+                    },
                     y: {
                         beginAtZero: true,
                         grid: {
@@ -450,15 +624,6 @@ export class HistoryModule {
                             display: true,
                             text: 'Watt (W)',
                             color: '#888'
-                        }
-                    },
-                    x: {
-                        grid: {
-                            display: false
-                        },
-                        ticks: {
-                            color: '#888',
-                            maxTicksLimit: 8
                         }
                     }
                 },

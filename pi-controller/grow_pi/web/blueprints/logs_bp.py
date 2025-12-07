@@ -57,12 +57,18 @@ def create_response(success: bool, data: dict = None, error: str = None) -> dict
 
 @logs_bp.route('/api/logs/sensors', methods=['GET'])
 def get_sensor_logs():
-    """Get sensor reading history
+    """Get sensor reading history with intelligent downsampling.
+
+    Downsampling is applied automatically based on the requested time range:
+    - 0-4 hours: Raw data (every minute)
+    - 4-24 hours: 5-minute averages
+    - 1-7 days: 15-minute averages
+    - 7-30 days: 30-minute averages
+    - >30 days: 1-hour averages
 
     Query Parameters:
-        type (str, optional): Sensor type filter
-        hours (int, default=24): Hours of history to retrieve
-        limit (int, default=1000): Maximum number of records
+        type (str, optional): Sensor type filter ('temperature', 'humidity')
+        hours (int, default=24): Hours of history to retrieve (no limit!)
     """
     if not DB_AVAILABLE or not data_logger:
         return jsonify(create_response(False, error="Logging not available")), 503
@@ -70,15 +76,16 @@ def get_sensor_logs():
     try:
         sensor_type = request.args.get('type')
         hours = int(request.args.get('hours', 24))
-        limit = int(request.args.get('limit', 1000))
 
         db = get_database()
-        readings = db.get_sensor_readings(sensor_type=sensor_type, hours=hours, limit=limit)
+        # Use downsampled query - no limit needed, data is automatically aggregated
+        readings = db.get_sensor_readings_downsampled(sensor_type=sensor_type, hours=hours)
 
         return jsonify(create_response(True, {
-            "readings": [r.to_dict() for r in readings],
+            "readings": readings,
             "count": len(readings),
-            "hours": hours
+            "hours": hours,
+            "downsampled": True
         }))
 
     except Exception as e:
@@ -88,12 +95,18 @@ def get_sensor_logs():
 
 @logs_bp.route('/api/logs/lamps', methods=['GET'])
 def get_lamp_logs():
-    """Get lamp state history
+    """Get lamp state history with intelligent downsampling.
+
+    Downsampling is applied automatically based on the requested time range:
+    - 0-4 hours: Raw data (every minute)
+    - 4-24 hours: 5-minute averages
+    - 1-7 days: 15-minute averages
+    - 7-30 days: 30-minute averages
+    - >30 days: 1-hour averages
 
     Query Parameters:
         channel (int, optional): Lamp channel filter (1-4)
-        hours (int, default=24): Hours of history to retrieve
-        limit (int, default=1000): Maximum number of records
+        hours (int, default=24): Hours of history to retrieve (no limit!)
     """
     if not DB_AVAILABLE or not data_logger:
         return jsonify(create_response(False, error="Logging not available")), 503
@@ -101,15 +114,16 @@ def get_lamp_logs():
     try:
         channel = request.args.get('channel', type=int)
         hours = int(request.args.get('hours', 24))
-        limit = int(request.args.get('limit', 1000))
 
         db = get_database()
-        logs = db.get_lamp_state_log(channel=channel, hours=hours, limit=limit)
+        # Use downsampled query - no limit needed, data is automatically aggregated
+        logs = db.get_lamp_state_log_downsampled(channel=channel, hours=hours)
 
         return jsonify(create_response(True, {
-            "logs": [l.to_dict() for l in logs],
+            "logs": logs,
             "count": len(logs),
-            "hours": hours
+            "hours": hours,
+            "downsampled": True
         }))
 
     except Exception as e:
@@ -157,26 +171,33 @@ def get_event_logs():
 
 @logs_bp.route('/api/logs/plugs', methods=['GET'])
 def get_plug_logs():
-    """Get smart plug history
+    """Get smart plug history with intelligent downsampling.
+
+    Downsampling is applied automatically based on the requested time range:
+    - 0-4 hours: Raw data (every minute)
+    - 4-24 hours: 5-minute averages
+    - 1-7 days: 15-minute averages
+    - 7-30 days: 30-minute averages
+    - >30 days: 1-hour averages
 
     Query Parameters:
-        hours (int, default=24): Hours of history to retrieve
-        limit (int, default=1000): Maximum number of records
+        hours (int, default=24): Hours of history to retrieve (no limit!)
     """
     if not DB_AVAILABLE or not data_logger:
         return jsonify(create_response(False, error="Logging not available")), 503
 
     try:
         hours = int(request.args.get('hours', 24))
-        limit = int(request.args.get('limit', 1000))
 
         db = get_database()
-        logs = db.get_plug_logs(hours=hours, limit=limit)
+        # Use downsampled query - no limit needed, data is automatically aggregated
+        logs = db.get_plug_logs_downsampled(hours=hours)
 
         return jsonify(create_response(True, {
-            "data": [l.to_dict() for l in logs],
+            "data": logs,
             "count": len(logs),
-            "hours": hours
+            "hours": hours,
+            "downsampled": True
         }))
 
     except Exception as e:
