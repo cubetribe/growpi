@@ -241,6 +241,10 @@ function setupCurveEventListeners() {
     document.querySelectorAll(".curve-toggle").forEach((toggle) => {
         toggle.addEventListener("click", () => {
             const ch = parseInt(toggle.dataset.channel);
+            if (!curvesData[ch]) {
+                console.warn(`Channel ${ch} not found in curvesData`);
+                return;
+            }
             curvesData[ch].enabled = !curvesData[ch].enabled;
             toggle.classList.toggle("enabled");
         });
@@ -259,6 +263,10 @@ function setupCurveEventListeners() {
                 value = parseInt(value);
             }
 
+            if (!curvesData[ch]?.curve?.[idx]) {
+                console.warn(`Channel ${ch} or point ${idx} not found`);
+                return;
+            }
             curvesData[ch].curve[idx][field] = value;
             updateLocalPreview(ch);
         });

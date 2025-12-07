@@ -1,8 +1,66 @@
 # GrowPi Roadmap - Geplante Features
 
-**Letzte Aktualisierung**: 2025-12-06
-**Aktuelle Version**: v6.9.0
-**Status**: Active Development
+**Letzte Aktualisierung**: 2025-12-07
+**Aktuelle Version**: v6.9.1
+**Status**: Active Development - Bug Fixing Phase
+
+---
+
+## 🔴 KRITISCHE BUGS (Priorität 1)
+
+Diese Bugs müssen VOR neuen Features behoben werden!
+
+### Bug #1: Room/Entfeuchter-Steuerung funktioniert nicht
+
+**Status**: 🔴 OFFEN
+**Entdeckt**: 2025-12-07
+**Symptome**:
+- Steckdose reagiert nicht auf Steuerung (An/Aus)
+- Automatik springt nicht an trotz Wertänderungen
+- Fehler in Logs: `no such table: device_automation_config`
+
+**Vermutete Ursache**:
+- DB-Migration für `device_automation_config` fehlt oder wurde nicht ausgeführt
+- Möglicherweise Smart-Plug-Integration unvollständig
+
+**Zu prüfen**:
+- [ ] DB-Tabelle `device_automation_config` existiert?
+- [ ] Migration-File vorhanden und ausgeführt?
+- [ ] Tuya Smart-Plug Verbindung funktioniert?
+- [ ] DehumidifierController initialisiert korrekt?
+
+---
+
+### Bug #2: Zeitschaltung/Override funktioniert nicht
+
+**Status**: 🔴 OFFEN
+**Entdeckt**: 2025-12-07
+**Symptome**:
+- Zeitfenster-basierte Schaltung reagiert nicht
+- Override-Funktion im UI ohne Wirkung
+
+**Vermutete Ursache**:
+- Abhängig von Bug #1 (device_automation_config fehlt)
+- Scheduler-Logik greift nicht
+
+**Zu prüfen**:
+- [ ] DB-Tabelle `device_time_schedules` existiert?
+- [ ] API `/api/room/schedules` liefert Daten?
+- [ ] Scheduler-Loop läuft im Background?
+
+---
+
+### Bug #3: Kosten-Tracking API prüfen
+
+**Status**: 🟡 ZU PRÜFEN
+**Entdeckt**: 2025-12-07
+**Symptome**:
+- API-Verbindung möglicherweise fehlerhaft
+
+**Zu prüfen**:
+- [ ] Endpoint `/api/costs` erreichbar?
+- [ ] DB-Tabelle für Kosten existiert?
+- [ ] Logging funktioniert?
 
 ---
 
@@ -148,21 +206,43 @@ function formatTime(minutes) {
 
 ## ✅ Erledigte Features
 
-### **v6.9.0 (2025-12-06) - PWM Zero-Downtime Restarts**
+### **v6.9.1 (2025-12-07) - Zero-Downtime BUGFIX**
 
-**Problem gelöst:** LED-Flackern bei Service-Restart
+**Problem gelöst:** Zero-Downtime aus v6.9.0 funktionierte NICHT - Lampen gingen kurz aus
+
+**Root Cause:**
+- `api.py` wurde beim Flask-Import geladen
+- `PWMController.initialize()` wurde OHNE State-Check aufgerufen
+- Alle PWM-Kanäle wurden auf 0 gesetzt → Lampen aus
+- Erst danach wurde State geladen und Werte wiederhergestellt → Fade-In
+
+**Fix:**
+- ✅ `PWMController.initialize()` mit neuem Parameter `skip_zero_init`
+- ✅ `api.py` prüft `state_exists()` VOR initialize()
+- ✅ `main.py` prüft State VOR initialize()
+
+**Test-Ergebnis:**
+```
+VOR RESTART:  Ch2: 34%, Ch3: 65%
+NACH RESTART: Ch2: 34%, Ch3: 65%  ← LAMPEN BLIEBEN AN!
+```
+
+**Dateien:**
+- `grow_pi/lamps/pwm_controller.py` (GEÄNDERT)
+- `grow_pi/web/api.py` (GEÄNDERT)
+- `grow_pi/main.py` (GEÄNDERT)
+
+---
+
+### **v6.9.0 (2025-12-06) - PWM Zero-Downtime Restarts (Initial)**
+
+**Problem gelöst:** LED-Flackern bei Service-Restart (TEILWEISE - siehe v6.9.1)
 
 **Implementierung:**
 - ✅ Neue `disconnect()` Methode im PWMController
 - ✅ State-Persistence in `/run/growpi/pwm_state.json`
 - ✅ Warm-Restart Erkennung beim Startup
 - ✅ Systemd RuntimeDirectoryPreserve
-
-**Test-Ergebnis:**
-```
-VOR RESTART:  Ch1: 95%
-NACH RESTART: Ch1: 95%  ← KEIN FLACKERN!
-```
 
 **Dateien:**
 - `grow_pi/utils/pwm_state.py` (NEU)
@@ -276,6 +356,8 @@ NACH RESTART: Ch1: 95%  ← KEIN FLACKERN!
 
 | Datum | Änderung | Autor |
 |-------|----------|-------|
+| 2025-12-07 | v6.9.1 Zero-Downtime BUGFIX - PWM-Init Problem behoben | Dennis + Claude |
+| 2025-12-07 | KRITISCHE BUGS dokumentiert: Room, Zeitschaltung, Kosten | Dennis + Claude |
 | 2025-12-06 | v6.9.0 PWM Zero-Downtime implementiert und getestet | Dennis + Claude |
 | 2025-12-06 | Roadmap komplett umstrukturiert: Chronologisch, Nächstes zuerst | Dennis + Claude |
 | 2025-12-06 | Feature 2B.1 (Zeitbasierte Schaltung) hinzugefügt | Dennis + Claude |

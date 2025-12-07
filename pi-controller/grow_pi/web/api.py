@@ -154,9 +154,11 @@ CORS(app)
 try:
     from .blueprints.costs_bp import costs_bp
     from .blueprints.dehumidifier_bp import dehumidifier_bp
+    from .blueprints.curves_bp import curves_bp, init_blueprint as init_curves_blueprint
     app.register_blueprint(costs_bp)
     app.register_blueprint(dehumidifier_bp)
-    logging.info("Registered costs_bp and dehumidifier_bp blueprints")
+    app.register_blueprint(curves_bp)
+    logging.info("Registered costs_bp, dehumidifier_bp, and curves_bp blueprints")
 except ImportError as e:
     logging.warning(f"Could not import blueprints: {e}")
 
@@ -173,14 +175,32 @@ logger = logging.getLogger(__name__)
 # ============================================================================
 
 # Initialize PWM Controller (use singleton)
+# BUGFIX 2025-12-07: Check for warm restart state BEFORE initializing
 pwm_controller = None
 try:
     pwm_controller = get_pwm_controller()  # Use singleton!
     # Initialize with channel configs (only if not already initialized)
     if not pwm_controller._initialized:
-        from config import load_config
+        try:
+            from ..config import load_config
+        except ImportError:
+            from grow_pi.config import load_config
         config = load_config()
-        pwm_controller.initialize(config.lamps.channels)
+
+        # Check for warm restart state - don't reset PWM to 0 if state exists
+        skip_zero = False
+        try:
+            try:
+                from ..utils.pwm_state import state_exists
+            except ImportError:
+                from grow_pi.utils.pwm_state import state_exists
+            skip_zero = state_exists()
+            if skip_zero:
+                logger.info("Warm restart detected - preserving PWM values")
+        except ImportError:
+            pass
+
+        pwm_controller.initialize(config.lamps.channels, skip_zero_init=skip_zero)
     logger.info("PWM Controller initialized successfully")
 except Exception as e:
     logger.error(f"Failed to initialize PWM Controller: {e}")
@@ -212,6 +232,13 @@ if CURVE_AVAILABLE and DB_AVAILABLE:
         curve_controller = get_curve_controller()
         curve_controller.initialize(channels)
         logger.info("CurveController initialized successfully")
+
+        # Initialize curves blueprint with dependencies
+        try:
+            init_curves_blueprint(curve_controller, data_logger, LAMP_CHANNELS)
+            logger.info("Curves blueprint initialized with dependencies")
+        except Exception as e:
+            logger.warning(f"Could not initialize curves blueprint: {e}")
     except Exception as e:
         logger.error(f"Failed to initialize CurveController: {e}")
 

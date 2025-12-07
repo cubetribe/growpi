@@ -140,31 +140,36 @@ class GrowPiController:
             logger.error("No lamp channels configured!")
             return False
 
-        if not self.pwm_controller.initialize(channels):
-            logger.error("Failed to initialize PWM controller")
-            return False
-
-        # Zero-Downtime: Check for saved state (warm restart)
-        # Wenn State existiert, wurden PWM-Werte bereits von pigpiod gehalten
-        # Wir stellen nur die internen Tracking-Variablen wieder her
+        # Zero-Downtime: Check for saved state BEFORE initializing PWM
+        # BUGFIX 2025-12-07: Bei Warm-Restart darf PWM nicht auf 0 gesetzt werden!
         warm_restart = False
+        saved_state = None
         if STATE_PERSISTENCE_AVAILABLE and state_exists():
             logger.info("=" * 30)
             logger.info("WARM RESTART DETECTED")
             logger.info("=" * 30)
             saved_state = load_state()
             if saved_state:
-                logger.info("Restoring PWM tracking from saved state...")
-                for ch_str, ch_data in saved_state.get('channels', {}).items():
-                    channel = int(ch_str)
-                    intensity = ch_data.get('intensity', 0)
-                    # PWM ist bereits von pigpiod gehalten - nur Tracking wiederherstellen
-                    if channel in self.pwm_controller.channels:
-                        self.pwm_controller.channels[channel].current_intensity = intensity
-                        self.last_intensities[channel] = intensity
-                        logger.info(f"  Channel {channel}: {intensity}% (preserved)")
                 warm_restart = True
-                logger.info("PWM state restored - no flickering!")
+                logger.info("State file found - will preserve PWM values")
+
+        # Initialize PWM controller (skip zero-init on warm restart)
+        if not self.pwm_controller.initialize(channels, skip_zero_init=warm_restart):
+            logger.error("Failed to initialize PWM controller")
+            return False
+
+        # Restore PWM values from saved state
+        if warm_restart and saved_state:
+            logger.info("Restoring PWM values from saved state...")
+            for ch_str, ch_data in saved_state.get('channels', {}).items():
+                channel = int(ch_str)
+                intensity = ch_data.get('intensity', 0)
+                if channel in self.pwm_controller.channels:
+                    # Setze PWM-Wert UND Tracking
+                    self.pwm_controller.set_intensity(channel, intensity)
+                    self.last_intensities[channel] = intensity
+                    logger.info(f"  Channel {channel}: {intensity}% (restored)")
+            logger.info("PWM state restored - Zero-Downtime active!")
 
         if self.mode == "fixed":
             # Set initial intensities from config
