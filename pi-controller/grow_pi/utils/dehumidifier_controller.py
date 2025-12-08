@@ -14,8 +14,8 @@ Key Features:
 - Automatic fallback from time schedule to humidity automation
 - Comprehensive logging of all state changes
 
-Version: 6.9.2
-Date: 2025-12-07
+Version: 6.15.1
+Date: 2025-12-08
 
 Bugfix 6.9.1: Status-Desync Fix
 - Added _sync_device_status() to synchronize internal state with actual Tuya device
@@ -26,6 +26,12 @@ Bugfix 6.9.2: Manual Control Skip-Bug Fix
 - MANUAL triggers now ALWAYS send commands, even if internal state appears correct
 - Bypasses min_run_time/min_off_time constraints for manual overrides
 - Fixes issue where user clicks "ON" but nothing happens due to stale state
+
+Bugfix 6.15.1: Critical Timing Logic Fix
+- MANUAL bypass now comes BEFORE timing constraints (was blocking manual OFF!)
+- Added emergency override: critically low humidity (< 85% of low_threshold) bypasses min_run_time
+- Reduced default min_run_time from 300s to 60s for faster response
+- Fixes issue where manual shutoff was blocked by min_run_time constraint
 """
 
 import logging
@@ -79,7 +85,7 @@ class DehumidifierConfig:
     target: float = 60.0
     threshold_high: float = 5.0
     threshold_low: float = 5.0
-    min_run_time: int = 300  # seconds
+    min_run_time: int = 60  # seconds (reduced from 300 to allow faster shutoff)
     min_off_time: int = 60   # seconds
     time_schedule_enabled: bool = False
 
@@ -633,33 +639,61 @@ class DehumidifierController:
         # This prevents issues when device was manually switched externally
         self._sync_device_status()
 
-        # Check minimum time constraints (skip for MANUAL triggers - user override)
-        if trigger != TriggerType.MANUAL and self._last_toggle_time:
-            elapsed = (datetime.now() - self._last_toggle_time).total_seconds()
-
-            if target_on and not self._is_on:
-                # Want to turn ON - check min_off_time
-                if elapsed < self._config.min_off_time:
-                    logger.debug(f"Blocked: min_off_time ({elapsed:.0f}s < {self._config.min_off_time}s)")
-                    return None
-            elif not target_on and self._is_on:
-                # Want to turn OFF - check min_run_time
-                if elapsed < self._config.min_run_time:
-                    logger.debug(f"Blocked: min_run_time ({elapsed:.0f}s < {self._config.min_run_time}s)")
-                    return None
-
-        # BUGFIX 6.9.2: For MANUAL triggers, ALWAYS send the command
-        # Reason: User explicitly clicked the button, so we must honor the request
-        # even if our internal state thinks the device is already in that state.
-        # The internal state could be wrong due to stale cache, sync failure, etc.
+        # BUGFIX 6.15.1: MANUAL bypass FIRST - user override takes priority
+        # Must come BEFORE timing constraints, otherwise manual OFF gets blocked!
         if trigger == TriggerType.MANUAL:
             if target_on == self._is_on:
                 logger.info(
                     f"MANUAL override: forcing {'ON' if target_on else 'OFF'} command "
                     f"even though internal state is already {self._is_on}"
                 )
-            # Continue to execute command regardless of current state
+            else:
+                logger.info(f"MANUAL override: bypassing timing constraints for {'ON' if target_on else 'OFF'}")
+            # Continue to execute command regardless of timing or current state
         else:
+            # BUGFIX 6.15.1: Emergency override for critically low humidity
+            # If humidity < 85% of low_threshold, turn OFF immediately (safety)
+            if not target_on and self._is_on and trigger == TriggerType.HUMIDITY_AUTO:
+                humidity = self.get_humidity()
+                if humidity is not None:
+                    low_threshold = self._config.target - self._config.threshold_low
+                    critical_threshold = low_threshold * 0.85
+                    if humidity < critical_threshold:
+                        logger.warning(
+                            f"EMERGENCY: Humidity critically low ({humidity:.1f}% < {critical_threshold:.1f}%) "
+                            f"-> forcing immediate shutdown (bypassing min_run_time)"
+                        )
+                        # Skip timing constraints - continue to execute
+                    else:
+                        # Check timing constraints normally
+                        if self._last_toggle_time:
+                            elapsed = (datetime.now() - self._last_toggle_time).total_seconds()
+                            if elapsed < self._config.min_run_time:
+                                logger.debug(f"Blocked: min_run_time ({elapsed:.0f}s < {self._config.min_run_time}s)")
+                                return None
+                else:
+                    # Can't read humidity - apply timing constraints
+                    if self._last_toggle_time:
+                        elapsed = (datetime.now() - self._last_toggle_time).total_seconds()
+                        if elapsed < self._config.min_run_time:
+                            logger.debug(f"Blocked: min_run_time ({elapsed:.0f}s < {self._config.min_run_time}s)")
+                            return None
+            else:
+                # Check minimum time constraints for all other automation triggers
+                if self._last_toggle_time:
+                    elapsed = (datetime.now() - self._last_toggle_time).total_seconds()
+
+                    if target_on and not self._is_on:
+                        # Want to turn ON - check min_off_time
+                        if elapsed < self._config.min_off_time:
+                            logger.debug(f"Blocked: min_off_time ({elapsed:.0f}s < {self._config.min_off_time}s)")
+                            return None
+                    elif not target_on and self._is_on:
+                        # Want to turn OFF - check min_run_time
+                        if elapsed < self._config.min_run_time:
+                            logger.debug(f"Blocked: min_run_time ({elapsed:.0f}s < {self._config.min_run_time}s)")
+                            return None
+
             # For automation triggers: Skip if state is already correct
             if target_on == self._is_on:
                 logger.debug(f"State already {'ON' if target_on else 'OFF'}, skipping (trigger: {trigger.value})")

@@ -7,6 +7,46 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [v6.16.0] - 2025-12-08
+
+### Fixed
+- **KRITISCH: Bug #11 - Entfeuchtung schaltet nicht aus** 🚨
+  - Problem: MANUAL Override wurde durch min_run_time blockiert
+  - Root Cause: MANUAL Bypass kam NACH min_run_time Check (Zeile 644)
+  - Fix: MANUAL Bypass jetzt VOR allen Timing Constraints
+  - Ergebnis: MANUAL kann IMMER durchkommen, keine Blockierung mehr
+
+- **Emergency Override bei kritischer Luftfeuchtigkeit**
+  - Auto-Shutdown bei Humidity < 85% des low_threshold
+  - Beispiel: threshold_low=55% → Emergency bei < 46.75%
+  - Bypassed min_run_time für SAFETY
+
+### Changed
+- **Schnellere Reaktionszeit**
+  - min_run_time Default: 300s → 60s
+  - Schnellere Reaktion auf Luftfeuchtigkeit-Änderungen
+
+- **API Cleanup - 21% Reduktion** 🧹
+  - api.py: 1516 → 1192 Zeilen (-324 LOC)
+  - Dehumidifier Legacy-Routen → dehumidifier_bp.py
+  - Costs Legacy-Routen → costs_bp.py
+  - Curves Legacy-Routen → curves_bp.py
+  - Sauberere Blueprint-Architektur
+
+### Technical Details
+- `dehumidifier_controller.py`:
+  - MANUAL Bypass jetzt in Zeile 644 (VOR min_run_time)
+  - Emergency Override bei < 85% threshold_low
+  - min_run_time Default: 60s
+- `api.py`:
+  - 9 Legacy-Routen entfernt/auskommentiert
+  - Blueprints vollständig übernommen
+
+### Deployment
+- ⏳ Wartet auf User-Genehmigung
+
+---
+
 ## [v6.15.0] - 2025-12-07
 
 ### Added
