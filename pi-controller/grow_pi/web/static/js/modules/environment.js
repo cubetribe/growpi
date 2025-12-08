@@ -39,6 +39,14 @@ let statusInterval = null;
 let schedules = [];
 let timeScheduleEnabled = false;
 
+// Track if user is currently editing input fields to prevent polling overwrites
+// FIX: Race-condition zwischen User-Input und Auto-Refresh (v6.16.0 Bugfix)
+let isUserEditing = {
+    targetHumidity: false,
+    thresholdHigh: false,
+    thresholdLow: false
+};
+
 // ==========================================
 // Public API
 // ==========================================
@@ -130,10 +138,17 @@ function updateDehumidifierDisplay(dehumidifier) {
         dehumidifierOff.style.pointerEvents = buttonsDisabled ? 'none' : 'auto';
     }
 
-    // Update config input values
-    if (targetHumidity) targetHumidity.value = dehumidifier.config.target;
-    if (thresholdHigh) thresholdHigh.value = dehumidifier.config.threshold_high;
-    if (thresholdLow) thresholdLow.value = dehumidifier.config.threshold_low;
+    // Update config input values - ONLY if user is NOT currently editing them
+    // FIX: Prevent polling from overwriting user input (v6.16.0 Bugfix)
+    if (targetHumidity && !isUserEditing.targetHumidity) {
+        targetHumidity.value = dehumidifier.config.target;
+    }
+    if (thresholdHigh && !isUserEditing.thresholdHigh) {
+        thresholdHigh.value = dehumidifier.config.threshold_high;
+    }
+    if (thresholdLow && !isUserEditing.thresholdLow) {
+        thresholdLow.value = dehumidifier.config.threshold_low;
+    }
 
     // Update time schedule toggle (Feature #2)
     timeScheduleEnabled = dehumidifier.config.time_schedule_enabled || false;
@@ -371,4 +386,56 @@ function setupEventListeners() {
 
     // Save configuration
     btnSaveRoomConfig?.addEventListener('click', saveRoomConfig);
+
+    // FIX: Humidity input focus/blur handlers to prevent polling overwrites (v6.16.0 Bugfix)
+    // Prevents race-condition where auto-refresh would overwrite user input
+    targetHumidity?.addEventListener('focus', () => {
+        isUserEditing.targetHumidity = true;
+    });
+    targetHumidity?.addEventListener('blur', () => {
+        isUserEditing.targetHumidity = false;
+    });
+
+    thresholdHigh?.addEventListener('focus', () => {
+        isUserEditing.thresholdHigh = true;
+    });
+    thresholdHigh?.addEventListener('blur', () => {
+        isUserEditing.thresholdHigh = false;
+    });
+
+    thresholdLow?.addEventListener('focus', () => {
+        isUserEditing.thresholdLow = true;
+    });
+    thresholdLow?.addEventListener('blur', () => {
+        isUserEditing.thresholdLow = false;
+    });
 }
+
+// ==========================================
+// Version Display Update (v6.16.0)
+// ==========================================
+
+/**
+ * Update version display from API
+ * Fetches current GrowPi version and updates the header badge
+ */
+async function updateVersionDisplay() {
+    const versionBadge = document.getElementById('versionBadge');
+    if (!versionBadge) return;
+
+    try {
+        const data = await GrowPiAPI.getVersion();
+        if (data.success) {
+            versionBadge.textContent = data.version_display;
+            versionBadge.title = `GrowPi ${data.version_display}`;
+        }
+    } catch (error) {
+        console.error('[Environment] Failed to fetch version:', error);
+        versionBadge.textContent = 'v?.?.?';
+    }
+}
+
+// Call version update on page load
+document.addEventListener('DOMContentLoaded', () => {
+    updateVersionDisplay();
+});

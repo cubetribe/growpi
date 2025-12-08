@@ -435,6 +435,18 @@ export const GrowPiAPI = {
      */
     async getTimelapseImages(limit = 50) {
         return await get(`/api/camera/timelapse/images?limit=${limit}`);
+    },
+
+    // ==========================================
+    // Version API (v6.16.0)
+    // ==========================================
+
+    /**
+     * Get GrowPi version information
+     * @returns {Promise<Object>} Version data { version, version_display, api_version }
+     */
+    async getVersion() {
+        return await get('/api/version');
     }
 };
 

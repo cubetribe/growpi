@@ -137,8 +137,11 @@ def load_lamp_channels():
 
 load_lamp_channels()
 
+# Import version from centralized VERSION file
+from grow_pi.version import get_version, get_version_display
+
 # API Configuration
-API_VERSION = "6.8.0"  # GrowPi production version
+API_VERSION = get_version()  # GrowPi production version (from VERSION file)
 API_PORT = 5000
 API_HOST = "0.0.0.0"
 
@@ -972,6 +975,22 @@ def health_check():
         "logging_available": DB_AVAILABLE and data_logger is not None,
         "logging_running": data_logger._running if data_logger else False,
         "curves_available": CURVE_AVAILABLE and curve_controller is not None
+    })
+
+
+@app.route('/api/version', methods=['GET'])
+def get_version_info():
+    """
+    Get GrowPi version information.
+
+    Returns:
+        JSON with version details
+    """
+    return jsonify({
+        "success": True,
+        "version": get_version(),
+        "version_display": get_version_display(),
+        "api_version": API_VERSION
     })
 
 
