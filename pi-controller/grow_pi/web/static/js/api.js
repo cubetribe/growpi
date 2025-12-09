@@ -431,10 +431,53 @@ export const GrowPiAPI = {
     /**
      * Get list of timelapse images
      * @param {number} limit - Maximum number of images
+     * @param {string} dateFolder - Optional date filter (YYYY-MM-DD)
      * @returns {Promise<Object>} List of timelapse images
      */
-    async getTimelapseImages(limit = 50) {
-        return await get(`/api/camera/timelapse/images?limit=${limit}`);
+    async getTimelapseImages(limit = 50, dateFolder = null) {
+        let url = `/api/camera/timelapse/images?limit=${limit}`;
+        if (dateFolder) {
+            url += `&date=${dateFolder}`;
+        }
+        return await get(url);
+    },
+
+    // ==========================================
+    // Timelapse API - v6.17.0
+    // ==========================================
+
+    /**
+     * Get timelapse statistics (config, storage, counts)
+     * @returns {Promise<Object>} Stats including config, storage_size_mb, total_images
+     */
+    async getTimelapseStats() {
+        return await get('/api/camera/timelapse/stats');
+    },
+
+    /**
+     * Get list of timelapse date folders
+     * @returns {Promise<Object>} List of folders with image counts
+     */
+    async getTimelapseFolders() {
+        return await get('/api/camera/timelapse/folders');
+    },
+
+    /**
+     * Get timelapse image URL for direct display
+     * @param {string} dateFolder - Date folder (YYYY-MM-DD)
+     * @param {string} filename - Image filename
+     * @returns {string} Image URL
+     */
+    getTimelapseImageUrl(dateFolder, filename) {
+        return `/api/camera/timelapse/image/${dateFolder}/${filename}`;
+    },
+
+    /**
+     * Test current brightness (preview darkness detection)
+     * @returns {Promise<Object>} Brightness analysis { brightness: {...}, would_save: bool }
+     */
+    async testBrightness() {
+        return await get('/api/camera/timelapse/test-brightness');
     },
 
     // ==========================================

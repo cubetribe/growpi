@@ -3,7 +3,7 @@
 Professional greenhouse automation and monitoring platform powered by Raspberry Pi.
 
 **Live Demo**: http://growpi.nm-forum.de
-**Version**: v6.9.0 (2025-12-06)
+**Version**: v6.16.0 (2025-12-08)
 **Status**: Production-Ready
 
 > **Note**: This repository contains the **Raspberry Pi backend** (pi-controller).
@@ -153,12 +153,14 @@ http://192.168.0.86:5000
 | `/api/room/config` | GET | Automation config |
 | `/api/room/toggle` | POST | Manual override |
 
-### Logging
+### Logging (v6.16 - Downsampling)
 | Endpoint | Method | Description |
 |----------|--------|-------------|
-| `/api/logs/sensors` | GET | Sensor readings |
-| `/api/logs/lamps` | GET | Lamp state changes |
+| `/api/logs/sensors` | GET | Sensor readings (downsampled) |
+| `/api/logs/lamps` | GET | Lamp state changes (downsampled) |
+| `/api/logs/plugs` | GET | Smart plug power data (downsampled) |
 | `/api/logs/events` | GET | System events |
+| `/api/logs/stats` | GET | Logging statistics |
 
 ---
 
@@ -185,32 +187,21 @@ cd pi-controller
 
 ## Recent Updates
 
-### v6.7.0 (2025-12-06) - Major Refactoring
-
-**Frontend:**
-- 86% code reduction (2894 -> 408 LOC)
-- Modular JavaScript architecture (8 modules)
-- Centralized API client (GrowPiAPI class)
-- Tab-based lazy loading
-
-**Backend:**
-- 8 Flask Blueprints architecture
-- Clean separation of concerns
-- Service layer pattern
-
-**New Features:**
-- v6.3: Energy cost tracking (Stromkosten)
-- v6.4: Dehumidifier control (Entfeuchter)
+### v6.16.0 (2025-12-08) - Critical Bug Fixes
 
 **Bug Fixes:**
-- Tab-switch handler for curves data
-- CSS styling for cost/room buttons
-- Missing blueprints deployment
+- Humidity Control Race-Condition (Input-Werte sprangen während Bearbeitung)
+- Stromverbrauchs-Historie zeigte nur 2-3h statt 24h+ Daten
 
-**Testing:**
-- 140/140 unit tests passed
-- 14/14 smoke tests passed
-- Full deployment verified on Pi
+**API Improvements:**
+- Alle `/api/logs/*` Routes zu Blueprint-Architektur migriert
+- Intelligentes Downsampling für große Zeitbereiche
+- Keine hardcoded Limits mehr
+
+**Previous:**
+- v6.15.0: Interactive Bezier Curve Editor
+- v6.14.0: Room Control Verification
+- v6.13.0: Status-Desync Fix
 
 See [CHANGELOG.md](CHANGELOG.md) for complete history.
 
@@ -313,5 +304,5 @@ Orchestrated with Claude Code (17 parallel agents for v6.5 refactoring)
 
 ---
 
-**Last Updated**: 2025-12-06
-**Version**: v6.9.0
+**Last Updated**: 2025-12-08
+**Version**: v6.16.0

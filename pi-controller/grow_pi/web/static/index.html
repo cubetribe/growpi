@@ -270,6 +270,75 @@
                         Nach Ende des Zeitfensters greift wieder die normale Automatik.
                     </div>
                 </section>
+
+                <!-- Timelapse Camera Section (v6.17.0) -->
+                <section class="section timelapse-section">
+                    <h2 class="section-title">Timelapse Kamera</h2>
+
+                    <!-- Enable Toggle + Status -->
+                    <div class="timelapse-header">
+                        <div class="timelapse-toggle-row">
+                            <div class="curve-toggle" id="timelapseToggle"></div>
+                            <span>Timelapse aktiv</span>
+                        </div>
+                        <span id="timelapseStatus" class="timelapse-status stopped">Inaktiv</span>
+                    </div>
+
+                    <!-- Configuration -->
+                    <div class="timelapse-config">
+                        <div class="config-row">
+                            <label for="timelapseInterval">Intervall (Sekunden)</label>
+                            <input type="number" id="timelapseInterval" min="30" max="600" step="10" value="300">
+                        </div>
+
+                        <div class="config-row toggle-row">
+                            <div class="curve-toggle enabled" id="skipDarkToggle"></div>
+                            <span>Dunkle Bilder uberspringen</span>
+                        </div>
+
+                        <div class="config-row">
+                            <label for="brightnessThreshold">Helligkeitsschwelle (0-255)</label>
+                            <input type="number" id="brightnessThreshold" min="0" max="255" step="5" value="15">
+                        </div>
+
+                        <!-- Brightness Test -->
+                        <div class="brightness-test-section">
+                            <button id="btnTestBrightness" class="btn btn-small">Helligkeit testen</button>
+                            <div id="brightnessTestResult" class="brightness-test-result">
+                                <span class="placeholder">Klicke um aktuelle Helligkeit zu testen</span>
+                            </div>
+                        </div>
+
+                        <button class="btn-save" id="btnSaveTimelapseConfig">
+                            Timelapse speichern
+                        </button>
+                    </div>
+
+                    <!-- Storage Info -->
+                    <div class="timelapse-storage">
+                        <span class="storage-label">Speicher:</span>
+                        <span id="timelapseStorageInfo">0 MB (0 Bilder)</span>
+                    </div>
+
+                    <!-- Image Gallery -->
+                    <div class="timelapse-gallery-section">
+                        <div class="gallery-header">
+                            <h3>Bilder-Galerie</h3>
+                            <div class="gallery-controls">
+                                <select id="timelapseFolderSelect" class="folder-select">
+                                    <option value="">Alle Ordner</option>
+                                </select>
+                                <button id="btnRefreshGallery" class="btn btn-small">Aktualisieren</button>
+                            </div>
+                        </div>
+                        <div id="timelapseGallery" class="timelapse-gallery">
+                            <div class="gallery-empty">
+                                <span>Keine Bilder vorhanden</span>
+                                <small>Timelapse aktivieren um Bilder aufzunehmen</small>
+                            </div>
+                        </div>
+                    </div>
+                </section>
             </div>
 
             <div id="tab-costs" class="tab-content">
@@ -469,6 +538,7 @@
             import { showError, showSuccess, setupTabs } from './js/utils.js';
             import { initCameraModule, cleanupCameraModule } from './js/modules/camera.js';
             import { initAccordion } from './js/modules/accordion.js';
+            import { initTimelapseModule, cleanupTimelapseModule } from './js/modules/timelapse.js';
 
             // Expose utils to window for modules that rely on them (legacy support)
             window.showError = showError;
@@ -482,6 +552,7 @@
                 initCurvesTab();
                 initCameraModule();
                 initAccordion();
+                initTimelapseModule();
 
                 const historyModule = new HistoryModule();
                 historyModule.initHistoryTab();

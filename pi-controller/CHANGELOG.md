@@ -2,6 +2,60 @@
 
 Alle wichtigen Änderungen am GrowPi Pi-Controller werden hier dokumentiert.
 
+## [v6.18] - 2025-12-09
+
+### Added
+- **Kamera Auto-Detection**
+  - `find_lifecam_device()` findet USB-Webcam dynamisch
+  - Nutzt v4l2-ctl für Device-Erkennung by name
+  - Fallback auf OpenCV Probing (video0/1/2)
+  - Default `device_id: -1` triggert Auto-Detection
+- **Separate JPEG-Qualitäten**
+  - `preview_jpeg_quality: 70` (Live-Preview)
+  - `timelapse_jpeg_quality: 95` (Timelapse-Fotos)
+
+### Changed
+- Preview FPS: 10 → 2 (Resource-friendly)
+- CameraConfig: `device_id` default 0 → -1
+
+### Fixed
+- USB-Webcam wechselt nicht mehr Device nach Reboot
+
+---
+
+## [v6.17] - 2025-12-08
+
+### Added
+- **Timelapse mit Dunkelheits-Erkennung**
+  - Automatische Bildaufnahme in Intervallen
+  - Brightness Detection Algorithm
+  - Datum-basierte Ordnerstruktur
+- **Humidity Auto-Control Fix**
+  - `start_dehumidifier_controller()` wird jetzt korrekt aufgerufen
+
+---
+
+## [v6.16] - 2025-12-08
+
+### Fixed
+- **Humidity Control Bug** - MANUAL Override jetzt zuverlässig
+
+---
+
+## [v6.15] - 2025-12-07
+
+### Added
+- **Bezier Curve Editor** - Interaktiver Kurven-Editor
+
+---
+
+## [v6.14] - 2025-12-07
+
+### Fixed
+- **Room Control** - Plug Verification & MANUAL Override
+
+---
+
 ## [v6.7] - 2025-12-06
 
 ### Performance

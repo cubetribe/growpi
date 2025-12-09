@@ -7,6 +7,101 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [v6.18.0] - 2025-12-09
+
+### Added
+- **Kamera Auto-Detection** 📹
+  - Findet USB-Webcam automatisch unabhängig von Device-Nummer
+  - `find_lifecam_device()` sucht nach LifeCam HD-3000 via v4l2-ctl
+  - Fallback: Probiert /dev/video0, video1, video2 durch
+  - CameraConfig: `device_id: -1` triggert Auto-Detection
+  - Problem behoben: USB-Kamera wechselt Device-Nummer nach Reboot/Reconnect
+
+- **Separate JPEG-Qualitätseinstellungen**
+  - `preview_jpeg_quality: 70` - Für Live-Preview (ressourcenschonend)
+  - `timelapse_jpeg_quality: 95` - Für Zeitraffer-Fotos (hohe Qualität)
+
+### Changed
+- **Preview FPS Optimierung**
+  - FPS reduziert: 10 → 2 (90% weniger Ressourcenverbrauch)
+  - Live-Preview bleibt smooth trotz niedriger Polling-Rate
+
+- **CameraConfig Defaults**
+  - `device_id`: 0 → -1 (Auto-Detection)
+  - `preview_fps`: 10 → 2 (Resource-friendly)
+
+### Fixed
+- **Kamera-Ausfall nach Reboot/USB-Reconnect** - Root Cause behoben
+  - Problem: USB-Webcam wechselte von /dev/video0 zu /dev/video1
+  - Kurz-Fix: device_id von 0 auf 1 (funktioniert nur bis nächster Reboot)
+  - Permanenter Fix: Auto-Detection findet Kamera dynamisch
+  - Datei: `pi-controller/grow_pi/utils/camera.py`
+
+### Technical Details
+- `find_lifecam_device()`: 80 Zeilen Python (v4l2-ctl Integration)
+- Subprocess Timeout: 5s (verhindert Blocking)
+- Regex Pattern: `/dev/video(\d+)`
+- Fallback-Chain: Name Detection → v4l2-ctl → OpenCV Probe → Default 0
+
+### Deployment
+- ⏳ Wartet auf User-Genehmigung
+
+---
+
+## [v6.17.0] - 2025-12-08
+
+### Added
+- **Timelapse Kamera mit Dunkelheits-Erkennung** 📸
+  - Automatische Bildaufnahme in konfigurierbaren Intervallen (30s - 10min)
+  - Intelligente Dunkelheits-Erkennung: Bilder werden nur gespeichert wenn ausreichend Licht vorhanden
+  - Bilder nach Datum in Ordnern organisiert (`/timelapse/YYYY-MM-DD/`)
+  - "Helligkeit testen" Button für Kalibrierung
+  - JPEG-Format für spätere Zeitraffer-Video-Erstellung
+
+- **Timelapse UI im Room-Tab**
+  - Toggle: Timelapse aktivieren/deaktivieren
+  - Intervall-Konfiguration (30-600 Sekunden)
+  - Helligkeitsschwelle einstellbar (0-255)
+  - Dunkle Bilder überspringen Toggle
+  - Speicher-Info (MB + Anzahl Bilder)
+  - Bilder-Galerie mit Lightbox-Vorschau
+  - Ordner-Filter nach Datum
+
+### New API Endpoints
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/api/camera/timelapse/stats` | GET | Statistiken (Config, Speicher, Counts) |
+| `/api/camera/timelapse/folders` | GET | Liste der Datum-Ordner |
+| `/api/camera/timelapse/images` | GET | Bilder-Liste (mit ?date= Filter) |
+| `/api/camera/timelapse/image/<folder>/<file>` | GET | Einzelbild ausliefern |
+| `/api/camera/timelapse/test-brightness` | GET | Helligkeit testen |
+
+### New Files
+- `timelapse.js` (~320 Zeilen) - Frontend-Modul
+- CSS: ~400 Zeilen für Timelapse-Section und Galerie
+
+### Technical Details
+- **Brightness Detection Algorithm:**
+  - Konvertiert Frame zu Graustufen
+  - Berechnet Durchschnittshelligkeit (0-255)
+  - Zählt Prozent "heller" Pixel über Schwellwert
+  - Bild wird übersprungen wenn: avg < threshold ODER bright_pixels < min_percent
+
+- **Default-Werte:**
+  - `brightness_threshold`: 15 (0-255)
+  - `min_bright_pixels_percent`: 10%
+  - `interval_seconds`: 300 (5 Minuten)
+  - `max_images`: 1000 (Auto-Cleanup)
+
+- **Security:**
+  - Directory Traversal Protection mit Regex-Validierung
+  - Sanitized Pfade für Bildauslieferung
+
+### Deployment
+- ⏳ Wartet auf User-Genehmigung
+
+---
+
 ## [v6.16.0] - 2025-12-08
 
 ### Fixed

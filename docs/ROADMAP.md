@@ -1,8 +1,55 @@
 # GrowPi Roadmap - Geplante Features
 
-**Letzte Aktualisierung**: 2025-12-07
-**Aktuelle Version**: v6.15.0
+**Letzte Aktualisierung**: 2025-12-09
+**Aktuelle Version**: v6.18.0
 **Status**: Active Development - Feature Phase 🚀
+
+---
+
+## ✅ NEUE FEATURES & FIXES (2025-12-09)
+
+### Feature: Kamera Auto-Detection - IMPLEMENTIERT ✅
+
+**Status**: ✅ IMPLEMENTIERT
+**Implementiert am**: 2025-12-09
+**Version**: v6.18.0
+
+**Problem:**
+USB-Webcam wechselt Device-Nummer nach Reboot/USB-Reconnect:
+- Nach Reboot: /dev/video0 → /dev/video1
+- Hardcoded `device_id: 0` funktioniert nicht mehr
+
+**Lösung:**
+- Neue Funktion `find_lifecam_device()` in `camera.py`
+- Sucht automatisch nach LifeCam HD-3000 via v4l2-ctl
+- Fallback: Probiert video0/1/2 durch mit OpenCV
+- Default `device_id: -1` triggert Auto-Detection
+
+**Technische Details:**
+- Subprocess: `v4l2-ctl --list-devices` (Timeout 5s)
+- Regex: `/dev/video(\d+)` Parsing
+- Fallback-Chain: Name → v4l2-ctl → OpenCV Probe → Default 0
+
+**Deployment:**
+- ⏳ Wartet auf User-Genehmigung
+
+---
+
+### Optimization: Separate JPEG-Qualitäten - IMPLEMENTIERT ✅
+
+**Status**: ✅ IMPLEMENTIERT
+**Implementiert am**: 2025-12-09
+**Version**: v6.18.0
+
+**Änderungen:**
+- `preview_jpeg_quality: 70` - Für Live-Preview (ressourcenschonend)
+- `timelapse_jpeg_quality: 95` - Für Zeitraffer-Fotos (hohe Qualität)
+- Preview FPS: 10 → 2 (90% weniger Ressourcenverbrauch)
+
+**Rationale:**
+- Live-Preview braucht keine hohe Qualität (70% reicht)
+- Timelapse-Fotos sollten beste Qualität haben (95%)
+- 2 FPS reicht für Live-Vorschau, spart CPU
 
 ---
 
@@ -265,6 +312,33 @@ def _ensure_state(self, target_on: bool, trigger: TriggerType, details: str = ""
 
 ---
 
+### Bug #11: Datalog/History Problem - ZU UNTERSUCHEN 🔴
+
+**Status**: 🔴 ZU UNTERSUCHEN
+**Gemeldet**: 2025-12-07 20:10
+**Version**: v6.15.0
+
+**Symptome (vom User gemeldet):**
+- Console zeigt `[History] Loading data for 24 hours (downsampled)`
+- Unbekanntes Problem mit der History-Seite
+
+**Console-Logs:**
+```
+[History] Loading data for 24 hours (downsampled)
+[History] Range changed to 1 hours
+[History] Loading data for 1 hours (downsampled)
+```
+
+**Hinweis:** `content.js` Fehler sind von Browser-Extension, nicht unser Code!
+
+**Zu untersuchen:**
+- [ ] Werden Daten korrekt geladen?
+- [ ] Funktioniert die Chart-Darstellung?
+- [ ] API-Response prüfen
+- [ ] SQLite-Daten prüfen
+
+---
+
 ### Bug #7: Verlauf-Seite - Teilweise behoben ✅
 
 **Status**: 🟡 TEILWEISE BEHOBEN
@@ -340,6 +414,85 @@ def _ensure_state(self, target_on: bool, trigger: TriggerType, details: str = ""
 ---
 
 ## 🚀 Nächste Features (Priorisiert)
+
+### Feature #-1: Timelapse Kamera mit Dunkelheits-Erkennung (PRIORITÄT) 🎯
+
+**Status**: 📋 GEPLANT - WARTET AUF GENEHMIGUNG
+**Erstellt**: 2025-12-08
+**Geplante Version**: v6.17.0
+**Geschätzter Aufwand**: 2-3 Tage
+**Detaillierter Plan**: [`/agents/TIMELAPSE_CAMERA_PLAN.md`](/agents/TIMELAPSE_CAMERA_PLAN.md)
+
+#### Ziel
+Automatische Timelapse-Aufnahmen für spätere Zeitraffer-Video-Erstellung. Mit intelligenter Dunkelheits-Erkennung, damit nachts (wenn Lampen aus sind) keine schwarzen Bilder gespeichert werden.
+
+#### Funktionalität
+
+**Konfigurierbare Aufnahme:**
+- Intervall: 30 Sekunden bis 10 Minuten (konfigurierbar)
+- Format: JPEG für maximale Kompatibilität
+- Speicherort: `/opt/grow-pi/data/timelapse/` (nach Datum sortiert)
+
+**Dunkelheits-Filter (KRITISCH):**
+- Analysiert Helligkeit jedes Frames vor dem Speichern
+- Schwellwert konfigurierbar (0-255)
+- "Helligkeit testen" Button für Live-Preview
+- Verhindert schwarze/dunkle Bilder wenn Lampen aus sind
+
+**UI im Room-Tab:**
+- Timelapse aktivieren/deaktivieren
+- Intervall einstellen
+- Helligkeits-Schwellwert konfigurieren
+- Bilder-Galerie mit Lightbox
+- Speicherplatz-Anzeige
+
+#### Verzeichnisstruktur
+
+```
+/opt/grow-pi/data/timelapse/
+├── 2025-12-08/
+│   ├── timelapse_20251208_060000.jpg
+│   ├── timelapse_20251208_060030.jpg
+│   └── ...
+├── 2025-12-09/
+│   └── ...
+```
+
+#### Neue API-Endpoints
+
+| Endpoint | Beschreibung |
+|----------|--------------|
+| `GET /api/camera/timelapse/stats` | Statistiken (Config, Speicher) |
+| `GET/POST /api/camera/timelapse/config` | Konfiguration |
+| `GET /api/camera/timelapse/folders` | Datum-Ordner |
+| `GET /api/camera/timelapse/images` | Bilder-Liste |
+| `GET /api/camera/timelapse/image/<folder>/<file>` | Einzelbild |
+| `GET /api/camera/timelapse/test-brightness` | Helligkeit testen |
+
+#### Betroffene Dateien
+
+**Backend:**
+- `grow_pi/utils/camera.py` - TimelapseConfig + Brightness-Detection
+- `grow_pi/web/api.py` - 6 neue Endpoints
+
+**Frontend:**
+- `static/js/modules/timelapse.js` (NEU)
+- `static/index.html` - Room-Tab erweitern
+- `static/css/main.css` - Galerie-Styles
+
+#### Akzeptanzkriterien
+
+- [ ] Timelapse aktivierbar/deaktivierbar
+- [ ] Intervall konfigurierbar (30s - 600s)
+- [ ] Dunkle Bilder werden automatisch übersprungen
+- [ ] Helligkeits-Schwellwert konfigurierbar
+- [ ] "Helligkeit testen" Button funktioniert
+- [ ] Bilder nach Datum in Ordnern gespeichert
+- [ ] Galerie mit Lightbox-Vorschau
+- [ ] Speicher-Info angezeigt
+- [ ] Auto-Cleanup bei Limit-Erreichen
+
+---
 
 ### Feature #0: Interactive Bezier Curve Editor (PRIORITÄT) 🎯
 

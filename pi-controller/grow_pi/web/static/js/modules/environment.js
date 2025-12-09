@@ -93,7 +93,7 @@ export async function fetchRoomStatus() {
 
             // Update humidity
             if (roomHumidityValue && data.humidity !== null && data.humidity !== undefined) {
-                roomHumidityValue.innerHTML = `${data.humidity.toFixed(0)}<span class="temp-unit">%</span>`;
+                roomHumidityValue.innerHTML = `${data.humidity.toFixed(1)}<span class="temp-unit">%</span>`;
             }
 
             // Update dehumidifier status

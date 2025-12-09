@@ -80,7 +80,7 @@ export async function fetchStatus() {
 
         // Update humidity
         if (statusData.humidity !== null && statusData.humidity !== undefined) {
-            humidityValue.innerHTML = `${statusData.humidity.toFixed(0)}<span class="temp-unit">%</span>`;
+            humidityValue.innerHTML = `${statusData.humidity.toFixed(1)}<span class="temp-unit">%</span>`;
         }
 
         // Update lamp displays

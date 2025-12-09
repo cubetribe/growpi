@@ -1809,3 +1809,409 @@ input[type="range"]::-moz-range-thumb {
         justify-content: flex-end;
     }
 }
+
+/* ==========================================
+ * Timelapse Section Styles (v6.17.0)
+ * ========================================== */
+
+.timelapse-section {
+    margin-top: 20px;
+}
+
+.timelapse-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 16px;
+}
+
+.timelapse-toggle-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.timelapse-status {
+    font-size: 12px;
+    font-weight: 600;
+    padding: 4px 12px;
+    border-radius: 12px;
+}
+
+.timelapse-status.running {
+    background: rgba(17, 255, 85, 0.15);
+    color: #11ff55;
+}
+
+.timelapse-status.stopped {
+    background: rgba(255, 255, 255, 0.05);
+    color: #888;
+}
+
+.timelapse-config {
+    background: rgba(0, 0, 0, 0.2);
+    border-radius: 12px;
+    padding: 16px;
+    margin-bottom: 16px;
+}
+
+.timelapse-config .config-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 12px;
+}
+
+.timelapse-config .config-row.toggle-row {
+    justify-content: flex-start;
+}
+
+.timelapse-config .config-row:last-child {
+    margin-bottom: 0;
+}
+
+.timelapse-config label {
+    font-size: 13px;
+    color: #888;
+}
+
+.timelapse-config input[type="number"] {
+    width: 100px;
+    padding: 10px;
+    border: 1px solid #333;
+    border-radius: 8px;
+    background: rgba(0, 0, 0, 0.3);
+    color: white;
+    font-size: 14px;
+    text-align: center;
+}
+
+.timelapse-config input[type="number"]:focus {
+    outline: none;
+    border-color: #11ff55;
+}
+
+/* Brightness Test Section */
+.brightness-test-section {
+    margin-top: 16px;
+    padding-top: 16px;
+    border-top: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.brightness-test-result {
+    margin-top: 12px;
+    padding: 12px;
+    border-radius: 8px;
+    background: rgba(255, 255, 255, 0.03);
+    font-size: 12px;
+}
+
+.brightness-test-result .placeholder {
+    color: #666;
+    font-style: italic;
+}
+
+.brightness-test-result .status {
+    display: block;
+    font-size: 16px;
+    font-weight: 700;
+    margin-bottom: 8px;
+}
+
+.brightness-test-result .status.ok {
+    color: #11ff55;
+}
+
+.brightness-test-result .status.too-dark {
+    color: #ff4444;
+}
+
+.brightness-test-result .details {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+    margin-bottom: 8px;
+    color: #888;
+}
+
+.brightness-test-result .verdict {
+    padding-top: 8px;
+    border-top: 1px solid rgba(255, 255, 255, 0.1);
+    color: #aaa;
+}
+
+.brightness-test-result.ok {
+    background: rgba(17, 255, 85, 0.08);
+    border: 1px solid rgba(17, 255, 85, 0.2);
+}
+
+.brightness-test-result.too-dark {
+    background: rgba(255, 68, 68, 0.08);
+    border: 1px solid rgba(255, 68, 68, 0.2);
+}
+
+.brightness-test-result.testing {
+    color: #888;
+}
+
+.brightness-test-result.error {
+    background: rgba(255, 68, 68, 0.08);
+    border: 1px solid rgba(255, 68, 68, 0.2);
+}
+
+.brightness-test-result .error {
+    color: #ff4444;
+}
+
+/* Storage Info */
+.timelapse-storage {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 12px;
+    background: rgba(255, 255, 255, 0.03);
+    border-radius: 8px;
+    margin-bottom: 16px;
+    font-size: 13px;
+}
+
+.timelapse-storage .storage-label {
+    color: #888;
+}
+
+#timelapseStorageInfo {
+    color: #11ff55;
+    font-weight: 600;
+}
+
+/* Gallery Section */
+.timelapse-gallery-section {
+    margin-top: 16px;
+}
+
+.timelapse-gallery-section .gallery-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 12px;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.timelapse-gallery-section .gallery-header h3 {
+    font-size: 14px;
+    font-weight: 600;
+    color: #fff;
+    margin: 0;
+}
+
+.gallery-controls {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+}
+
+.folder-select {
+    padding: 6px 12px;
+    border: 1px solid #333;
+    border-radius: 6px;
+    background: rgba(0, 0, 0, 0.3);
+    color: white;
+    font-size: 12px;
+    cursor: pointer;
+}
+
+.folder-select:focus {
+    outline: none;
+    border-color: #11ff55;
+}
+
+.timelapse-gallery {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
+    gap: 8px;
+    max-height: 400px;
+    overflow-y: auto;
+    padding: 8px;
+    background: rgba(0, 0, 0, 0.2);
+    border-radius: 8px;
+}
+
+.gallery-item {
+    position: relative;
+    aspect-ratio: 4/3;
+    border-radius: 6px;
+    overflow: hidden;
+    cursor: pointer;
+    transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.gallery-item:hover {
+    transform: scale(1.05);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+
+.gallery-item img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.gallery-item-info {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    background: linear-gradient(transparent, rgba(0, 0, 0, 0.9));
+    padding: 8px 6px 4px;
+    font-size: 9px;
+}
+
+.gallery-item-info .time {
+    color: #11ff55;
+    font-weight: 600;
+    display: block;
+}
+
+.gallery-item-info .date {
+    display: block;
+    color: #666;
+}
+
+.gallery-empty {
+    text-align: center;
+    color: #666;
+    padding: 40px 20px;
+    grid-column: 1 / -1;
+}
+
+.gallery-empty span {
+    display: block;
+    margin-bottom: 8px;
+}
+
+.gallery-empty small {
+    font-size: 11px;
+    color: #555;
+}
+
+.gallery-empty.error {
+    color: #ff4444;
+}
+
+.gallery-loading {
+    text-align: center;
+    color: #888;
+    padding: 40px 20px;
+    grid-column: 1 / -1;
+}
+
+/* Lightbox */
+.timelapse-lightbox {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.95);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 10000;
+    padding: 20px;
+}
+
+.lightbox-content {
+    position: relative;
+    max-width: 90vw;
+    max-height: 90vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+
+.lightbox-content img {
+    max-width: 100%;
+    max-height: 80vh;
+    border-radius: 8px;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+}
+
+.lightbox-info {
+    text-align: center;
+    padding: 12px;
+    color: #888;
+    font-size: 12px;
+}
+
+.lightbox-info .folder {
+    margin-right: 8px;
+    color: #11ff55;
+}
+
+.lightbox-info .filename {
+    color: #666;
+}
+
+.lightbox-close {
+    position: absolute;
+    top: -40px;
+    right: 0;
+    background: rgba(255, 255, 255, 0.1);
+    border: none;
+    color: white;
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    cursor: pointer;
+    font-size: 20px;
+    line-height: 1;
+    transition: background 0.2s;
+}
+
+.lightbox-close:hover {
+    background: rgba(255, 68, 68, 0.3);
+}
+
+/* Button Small Variant */
+.btn-small {
+    padding: 6px 12px !important;
+    font-size: 12px !important;
+}
+
+/* Responsive Timelapse */
+@media (max-width: 480px) {
+    .timelapse-header {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 8px;
+    }
+
+    .timelapse-config .config-row {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 8px;
+    }
+
+    .timelapse-config input[type="number"] {
+        width: 100%;
+    }
+
+    .timelapse-gallery-section .gallery-header {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+
+    .gallery-controls {
+        width: 100%;
+    }
+
+    .folder-select {
+        flex: 1;
+    }
+
+    .timelapse-gallery {
+        grid-template-columns: repeat(auto-fill, minmax(80px, 1fr));
+    }
+}

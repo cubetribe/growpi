@@ -17,7 +17,7 @@ Legacy Log Routes (MIGRATED to blueprints/logs_bp.py):
     /api/logs/plugs   - Plug power/state history with intelligent downsampling
 """
 
-from flask import Flask, jsonify, request, send_from_directory
+from flask import Flask, jsonify, request, send_from_directory, send_file
 from flask_cors import CORS
 import json
 import logging
@@ -941,22 +941,158 @@ def update_timelapse_config():
 
 @app.route('/api/camera/timelapse/images', methods=['GET'])
 def get_timelapse_images():
-    """Get list of timelapse images"""
+    """
+    Get list of timelapse images.
+
+    v6.17.0: Added date folder filtering support.
+
+    Query params:
+        limit (int): Maximum images to return (default 50)
+        date (str): Optional date filter (YYYY-MM-DD format)
+    """
     camera = _get_camera()
     if not camera:
         return jsonify(create_response(False, error="Camera not available")), 503
 
     try:
+        import re
+
         limit = int(request.args.get('limit', 50))
-        images = camera.get_timelapse_images(limit)
+        date_folder = request.args.get('date', None, type=str)
+
+        # Validate date format if provided
+        if date_folder:
+            if not re.match(r'^\d{4}-\d{2}-\d{2}$', date_folder):
+                return jsonify(create_response(False, error="Invalid date format. Use YYYY-MM-DD")), 400
+
+        images = camera.get_timelapse_images(limit=limit, date_folder=date_folder)
 
         return jsonify(create_response(True, {
             "images": images,
-            "count": len(images)
+            "count": len(images),
+            "date_filter": date_folder
         }))
 
     except Exception as e:
         logger.error(f"Error in get_timelapse_images: {e}")
+        return jsonify(create_response(False, error=str(e))), 500
+
+
+# ============================================================================
+# Camera Timelapse API - v6.17.0
+# ============================================================================
+
+@app.route('/api/camera/timelapse/stats', methods=['GET'])
+def get_timelapse_stats():
+    """
+    Get timelapse capture statistics.
+
+    Returns config, storage info, and image counts.
+    """
+    camera = _get_camera()
+    if not camera:
+        return jsonify(create_response(False, error="Camera not available")), 503
+
+    try:
+        stats = camera.get_timelapse_stats()
+        return jsonify(create_response(True, stats))
+    except Exception as e:
+        logger.error(f"Error in get_timelapse_stats: {e}")
+        return jsonify(create_response(False, error=str(e))), 500
+
+
+@app.route('/api/camera/timelapse/folders', methods=['GET'])
+def get_timelapse_folders():
+    """
+    Get list of timelapse date folders.
+
+    Returns list of folders with image counts.
+    """
+    camera = _get_camera()
+    if not camera:
+        return jsonify(create_response(False, error="Camera not available")), 503
+
+    try:
+        folders = camera.get_timelapse_folders()
+        return jsonify(create_response(True, {
+            "folders": folders,
+            "count": len(folders)
+        }))
+    except Exception as e:
+        logger.error(f"Error in get_timelapse_folders: {e}")
+        return jsonify(create_response(False, error=str(e))), 500
+
+
+@app.route('/api/camera/timelapse/image/<date_folder>/<filename>', methods=['GET'])
+def get_timelapse_image(date_folder: str, filename: str):
+    """
+    Serve a specific timelapse image.
+
+    Security: Validates date_folder and filename format to prevent directory traversal.
+
+    Args:
+        date_folder: Date folder in YYYY-MM-DD format
+        filename: Image filename in timelapse_YYYYMMDD_HHMMSS.jpg format
+    """
+    camera = _get_camera()
+    if not camera:
+        return jsonify(create_response(False, error="Camera not available")), 503
+
+    try:
+        import re
+
+        # Sanitize inputs to prevent directory traversal attacks
+        if not re.match(r'^\d{4}-\d{2}-\d{2}$', date_folder):
+            return jsonify(create_response(False, error="Invalid date format")), 400
+        if not re.match(r'^timelapse_\d{8}_\d{6}\.jpg$', filename):
+            return jsonify(create_response(False, error="Invalid filename")), 400
+
+        filepath = os.path.join(
+            camera.timelapse_config.output_dir,
+            date_folder,
+            filename
+        )
+
+        if not os.path.exists(filepath):
+            return jsonify(create_response(False, error="Image not found")), 404
+
+        return send_file(
+            filepath,
+            mimetype='image/jpeg',
+            download_name=filename
+        )
+    except Exception as e:
+        logger.error(f"Error serving timelapse image: {e}")
+        return jsonify(create_response(False, error=str(e))), 500
+
+
+@app.route('/api/camera/timelapse/test-brightness', methods=['GET'])
+def test_timelapse_brightness():
+    """
+    Test brightness detection with current camera frame.
+
+    Returns brightness analysis and whether an image would be saved
+    with current darkness filter settings.
+
+    Useful for calibrating brightness_threshold value.
+    """
+    camera = _get_camera()
+    if not camera or not camera.is_available:
+        return jsonify(create_response(False, error="Camera not available")), 503
+
+    try:
+        result = camera.test_brightness()
+
+        if result.get('success'):
+            return jsonify(create_response(True, {
+                "brightness": result['brightness'],
+                "would_save": result['would_save']
+            }))
+        else:
+            return jsonify(create_response(False, error=result.get('error', 'Unknown error'))), 500
+
+    except Exception as e:
+        logger.error(f"Error in test_brightness: {e}")
         return jsonify(create_response(False, error=str(e))), 500
 
 

@@ -6,9 +6,9 @@ Python-basierter Controller-Service für den Raspberry Pi 3B+.
 
 Dieser Controller läuft auf dem Raspberry Pi und steuert Grow-Lampen via PWM.
 
-**Aktueller Stand: v6.7 (2025-12-06)**
+**Aktueller Stand: v6.18 (2025-12-09)**
 - Web-Interface auf Port 5000
-- Live-Kamera Livestream (USB-Webcam, 720p)
+- Live-Kamera Livestream (USB-Webcam, 720p, Auto-Detection)
 - Sonnenkurven-Modus mit automatischer Tageszeit-Interpolation
 - 4 PWM-Kanäle für LED-Steuerung
 - Raumklima-Steuerung mit Entfeuchtung
