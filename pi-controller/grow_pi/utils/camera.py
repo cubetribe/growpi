@@ -144,8 +144,18 @@ class CameraService:
                 logger.error(f"Failed to open camera device {self.config.device_id}")
                 return False
 
-            # Set MJPEG format for efficient capture
-            self._camera.set(cv2.CAP_PROP_FOURCC, cv2.VideoWriter_fourcc('M', 'J', 'P', 'G'))
+            # Try YUYV (uncompressed) for better quality, fallback to MJPEG
+            yuyv_fourcc = cv2.VideoWriter_fourcc('Y', 'U', 'Y', 'V')
+            mjpeg_fourcc = cv2.VideoWriter_fourcc('M', 'J', 'P', 'G')
+
+            self._camera.set(cv2.CAP_PROP_FOURCC, yuyv_fourcc)
+            actual_fourcc = int(self._camera.get(cv2.CAP_PROP_FOURCC))
+
+            if actual_fourcc == yuyv_fourcc:
+                logger.info("Camera using YUYV format (uncompressed) for better quality")
+            else:
+                logger.warning("YUYV not supported, falling back to MJPEG")
+                self._camera.set(cv2.CAP_PROP_FOURCC, mjpeg_fourcc)
 
             # Set resolution
             self._camera.set(cv2.CAP_PROP_FRAME_WIDTH, self.config.width)

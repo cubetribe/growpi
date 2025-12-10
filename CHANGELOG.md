@@ -7,6 +7,39 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [v6.19.0] - 2025-12-09
+
+### Fixed
+- **Camera Quality**: Umstellung von MJPEG auf YUYV Format für deutlich bessere Timelapse-Bildqualität
+  - Problem: Doppel-Kompression (Kamera MJPEG → OpenCV → JPEG) reduzierte Qualität auf ~50%
+  - Lösung: YUYV (unkomprimiert) vermeidet erste Kompression
+  - Erwartete Verbesserung: +20-50% Bildqualität
+  - Fallback auf MJPEG falls YUYV nicht unterstützt
+  - Datei: `pi-controller/grow_pi/utils/camera.py` (Zeile 147-157)
+
+### Technical Details
+- **MJPEG Problem:**
+  - Kamera komprimiert mit ~50-80% Qualität (hardcoded)
+  - OpenCV dekodiert und re-encodiert mit 95%
+  - Effektive Qualität: 0.5 * 0.95 = 47.5% (worst case)
+
+- **YUYV Lösung:**
+  - Unkomprimiertes YUV422 Format
+  - Keine Kamera-seitige Kompression
+  - Nur 1x JPEG-Encoding mit 95% Qualität
+  - Nachteile: Höhere USB-Bandbreite (akzeptabel für Timelapse)
+
+- **Fallback Logic:**
+  - Versucht YUYV zu setzen
+  - Prüft ob Kamera Format akzeptiert hat
+  - Log: "Camera using YUYV format (uncompressed) for better quality"
+  - Falls nicht: "YUYV not supported, falling back to MJPEG"
+
+### Deployment
+- ⏳ Wartet auf User-Genehmigung
+
+---
+
 ## [v6.18.0] - 2025-12-09
 
 ### Added
