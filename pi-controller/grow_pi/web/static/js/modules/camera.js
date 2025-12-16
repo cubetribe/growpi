@@ -55,6 +55,16 @@ export function initCameraModule() {
     // Start status monitoring
     statusCheckInterval = setInterval(checkCameraStatus, STATUS_CHECK_INTERVAL_MS);
 
+    // Add click handler for fullscreen
+    if (cameraImage) {
+        cameraImage.addEventListener('click', () => {
+            if (cameraImage.src && cameraImage.style.display !== 'none') {
+                openCameraFullscreen(cameraImage.src);
+            }
+        });
+        cameraImage.style.cursor = 'zoom-in';
+    }
+
     // Start streaming immediately if camera is available
     startStream();
 }
@@ -191,4 +201,49 @@ export function getStreamStatus() {
         cameraAvailable,
         refreshInterval: REFRESH_INTERVAL_MS
     };
+}
+
+/**
+ * Open camera image in fullscreen overlay
+ */
+function openCameraFullscreen(imageSrc) {
+    // Create fullscreen overlay
+    const overlay = document.createElement('div');
+    overlay.className = 'camera-fullscreen';
+
+    // Get resolution from status element
+    const resolution = cameraStatus?.textContent || '1920x1080';
+
+    overlay.innerHTML = `
+        <div class="fullscreen-content">
+            <img src="${imageSrc}" alt="Live Camera">
+            <div class="fullscreen-info">${resolution} • Live</div>
+            <button class="fullscreen-close" aria-label="Schließen">&times;</button>
+        </div>
+    `;
+
+    document.body.appendChild(overlay);
+
+    // Prevent body scroll
+    document.body.style.overflow = 'hidden';
+
+    // Close handlers
+    const closeHandler = (e) => {
+        if (e.target === overlay || e.target.classList.contains('fullscreen-close')) {
+            overlay.remove();
+            document.body.style.overflow = '';
+        }
+    };
+
+    overlay.addEventListener('click', closeHandler);
+
+    // ESC key to close
+    const keyHandler = (e) => {
+        if (e.key === 'Escape') {
+            overlay.remove();
+            document.body.style.overflow = '';
+            document.removeEventListener('keydown', keyHandler);
+        }
+    };
+    document.addEventListener('keydown', keyHandler);
 }

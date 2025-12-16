@@ -83,8 +83,8 @@ def find_lifecam_device() -> int:
 class CameraConfig:
     """Camera configuration."""
     device_id: int = -1  # -1 = auto-detect LifeCam, or specific device number
-    width: int = 1280
-    height: int = 720
+    width: int = 1920
+    height: int = 1080
     preview_fps: int = 2  # Low FPS for live preview (resource-friendly)
     preview_jpeg_quality: int = 70  # Lower quality OK for preview
     timelapse_jpeg_quality: int = 95  # High quality for timelapse photos

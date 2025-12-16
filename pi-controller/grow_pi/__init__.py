@@ -5,6 +5,6 @@ Greenhouse management system controller for Raspberry Pi.
 Handles sensors, lamp control, and communication with VPS server.
 """
 
-__version__ = "6.19.0"
+__version__ = "6.20.0"
 __author__ = "Dennis Westermann"
 __email__ = "d.westermann@ol-mg.de"

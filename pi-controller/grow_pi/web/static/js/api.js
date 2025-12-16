@@ -490,6 +490,153 @@ export const GrowPiAPI = {
      */
     async getVersion() {
         return await get('/api/version');
+    },
+
+    // ==========================================
+    // Calendar API (v6.20)
+    // ==========================================
+
+    /**
+     * Get all grows (active and/or archived)
+     * @param {boolean} includeArchived - Include archived grows (default: false)
+     * @returns {Promise<Object>} Grows list
+     */
+    async getGrows(includeArchived = false) {
+        const url = includeArchived ? '/api/calendar/grows?archived=true' : '/api/calendar/grows';
+        return await get(url);
+    },
+
+    /**
+     * Create a new grow
+     * @param {Object} growData - Grow data
+     * @param {string} growData.name - Grow name
+     * @param {string} growData.strain - Optional strain name
+     * @param {string} growData.start_date - Start date (YYYY-MM-DD)
+     * @returns {Promise<Object>} Created grow with ID
+     */
+    async createGrow(growData) {
+        return await post('/api/calendar/grows', growData);
+    },
+
+    /**
+     * Get a specific grow
+     * @param {number} growId - Grow ID
+     * @returns {Promise<Object>} Grow data
+     */
+    async getGrow(growId) {
+        return await get(`/api/calendar/grows/${growId}`);
+    },
+
+    /**
+     * Update a grow
+     * @param {number} growId - Grow ID
+     * @param {Object} updates - Fields to update
+     * @returns {Promise<Object>} Success response
+     */
+    async updateGrow(growId, updates) {
+        return await put(`/api/calendar/grows/${growId}`, updates);
+    },
+
+    /**
+     * Transition to a new grow phase
+     * @param {number} growId - Grow ID
+     * @param {Object} phaseData - Phase transition data
+     * @param {string} phaseData.new_phase - New phase (seedling/vegetative/flowering/drying/curing)
+     * @param {string} phaseData.notes - Optional notes for phase transition
+     * @returns {Promise<Object>} Success response
+     */
+    async transitionPhase(growId, phaseData) {
+        return await post(`/api/calendar/grows/${growId}/phase`, phaseData);
+    },
+
+    /**
+     * Save a daily log (create or update)
+     * @param {Object} logData - Daily log data
+     * @param {number} logData.grow_id - Grow ID
+     * @param {string} logData.log_date - Date (YYYY-MM-DD)
+     * @param {boolean} logData.watered - Was watered
+     * @param {number} logData.water_amount_ml - Water amount in ml (optional)
+     * @param {boolean} logData.fertilized - Was fertilized
+     * @param {string} logData.fertilizer_type - Fertilizer type/notes (optional)
+     * @param {number} logData.fertilizer_amount_ml - Fertilizer amount in ml (optional)
+     * @param {string} logData.notes - General notes (optional)
+     * @param {number} logData.plant_height_cm - Plant height in cm (optional)
+     * @param {string} logData.photos - Photo URLs/paths (optional)
+     * @returns {Promise<Object>} Success response
+     */
+    async saveDailyLog(logData) {
+        return await post('/api/calendar/logs', logData);
+    },
+
+    /**
+     * Get calendar data for a specific month
+     * @param {string} month - Month in YYYY-MM format
+     * @returns {Promise<Object>} Month data { grow, logs, events }
+     */
+    async getCalendarMonth(month) {
+        return await get(`/api/calendar/month/${month}`);
+    },
+
+    // ==========================================
+    // Calendar Events API (v6.20)
+    // ==========================================
+
+    /**
+     * Get milestones (optionally filtered by phase)
+     * @param {string} phase - Optional phase filter (seedling/vegetative/flowering/drying/curing)
+     * @returns {Promise<Object>} Milestones list
+     */
+    async getMilestones(phase = null) {
+        const url = phase ? `/api/calendar/milestones?phase=${phase}` : '/api/calendar/milestones';
+        return await get(url);
+    },
+
+    /**
+     * Get milestones for a specific date
+     * @param {number} growId - Grow ID
+     * @param {string} date - Date (YYYY-MM-DD)
+     * @returns {Promise<Object>} Milestones for date
+     */
+    async getMilestonesForDate(growId, date) {
+        return await get(`/api/calendar/milestones/for-date?grow_id=${growId}&date=${date}`);
+    },
+
+    /**
+     * Toggle milestone enabled/disabled
+     * @param {number} id - Milestone ID
+     * @param {boolean} enabled - Enable state
+     * @returns {Promise<Object>} Success response
+     */
+    async toggleMilestone(id, enabled) {
+        return await request(`/api/calendar/milestones/${id}/toggle`, {
+            method: 'PATCH',
+            body: JSON.stringify({ enabled: enabled })
+        });
+    },
+
+    /**
+     * Create a custom milestone
+     * @param {Object} data - Milestone data
+     * @param {string} data.phase - Phase (seedling/vegetative/flowering/drying/curing)
+     * @param {number} data.day_offset_min - Minimum day offset
+     * @param {number} data.day_offset_max - Maximum day offset (optional)
+     * @param {string} data.title - Milestone title
+     * @param {string} data.description - Optional description
+     * @param {string} data.icon - Optional icon
+     * @param {string} data.category - Category (training/environment/nutrients/observation/harvest)
+     * @returns {Promise<Object>} Created milestone
+     */
+    async createMilestone(data) {
+        return await post('/api/calendar/milestones', data);
+    },
+
+    /**
+     * Delete a custom milestone
+     * @param {number} id - Milestone ID
+     * @returns {Promise<Object>} Success response
+     */
+    async deleteMilestone(id) {
+        return await request(`/api/calendar/milestones/${id}`, { method: 'DELETE' });
     }
 };
 

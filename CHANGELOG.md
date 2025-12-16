@@ -7,6 +7,86 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [v6.21.0] - 2025-12-16
+
+### Added
+- **Ereignisliste (Milestones) für Kalender** 📅
+  - Liste aller System-Milestones für aktuelle Phase (Keim/Wachstum/Blüte)
+  - Tag-Range Anzeige (z.B. "Tag 15-21: Zweite Schwazze")
+  - Category-Farben am linken Border (Training=Blau, Environment=Grün, etc.)
+  - Toggle-Switch zum Ein-/Ausschalten einzelner Events
+  - "+ Neues Event" Button für Custom Milestones
+  - Custom Events löschen (System-Events sind geschützt)
+
+- **Add Event Modal**
+  - Titel, Beschreibung, Icon eingeben
+  - Tag-Range (Ab Tag / Bis Tag) festlegen
+  - Category-Auswahl (Training/Environment/Nutrients/Observation/Other)
+  - Validierung und Fehlerbehandlung
+
+### Technical Details
+- `calendar.js`: +175 LOC (loadPhaseEvents, renderEventsList, toggleEvent, deleteEvent)
+- `api.js`: +24 LOC (createMilestone, deleteMilestone)
+- `calendar.css`: +178 LOC (Events Section, Toggle Switch, Event Items)
+- `index.html`: +46 LOC (Events Section HTML, Add Event Modal)
+
+### Files Modified
+- `pi-controller/grow_pi/web/static/js/modules/calendar.js`
+- `pi-controller/grow_pi/web/static/js/api.js`
+- `pi-controller/grow_pi/web/static/css/calendar.css`
+- `pi-controller/grow_pi/web/static/index.html`
+
+### Deployment
+- ✅ Deployed auf Pi @ 192.168.0.86
+- ⏳ User-Test ausstehend
+
+---
+
+## [v6.20.0] - 2025-12-16
+
+### Added
+- **Grow Calendar Status Dashboard** 📊
+  - Große Tag-Anzeige: "Tag X" der aktuellen Phase (48px, Neon Green)
+  - Phase-Info mit Icon und Namen (🌱 Keim / 🌿 Wachstum / 🌸 Blüte)
+  - Grow-Startdatum und Phase-Startdatum sichtbar
+  - Responsives Grid-Layout (3-spaltig Desktop, 1-spaltig Mobile)
+
+- **Grow-Einstellungen Modal** ⚙️
+  - Grow-Name und Sorte editierbar
+  - Grow-Startdatum änderbar (HTML5 Date-Picker)
+  - Phase-Startdatum änderbar (z.B. "Blüte begann am...")
+  - Automatische Neuberechnung des aktuellen Tags
+  - Smart-Saving: Nur geänderte Felder werden gesendet
+
+### Changed
+- **Backend API erweitert (calendar_bp.py):**
+  - `GET /api/calendar/grows` liefert jetzt `phase_day` (berechneter Tag der Phase)
+  - `PUT /api/calendar/grows/<id>` akzeptiert `start_date` und `phase_started_at`
+  - Validierung: Datum darf nicht in der Zukunft liegen
+  - phase_events Tabelle wird automatisch synchronisiert
+
+### Technical Details
+- `calendar_bp.py`: +68 LOC (phase_day Berechnung, Datum-Editierung)
+- `calendar.js`: +150 LOC (Status Dashboard, Settings Modal)
+- `calendar.css`: +120 LOC (Dashboard Styling, Responsive)
+- `index.html`: +60 LOC (Dashboard HTML, Settings Modal HTML)
+
+### Fixed
+- Deployment: Fehlende Python-Module (tinytuya, python-dotenv) auf Pi installiert
+- venv auf Pi neu erstellt wegen macOS-Symlink-Problemen
+
+### Files Modified
+- `pi-controller/grow_pi/web/blueprints/calendar_bp.py`
+- `pi-controller/grow_pi/web/static/index.html`
+- `pi-controller/grow_pi/web/static/js/modules/calendar.js`
+- `pi-controller/grow_pi/web/static/css/calendar.css`
+
+### Deployment
+- ✅ Deployed auf Pi @ 192.168.0.86
+- ⏳ User-Test ausstehend
+
+---
+
 ## [v6.19.0] - 2025-12-09
 
 ### Fixed

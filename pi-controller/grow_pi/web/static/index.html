@@ -9,6 +9,7 @@
         <title>GrowPi Control</title>
 <link rel="stylesheet" href="css/main.css">
         <link rel="stylesheet" href="css/curve-editor.css">
+        <link rel="stylesheet" href="css/calendar.css">
         <script src="chart.js"></script>
         <!-- Date adapter for Chart.js time scale (required for fixed X-axis time range) -->
         <script src="chartjs-adapter-date-fns.bundle.min.js"></script>
@@ -29,15 +30,26 @@
             <div class="error-msg" id="errorMsg"></div>
             <div class="success-msg" id="successMsg"></div>
 
-            <div class="tabs">
+            <!-- Mobile Nav Toggle -->
+            <button class="mobile-nav-toggle" id="mobileNavToggle">
+                <span></span>
+                <span></span>
+                <span></span>
+            </button>
+
+            <div class="tabs" id="mainTabs">
                 <button class="tab-btn active" data-tab="control">
                     Start
                 </button>
+                <button class="tab-btn" data-tab="calendar">Kalender</button>
                 <button class="tab-btn" data-tab="room">Room</button>
                 <button class="tab-btn" data-tab="costs">Kosten</button>
                 <button class="tab-btn" data-tab="curves">Kurven</button>
                 <button class="tab-btn" data-tab="history">Verlauf</button>
             </div>
+
+            <!-- Mobile Nav Overlay -->
+            <div class="mobile-nav-overlay" id="mobileNavOverlay"></div>
 
             <div id="tab-control" class="tab-content active">
                 <!-- Camera Livestream -->
@@ -176,6 +188,124 @@
                         </div>
                     </div>
                 </section>
+            </div>
+
+            <!-- Calendar Tab -->
+            <div id="tab-calendar" class="tab-content">
+                <div class="calendar-container">
+                    <!-- Grow Header -->
+                    <section class="grow-header">
+                        <div class="grow-info">
+                            <div class="grow-name" id="currentGrowName">Kein Grow aktiv</div>
+                            <div class="grow-phase" id="currentPhaseInfo">-</div>
+                        </div>
+                        <div class="grow-actions">
+                            <button class="btn" id="btnNewGrow">+ Neuer Grow</button>
+                        </div>
+                    </section>
+
+                    <!-- Phase Selector -->
+                    <section class="phase-selector">
+                        <div class="phase-buttons">
+                            <button class="phase-btn seedling" id="phaseBtnSeedling">
+                                🌱 Keim
+                            </button>
+                            <button class="phase-btn veggie" id="phaseBtnVeggie">
+                                🌿 Wachstum
+                            </button>
+                            <button class="phase-btn bloom" id="phaseBtnBloom">
+                                🌸 Blüte
+                            </button>
+                        </div>
+                    </section>
+
+                    <!-- Status Dashboard -->
+                    <div class="grow-status-dashboard hidden" id="growStatusDashboard">
+                        <div class="status-phase">
+                            <span class="phase-icon" id="statusPhaseIcon">🌱</span>
+                            <div class="phase-details">
+                                <span class="phase-name" id="statusPhaseName">-</span>
+                                <span class="phase-label">Aktuelle Phase</span>
+                            </div>
+                        </div>
+                        <div class="status-day">
+                            <span class="day-number" id="statusPhaseDay">-</span>
+                            <span class="day-label">Tag</span>
+                        </div>
+                        <div class="status-dates">
+                            <div class="date-row">
+                                <span class="date-label">Grow-Start:</span>
+                                <span class="date-value" id="statusGrowStart">-</span>
+                                <button class="edit-btn" id="btnEditGrowSettings" title="Einstellungen bearbeiten">⚙️</button>
+                            </div>
+                            <div class="date-row">
+                                <span class="date-label">Phase-Start:</span>
+                                <span class="date-value" id="statusPhaseStart">-</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Events Section -->
+                    <div class="events-section" id="eventsSection">
+                        <div class="events-header">
+                            <h3 class="events-title">📅 Ereignisse für <span id="eventsPhaseLabel">-</span></h3>
+                            <button class="btn-small" id="btnAddEvent">+ Neues Event</button>
+                        </div>
+                        <div class="events-list" id="eventsList">
+                            <!-- Events werden hier eingefügt -->
+                            <div class="events-loading">Lade Ereignisse...</div>
+                        </div>
+                    </div>
+
+                    <!-- Calendar Navigation -->
+                    <section class="section">
+                        <div class="calendar-nav">
+                            <button class="calendar-nav-btn" id="btnPrevMonth">◄</button>
+                            <div class="calendar-month-label" id="monthYearLabel">Januar 2025</div>
+                            <button class="calendar-nav-btn" id="btnNextMonth">►</button>
+                        </div>
+
+                        <!-- Calendar Grid -->
+                        <div class="calendar-grid" id="calendarGrid">
+                            <div class="calendar-empty">Lade Kalender...</div>
+                        </div>
+                    </section>
+
+                    <!-- Legend -->
+                    <div class="calendar-legend">
+                        <div class="legend-title">Legende</div>
+                        <div class="legend-items">
+                            <div class="legend-item">
+                                <span class="legend-icon">🌱</span>
+                                <span>Keim</span>
+                            </div>
+                            <div class="legend-item">
+                                <span class="legend-icon">🌿</span>
+                                <span>Wachstum</span>
+                            </div>
+                            <div class="legend-item">
+                                <span class="legend-icon">🌸</span>
+                                <span>Blüte</span>
+                            </div>
+                            <div class="legend-item">
+                                <span class="legend-icon">💧</span>
+                                <span>Bewässert</span>
+                            </div>
+                            <div class="legend-item">
+                                <span class="legend-icon">🧪</span>
+                                <span>Gedüngt</span>
+                            </div>
+                            <div class="legend-item">
+                                <span class="legend-icon">⚠️</span>
+                                <span>Problem</span>
+                            </div>
+                            <div class="legend-item">
+                                <span class="legend-icon">📅</span>
+                                <span>Event</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
             </div>
 
             <div id="tab-room" class="tab-content">
@@ -527,6 +657,227 @@
             </div>
         </div>
 
+        <!-- Daily Log Modal -->
+        <div class="daily-log-modal" id="dailyLogModal">
+            <div class="log-modal-content">
+                <div class="log-modal-header">
+                    <div class="log-modal-title">
+                        <div class="log-modal-date" id="modalDate">17. Januar 2025</div>
+                        <div class="log-modal-phase" id="modalPhaseInfo">🌸 Blüte - Tag 3</div>
+                    </div>
+                    <button class="log-modal-close" id="modalClose">&times;</button>
+                </div>
+
+                <div class="log-modal-body">
+                    <!-- Events Section -->
+                    <div id="modalEvents" class="modal-events" style="display: none;">
+                        <h4>📅 Anstehende Aufgaben</h4>
+                        <div id="eventsList" class="event-list"></div>
+                    </div>
+
+                    <!-- Fertilization Section -->
+                    <div class="log-section">
+                        <div class="log-section-title">Düngung</div>
+                        <div class="log-checkbox-group">
+                            <input type="checkbox" id="logFertilized">
+                            <label for="logFertilized">Gedüngt</label>
+                        </div>
+                        <div class="log-input-row">
+                            <div class="log-form-group">
+                                <label for="logEcValue">EC-Wert (mS/cm)</label>
+                                <input type="number" id="logEcValue" class="log-input" step="0.1" min="0" max="5" placeholder="1.8" disabled>
+                            </div>
+                            <div class="log-form-group">
+                                <label for="logPhValue">pH-Wert</label>
+                                <input type="number" id="logPhValue" class="log-input" step="0.1" min="4" max="8" placeholder="6.2" disabled>
+                            </div>
+                        </div>
+                        <div class="log-form-group">
+                            <label for="logFertilizerNotes">Dünger-Notizen</label>
+                            <input type="text" id="logFertilizerNotes" class="log-input" placeholder="BioBizz Bloom + CalMag" disabled>
+                        </div>
+                    </div>
+
+                    <!-- Watering Section -->
+                    <div class="log-section">
+                        <div class="log-section-title">Bewässerung</div>
+                        <div class="log-checkbox-group">
+                            <input type="checkbox" id="logWatered">
+                            <label for="logWatered">Bewässert</label>
+                        </div>
+                        <div class="log-form-group">
+                            <label for="logWaterAmount">Wassermenge (ml)</label>
+                            <input type="number" id="logWaterAmount" class="log-input" step="50" min="0" placeholder="500" disabled>
+                        </div>
+                    </div>
+
+                    <!-- Observations Section -->
+                    <div class="log-section">
+                        <div class="log-section-title">Beobachtungen</div>
+                        <div class="observations-grid">
+                            <div class="observation-item">
+                                <input type="checkbox" name="observations" value="burnt_tips" id="obs_burnt_tips">
+                                <label for="obs_burnt_tips" class="observation-label">
+                                    <span class="observation-icon">🔥</span>
+                                    <span>Verbrannte Spitzen</span>
+                                </label>
+                            </div>
+                            <div class="observation-item">
+                                <input type="checkbox" name="observations" value="yellowing" id="obs_yellowing">
+                                <label for="obs_yellowing" class="observation-label">
+                                    <span class="observation-icon">💛</span>
+                                    <span>Gelbe Blätter</span>
+                                </label>
+                            </div>
+                            <div class="observation-item">
+                                <input type="checkbox" name="observations" value="drooping" id="obs_drooping">
+                                <label for="obs_drooping" class="observation-label">
+                                    <span class="observation-icon">🥀</span>
+                                    <span>Hängende Blätter</span>
+                                </label>
+                            </div>
+                            <div class="observation-item">
+                                <input type="checkbox" name="observations" value="curling" id="obs_curling">
+                                <label for="obs_curling" class="observation-label">
+                                    <span class="observation-icon">🌀</span>
+                                    <span>Eingerollte Blätter</span>
+                                </label>
+                            </div>
+                            <div class="observation-item">
+                                <input type="checkbox" name="observations" value="spots" id="obs_spots">
+                                <label for="obs_spots" class="observation-label">
+                                    <span class="observation-icon">🔵</span>
+                                    <span>Flecken</span>
+                                </label>
+                            </div>
+                            <div class="observation-item">
+                                <input type="checkbox" name="observations" value="pests" id="obs_pests">
+                                <label for="obs_pests" class="observation-label">
+                                    <span class="observation-icon">🐛</span>
+                                    <span>Schädlinge</span>
+                                </label>
+                            </div>
+                            <div class="observation-item">
+                                <input type="checkbox" name="observations" value="mold" id="obs_mold">
+                                <label for="obs_mold" class="observation-label">
+                                    <span class="observation-icon">🦠</span>
+                                    <span>Schimmel</span>
+                                </label>
+                            </div>
+                            <div class="observation-item">
+                                <input type="checkbox" name="observations" value="slow_growth" id="obs_slow_growth">
+                                <label for="obs_slow_growth" class="observation-label">
+                                    <span class="observation-icon">🐌</span>
+                                    <span>Langsames Wachstum</span>
+                                </label>
+                            </div>
+                            <div class="observation-item">
+                                <input type="checkbox" name="observations" value="healthy" id="obs_healthy">
+                                <label for="obs_healthy" class="observation-label">
+                                    <span class="observation-icon">✅</span>
+                                    <span>Alles gut</span>
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Notes Section -->
+                    <div class="log-section">
+                        <div class="log-section-title">Notizen</div>
+                        <div class="log-form-group">
+                            <textarea id="logNotes" class="log-input" placeholder="Allgemeine Notizen und Beobachtungen..."></textarea>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="log-modal-footer">
+                    <button class="btn-modal btn-cancel" id="btnCancelLog">Abbrechen</button>
+                    <button class="btn-modal btn-primary" id="btnSaveDailyLog">Speichern</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Grow Settings Modal -->
+        <div class="daily-log-modal" id="growSettingsModal">
+            <div class="log-modal-content" style="max-width: 500px;">
+                <div class="log-modal-header">
+                    <div class="log-modal-title">
+                        <span class="log-modal-date">Grow-Einstellungen</span>
+                        <span class="log-modal-phase" id="settingsGrowName">-</span>
+                    </div>
+                    <button class="log-modal-close" id="settingsModalClose">&times;</button>
+                </div>
+                <div class="log-modal-body">
+                    <div class="log-section">
+                        <div class="log-section-title">Grow-Informationen</div>
+                        <div class="log-form-group">
+                            <label for="settingsGrowNameInput">Grow-Name</label>
+                            <input type="text" class="log-input" id="settingsGrowNameInput" placeholder="z.B. Grow 2025">
+                        </div>
+                        <div class="log-form-group">
+                            <label for="settingsStrainInput">Sorte (optional)</label>
+                            <input type="text" class="log-input" id="settingsStrainInput" placeholder="z.B. Northern Lights">
+                        </div>
+                    </div>
+                    <div class="log-section">
+                        <div class="log-section-title">Datum-Einstellungen</div>
+                        <div class="log-form-group">
+                            <label for="settingsGrowStartDate">Grow-Startdatum</label>
+                            <input type="date" class="log-input" id="settingsGrowStartDate">
+                            <small class="input-hint">Tag 1 des gesamten Grows</small>
+                        </div>
+                        <div class="log-form-group">
+                            <label for="settingsPhaseStartDate">Phase-Startdatum</label>
+                            <input type="date" class="log-input" id="settingsPhaseStartDate">
+                            <small class="input-hint">Tag 1 der aktuellen Phase (z.B. Blütestart)</small>
+                        </div>
+                    </div>
+                </div>
+                <div class="log-modal-footer">
+                    <button class="btn-secondary" id="btnCancelSettings">Abbrechen</button>
+                    <button class="btn-primary" id="btnSaveSettings">Speichern</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Add Event Modal -->
+        <div class="daily-log-modal" id="addEventModal">
+            <div class="log-modal-content" style="max-width: 450px;">
+                <div class="log-modal-header">
+                    <span class="log-modal-date">Neues Ereignis</span>
+                    <button class="log-modal-close" id="addEventModalClose">&times;</button>
+                </div>
+                <div class="log-modal-body">
+                    <div class="log-form-group">
+                        <label>Titel *</label>
+                        <input type="text" class="log-input" id="newEventTitle" placeholder="z.B. Topping durchgeführt">
+                    </div>
+                    <div class="log-form-group">
+                        <label>Beschreibung</label>
+                        <textarea class="log-input" id="newEventDescription" rows="2" placeholder="Optional"></textarea>
+                    </div>
+                    <div class="log-input-row">
+                        <div class="log-form-group">
+                            <label>Ab Tag *</label>
+                            <input type="number" class="log-input" id="newEventDayMin" min="1" value="1">
+                        </div>
+                        <div class="log-form-group">
+                            <label>Bis Tag (optional)</label>
+                            <input type="number" class="log-input" id="newEventDayMax" min="1">
+                        </div>
+                    </div>
+                    <div class="log-form-group">
+                        <label>Icon</label>
+                        <input type="text" class="log-input" id="newEventIcon" placeholder="z.B. ✂️" maxlength="2">
+                    </div>
+                </div>
+                <div class="log-modal-footer">
+                    <button class="btn-secondary" id="btnCancelAddEvent">Abbrechen</button>
+                    <button class="btn-primary" id="btnSaveNewEvent">Speichern</button>
+                </div>
+            </div>
+        </div>
+
         <script type="module">
             import { GrowPiAPI } from './js/api.js';
             import { GrowPiState } from './js/state.js';
@@ -535,10 +886,11 @@
             import { HistoryModule } from './js/modules/history.js';
             import { initEnvironmentTab } from './js/modules/environment.js';
             import { initCostsTab } from './js/modules/costs.js';
-            import { showError, showSuccess, setupTabs } from './js/utils.js';
+            import { showError, showSuccess, setupTabs, setupMobileNav } from './js/utils.js';
             import { initCameraModule, cleanupCameraModule } from './js/modules/camera.js';
             import { initAccordion } from './js/modules/accordion.js';
             import { initTimelapseModule, cleanupTimelapseModule } from './js/modules/timelapse.js';
+            import { initCalendarTab } from './js/modules/calendar.js';
 
             // Expose utils to window for modules that rely on them (legacy support)
             window.showError = showError;
@@ -553,12 +905,14 @@
                 initCameraModule();
                 initAccordion();
                 initTimelapseModule();
+                initCalendarTab();
 
                 const historyModule = new HistoryModule();
                 historyModule.initHistoryTab();
 
                 // Initialize Tabs
                 setupTabs();
+                setupMobileNav();
             });
         </script>
     </body>

@@ -1,0 +1,1059 @@
+/**
+ * Calendar Module Styles
+ * Neon-Green Dark Theme for Grow Calendar
+ * Part of GrowPi v6.20
+ */
+
+/* ==========================================
+   Calendar Container
+   ========================================== */
+
+.calendar-container {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+}
+
+/* ==========================================
+   Grow Header Section
+   ========================================== */
+
+.grow-header {
+    background: rgba(20, 20, 20, 0.9);
+    border-radius: 12px;
+    padding: 20px;
+    border: 1px solid #2a2a2a;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 16px;
+}
+
+.grow-info {
+    flex: 1;
+    min-width: 200px;
+}
+
+.grow-name {
+    font-size: 20px;
+    font-weight: 700;
+    color: #11ff55;
+    margin-bottom: 4px;
+}
+
+.grow-phase {
+    font-size: 14px;
+    color: #888;
+}
+
+.grow-actions {
+    display: flex;
+    gap: 12px;
+    align-items: center;
+}
+
+/* ==========================================
+   Phase Selector
+   ========================================== */
+
+.phase-selector {
+    background: rgba(20, 20, 20, 0.9);
+    border-radius: 12px;
+    padding: 16px;
+    border: 1px solid #2a2a2a;
+    margin-bottom: 20px;
+}
+
+.phase-buttons {
+    display: flex;
+    gap: 12px;
+    flex-wrap: wrap;
+}
+
+.phase-btn {
+    flex: 1;
+    min-width: 100px;
+    padding: 12px 20px;
+    border: 1px solid #333;
+    border-radius: 8px;
+    background: rgba(255, 255, 255, 0.05);
+    color: #fff;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+}
+
+.phase-btn:hover {
+    background: rgba(255, 255, 255, 0.1);
+    border-color: #11ff55;
+}
+
+.phase-btn.active {
+    background: rgba(17, 255, 85, 0.2);
+    border-color: #11ff55;
+    color: #11ff55;
+}
+
+.phase-btn.seedling { border-left: 3px solid #4ade80; }
+.phase-btn.veggie { border-left: 3px solid #60a5fa; }
+.phase-btn.bloom { border-left: 3px solid #c084fc; }
+
+/* ==========================================
+   Calendar Navigation
+   ========================================== */
+
+.calendar-nav {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 16px 0;
+}
+
+.calendar-month-label {
+    font-size: 18px;
+    font-weight: 600;
+    color: #fff;
+}
+
+.calendar-nav-buttons {
+    display: flex;
+    gap: 8px;
+}
+
+.calendar-nav-btn {
+    width: 40px;
+    height: 40px;
+    border-radius: 8px;
+    border: 1px solid #333;
+    background: rgba(255, 255, 255, 0.05);
+    color: #fff;
+    font-size: 18px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.calendar-nav-btn:hover {
+    background: rgba(255, 255, 255, 0.1);
+    border-color: #11ff55;
+}
+
+/* ==========================================
+   Calendar Grid
+   ========================================== */
+
+.calendar-grid {
+    background: rgba(20, 20, 20, 0.9);
+    border-radius: 12px;
+    padding: 16px;
+    border: 1px solid #2a2a2a;
+}
+
+.calendar-header {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    gap: 4px;
+    margin-bottom: 8px;
+}
+
+.calendar-day-label {
+    text-align: center;
+    font-size: 12px;
+    font-weight: 600;
+    color: #666;
+    padding: 8px 0;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.calendar-body {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    gap: 4px;
+}
+
+.calendar-day {
+    aspect-ratio: 1;
+    min-height: 80px;
+    background: rgba(255, 255, 255, 0.03);
+    border-radius: 8px;
+    padding: 8px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    display: flex;
+    flex-direction: column;
+    position: relative;
+    overflow: hidden;
+}
+
+.calendar-day:not(.empty):hover {
+    background: rgba(255, 255, 255, 0.08);
+    transform: scale(1.05);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+
+.calendar-day.empty {
+    background: transparent;
+    cursor: default;
+}
+
+.calendar-day.today {
+    border: 2px solid #11ff55 !important;
+    box-shadow: 0 0 12px rgba(17, 255, 85, 0.3);
+}
+
+.calendar-day.has-log {
+    background: rgba(17, 255, 85, 0.05);
+}
+
+.day-number {
+    font-size: 14px;
+    font-weight: 600;
+    color: #fff;
+    margin-bottom: 4px;
+}
+
+.day-indicators {
+    display: flex;
+    gap: 4px;
+    flex-wrap: wrap;
+    margin-top: auto;
+}
+
+.indicator {
+    font-size: 16px;
+    line-height: 1;
+    display: inline-block;
+}
+
+.calendar-empty {
+    text-align: center;
+    color: #666;
+    padding: 40px 20px;
+    font-size: 14px;
+    font-style: italic;
+}
+
+/* ==========================================
+   Daily Log Modal
+   ========================================== */
+
+.daily-log-modal {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.8);
+    backdrop-filter: blur(4px);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    z-index: 10000;
+    padding: 20px;
+}
+
+.daily-log-modal.active {
+    display: flex;
+}
+
+.log-modal-content {
+    background: linear-gradient(135deg, #1a1a1a 0%, #0d0d0d 100%);
+    border: 1px solid #333;
+    border-radius: 16px;
+    max-width: 600px;
+    width: 100%;
+    max-height: 90vh;
+    overflow-y: auto;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+}
+
+.log-modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 20px;
+    border-bottom: 1px solid #333;
+}
+
+.log-modal-title {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.log-modal-date {
+    font-size: 18px;
+    font-weight: 600;
+    color: #fff;
+}
+
+.log-modal-phase {
+    font-size: 14px;
+    color: #888;
+}
+
+.log-modal-close {
+    background: none;
+    border: none;
+    color: #888;
+    font-size: 24px;
+    cursor: pointer;
+    padding: 0;
+    line-height: 1;
+    transition: color 0.2s;
+}
+
+.log-modal-close:hover {
+    color: #ff4444;
+}
+
+.log-modal-body {
+    padding: 20px;
+}
+
+.log-modal-footer {
+    display: flex;
+    justify-content: flex-end;
+    gap: 12px;
+    padding: 16px 20px;
+    border-top: 1px solid #333;
+}
+
+/* ==========================================
+   Log Form
+   ========================================== */
+
+.log-section {
+    margin-bottom: 24px;
+    padding: 16px;
+    background: rgba(255, 255, 255, 0.03);
+    border-radius: 12px;
+    border: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.log-section:last-child {
+    margin-bottom: 0;
+}
+
+.log-section-title {
+    font-size: 14px;
+    font-weight: 600;
+    color: #11ff55;
+    margin-bottom: 12px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.log-section-title::before {
+    content: "";
+    width: 3px;
+    height: 14px;
+    background: #11ff55;
+    border-radius: 2px;
+}
+
+.log-form-group {
+    margin-bottom: 16px;
+}
+
+.log-form-group:last-child {
+    margin-bottom: 0;
+}
+
+.log-form-group label {
+    display: block;
+    font-size: 13px;
+    color: #888;
+    margin-bottom: 6px;
+}
+
+.log-checkbox-group {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 12px;
+}
+
+.log-checkbox-group input[type="checkbox"] {
+    width: 20px;
+    height: 20px;
+    cursor: pointer;
+    accent-color: #11ff55;
+}
+
+.log-checkbox-group label {
+    font-size: 14px;
+    color: #fff;
+    cursor: pointer;
+    margin-bottom: 0;
+}
+
+.log-input {
+    width: 100%;
+    padding: 12px;
+    background: rgba(0, 0, 0, 0.4);
+    border: 1px solid #444;
+    border-radius: 8px;
+    color: #fff;
+    font-size: 14px;
+}
+
+.log-input:focus {
+    outline: none;
+    border-color: #11ff55;
+}
+
+.log-input:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.log-input-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+}
+
+textarea.log-input {
+    resize: vertical;
+    min-height: 100px;
+    font-family: inherit;
+}
+
+/* ==========================================
+   Observations Grid
+   ========================================== */
+
+.observations-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 12px;
+}
+
+.observation-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px;
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.observation-item:hover {
+    background: rgba(255, 255, 255, 0.08);
+}
+
+.observation-item input[type="checkbox"] {
+    width: 18px;
+    height: 18px;
+    cursor: pointer;
+    accent-color: #11ff55;
+}
+
+.observation-label {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 13px;
+    color: #ccc;
+    cursor: pointer;
+}
+
+.observation-icon {
+    font-size: 16px;
+}
+
+/* ==========================================
+   Event Badges
+   ========================================== */
+
+.event-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 4px 8px;
+    border-radius: 6px;
+    font-size: 0.75rem;
+    margin: 2px;
+    white-space: nowrap;
+}
+
+.event-badge.training {
+    background: rgba(59, 130, 246, 0.2);
+    border: 1px solid #3b82f6;
+    color: #60a5fa;
+}
+
+.event-badge.environment {
+    background: rgba(34, 197, 94, 0.2);
+    border: 1px solid #22c55e;
+    color: #4ade80;
+}
+
+.event-badge.nutrients {
+    background: rgba(249, 115, 22, 0.2);
+    border: 1px solid #f97316;
+    color: #fb923c;
+}
+
+.event-badge.observation {
+    background: rgba(168, 85, 247, 0.2);
+    border: 1px solid #a855f7;
+    color: #c084fc;
+}
+
+.event-badge.harvest {
+    background: rgba(239, 68, 68, 0.2);
+    border: 1px solid #ef4444;
+    color: #f87171;
+}
+
+.event-icon {
+    font-size: 1em;
+    line-height: 1;
+}
+
+.event-title {
+    font-weight: 500;
+}
+
+/* Modal Events Section */
+.modal-events {
+    background: rgba(17, 255, 85, 0.05);
+    border: 1px solid rgba(17, 255, 85, 0.2);
+    border-radius: 8px;
+    padding: 12px;
+    margin-bottom: 16px;
+}
+
+.modal-events h4 {
+    margin: 0 0 8px 0;
+    color: #11ff55;
+    font-size: 0.9rem;
+    font-weight: 600;
+}
+
+.event-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+/* Calendar Day Events */
+.calendar-day .day-events {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 2px;
+    margin-top: 4px;
+}
+
+.calendar-day .event-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+}
+
+.event-dot.training {
+    background: #3b82f6;
+}
+
+.event-dot.environment {
+    background: #22c55e;
+}
+
+.event-dot.nutrients {
+    background: #f97316;
+}
+
+.event-dot.observation {
+    background: #a855f7;
+}
+
+.event-dot.harvest {
+    background: #ef4444;
+}
+
+/* ==========================================
+   Legend
+   ========================================== */
+
+.calendar-legend {
+    background: rgba(20, 20, 20, 0.9);
+    border-radius: 12px;
+    padding: 16px;
+    border: 1px solid #2a2a2a;
+    margin-top: 16px;
+}
+
+.legend-title {
+    font-size: 14px;
+    font-weight: 600;
+    color: #888;
+    margin-bottom: 12px;
+}
+
+.legend-items {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 16px;
+}
+
+.legend-item {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 12px;
+    color: #888;
+}
+
+.legend-icon {
+    font-size: 16px;
+}
+
+/* ==========================================
+   Phase Badge
+   ========================================== */
+
+.phase-badge {
+    display: inline-block;
+    padding: 4px 12px;
+    border-radius: 12px;
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.phase-badge.seedling {
+    background: rgba(74, 222, 128, 0.15);
+    color: #4ade80;
+    border: 1px solid rgba(74, 222, 128, 0.3);
+}
+
+.phase-badge.veggie {
+    background: rgba(96, 165, 250, 0.15);
+    color: #60a5fa;
+    border: 1px solid rgba(96, 165, 250, 0.3);
+}
+
+.phase-badge.bloom {
+    background: rgba(192, 132, 252, 0.15);
+    color: #c084fc;
+    border: 1px solid rgba(192, 132, 252, 0.3);
+}
+
+.phase-badge.harvest {
+    background: rgba(251, 191, 36, 0.15);
+    color: #fbbf24;
+    border: 1px solid rgba(251, 191, 36, 0.3);
+}
+
+/* ==========================================
+   Status Dashboard
+   ========================================== */
+
+.grow-status-dashboard {
+    display: grid;
+    grid-template-columns: auto 1fr auto;
+    gap: 24px;
+    background: linear-gradient(135deg, rgba(17, 255, 85, 0.1) 0%, rgba(20, 20, 20, 0.95) 100%);
+    border-radius: 16px;
+    padding: 24px;
+    border: 1px solid rgba(17, 255, 85, 0.3);
+    margin-bottom: 20px;
+    align-items: center;
+}
+
+.grow-status-dashboard.hidden {
+    display: none;
+}
+
+.status-phase {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.status-phase .phase-icon {
+    font-size: 40px;
+}
+
+.status-phase .phase-details {
+    display: flex;
+    flex-direction: column;
+}
+
+.status-phase .phase-name {
+    font-size: 20px;
+    font-weight: 700;
+    color: #11ff55;
+}
+
+.status-phase .phase-label {
+    font-size: 12px;
+    color: #666;
+    text-transform: uppercase;
+}
+
+.status-day {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    background: rgba(17, 255, 85, 0.15);
+    border-radius: 12px;
+    padding: 16px 32px;
+    border: 1px solid rgba(17, 255, 85, 0.3);
+}
+
+.status-day .day-number {
+    font-size: 48px;
+    font-weight: 800;
+    color: #11ff55;
+    line-height: 1;
+}
+
+.status-day .day-label {
+    font-size: 14px;
+    color: #888;
+    text-transform: uppercase;
+    margin-top: 4px;
+}
+
+.status-dates {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.status-dates .date-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.status-dates .date-label {
+    font-size: 13px;
+    color: #888;
+    min-width: 90px;
+}
+
+.status-dates .date-value {
+    font-size: 14px;
+    color: #fff;
+    font-weight: 500;
+}
+
+.status-dates .edit-btn {
+    background: rgba(255, 255, 255, 0.1);
+    border: 1px solid #333;
+    border-radius: 6px;
+    padding: 4px 8px;
+    cursor: pointer;
+    opacity: 0.6;
+    transition: all 0.2s;
+}
+
+.status-dates .edit-btn:hover {
+    opacity: 1;
+    border-color: #11ff55;
+    background: rgba(17, 255, 85, 0.1);
+}
+
+/* ==========================================
+   Events Section
+   ========================================== */
+
+.events-section {
+    background: rgba(20, 20, 20, 0.9);
+    border-radius: 12px;
+    padding: 16px;
+    border: 1px solid #2a2a2a;
+    margin-bottom: 20px;
+}
+
+.events-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 16px;
+}
+
+.events-title {
+    font-size: 16px;
+    font-weight: 600;
+    color: #fff;
+    margin: 0;
+}
+
+.events-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    max-height: 300px;
+    overflow-y: auto;
+}
+
+.events-empty, .events-error, .events-loading {
+    text-align: center;
+    color: #666;
+    padding: 20px;
+    font-size: 14px;
+}
+
+.event-item {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    padding: 12px;
+    background: rgba(255, 255, 255, 0.03);
+    border-radius: 8px;
+    border-left: 3px solid #666;
+    transition: all 0.2s;
+}
+
+.event-item.disabled {
+    opacity: 0.5;
+}
+
+.event-item.training { border-left-color: #3b82f6; }
+.event-item.environment { border-left-color: #22c55e; }
+.event-item.nutrients { border-left-color: #f97316; }
+.event-item.observation { border-left-color: #a855f7; }
+.event-item.harvest { border-left-color: #ef4444; }
+
+.event-toggle {
+    flex-shrink: 0;
+    padding-top: 2px;
+}
+
+/* Toggle Switch */
+.toggle-switch {
+    position: relative;
+    display: inline-block;
+    width: 36px;
+    height: 20px;
+}
+
+.toggle-switch input {
+    opacity: 0;
+    width: 0;
+    height: 0;
+}
+
+.toggle-slider {
+    position: absolute;
+    cursor: pointer;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-color: #333;
+    transition: 0.3s;
+    border-radius: 20px;
+}
+
+.toggle-slider:before {
+    position: absolute;
+    content: "";
+    height: 14px;
+    width: 14px;
+    left: 3px;
+    bottom: 3px;
+    background-color: #888;
+    transition: 0.3s;
+    border-radius: 50%;
+}
+
+.toggle-switch input:checked + .toggle-slider {
+    background-color: rgba(17, 255, 85, 0.3);
+}
+
+.toggle-switch input:checked + .toggle-slider:before {
+    transform: translateX(16px);
+    background-color: #11ff55;
+}
+
+.event-content {
+    flex: 1;
+    min-width: 0;
+}
+
+.event-header-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+.event-icon {
+    font-size: 16px;
+}
+
+.event-title {
+    font-size: 14px;
+    font-weight: 500;
+    color: #fff;
+}
+
+.event-day-badge {
+    font-size: 11px;
+    padding: 2px 8px;
+    background: rgba(17, 255, 85, 0.15);
+    border: 1px solid rgba(17, 255, 85, 0.3);
+    border-radius: 10px;
+    color: #11ff55;
+    white-space: nowrap;
+}
+
+.event-description {
+    font-size: 12px;
+    color: #888;
+    margin-top: 4px;
+    line-height: 1.4;
+}
+
+.event-delete-btn {
+    background: none;
+    border: none;
+    cursor: pointer;
+    padding: 4px;
+    opacity: 0.4;
+    transition: opacity 0.2s;
+    font-size: 14px;
+}
+
+.event-delete-btn:hover {
+    opacity: 1;
+}
+
+.btn-small {
+    padding: 6px 12px;
+    font-size: 12px;
+    background: rgba(17, 255, 85, 0.1);
+    border: 1px solid rgba(17, 255, 85, 0.3);
+    border-radius: 6px;
+    color: #11ff55;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.btn-small:hover {
+    background: rgba(17, 255, 85, 0.2);
+    border-color: #11ff55;
+}
+
+/* ==========================================
+   Responsive Adjustments
+   ========================================== */
+
+@media (max-width: 768px) {
+    .calendar-day {
+        min-height: 60px;
+        padding: 6px;
+    }
+
+    .day-number {
+        font-size: 12px;
+    }
+
+    .indicator {
+        font-size: 14px;
+    }
+
+    .grow-header {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+
+    .phase-buttons {
+        width: 100%;
+    }
+
+    .phase-btn {
+        flex: 1 1 100%;
+    }
+
+    .log-input-row {
+        grid-template-columns: 1fr;
+    }
+
+    .observations-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .log-modal-content {
+        max-height: 95vh;
+    }
+
+    /* Status Dashboard Mobile */
+    .grow-status-dashboard {
+        grid-template-columns: 1fr;
+        gap: 16px;
+        text-align: center;
+    }
+
+    .status-phase {
+        justify-content: center;
+    }
+
+    .status-dates {
+        align-items: center;
+    }
+
+    /* Events Section Mobile */
+    .events-list {
+        max-height: 200px;
+    }
+
+    .event-header-row {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 4px;
+    }
+}
+
+@media (max-width: 480px) {
+    .calendar-day {
+        min-height: 50px;
+        padding: 4px;
+    }
+
+    .day-number {
+        font-size: 11px;
+    }
+
+    .indicator {
+        font-size: 12px;
+    }
+
+    .calendar-day-label {
+        font-size: 10px;
+        padding: 6px 0;
+    }
+}
+
+/* ==========================================
+   Input Hints
+   ========================================== */
+
+.input-hint {
+    display: block;
+    font-size: 11px;
+    color: #666;
+    margin-top: 4px;
+    font-style: italic;
+}

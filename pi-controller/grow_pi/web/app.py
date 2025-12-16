@@ -399,6 +399,7 @@ def _register_blueprints(app: Flask) -> None:
             set_dehumidifier_controller,
             set_humidity_reader
         )
+        from .blueprints.calendar_bp import calendar_bp
 
         # Get lamp channels configuration
         from .services.lamp_config import get_lamp_channels
@@ -462,6 +463,7 @@ def _register_blueprints(app: Flask) -> None:
         app.register_blueprint(curves_bp)
         app.register_blueprint(costs_bp)
         app.register_blueprint(dehumidifier_bp)
+        app.register_blueprint(calendar_bp)
 
         logger.info("All blueprints registered successfully")
 

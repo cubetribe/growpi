@@ -31,7 +31,7 @@ _curve_available = False
 _mode_available = False
 
 # API Version
-_api_version = "6.8.0"
+_api_version = "6.20.0"
 
 
 # ============================================================================

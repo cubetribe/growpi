@@ -91,3 +91,46 @@ export function debounce(fn, delay, key) {
     clearTimeout(debounceTimers[key]);
     debounceTimers[key] = setTimeout(fn, delay);
 }
+
+/**
+ * Setup mobile navigation (hamburger menu)
+ * Handles side drawer for tabs on mobile devices
+ */
+export function setupMobileNav() {
+    const toggle = document.getElementById('mobileNavToggle');
+    const tabs = document.getElementById('mainTabs');
+    const overlay = document.getElementById('mobileNavOverlay');
+
+    if (!toggle || !tabs || !overlay) return;
+
+    // Toggle menu
+    toggle.addEventListener('click', () => {
+        const isOpen = tabs.classList.contains('mobile-open');
+
+        if (isOpen) {
+            tabs.classList.remove('mobile-open');
+            overlay.classList.remove('active');
+            toggle.classList.remove('active');
+        } else {
+            tabs.classList.add('mobile-open');
+            overlay.classList.add('active');
+            toggle.classList.add('active');
+        }
+    });
+
+    // Close on overlay click
+    overlay.addEventListener('click', () => {
+        tabs.classList.remove('mobile-open');
+        overlay.classList.remove('active');
+        toggle.classList.remove('active');
+    });
+
+    // Close on tab click
+    document.querySelectorAll('.tab-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+            tabs.classList.remove('mobile-open');
+            overlay.classList.remove('active');
+            toggle.classList.remove('active');
+        });
+    });
+}
