@@ -129,6 +129,88 @@ ON curve_presets(name);
 
 CREATE INDEX IF NOT EXISTS idx_curve_presets_system
 ON curve_presets(is_system);
+
+-- ============================================================================
+-- Grow Calendar Tables (v6.20+)
+-- ============================================================================
+
+-- Grow Cycles Table
+CREATE TABLE IF NOT EXISTS grows (
+    id TEXT PRIMARY KEY,
+    name TEXT NOT NULL,
+    strain TEXT,
+    start_date TEXT NOT NULL,
+    current_phase TEXT NOT NULL DEFAULT 'seedling',
+    phase_started_at TEXT NOT NULL,
+    notes TEXT,
+    is_active BOOLEAN DEFAULT 1,
+    created_at TEXT DEFAULT (datetime('now')),
+    updated_at TEXT DEFAULT (datetime('now'))
+);
+
+CREATE INDEX IF NOT EXISTS idx_grows_active ON grows(is_active);
+CREATE INDEX IF NOT EXISTS idx_grows_start_date ON grows(start_date DESC);
+
+-- Phase Events Table
+CREATE TABLE IF NOT EXISTS phase_events (
+    id TEXT PRIMARY KEY,
+    grow_id TEXT NOT NULL,
+    phase TEXT NOT NULL,
+    started_at TEXT NOT NULL,
+    ended_at TEXT,
+    duration_days INTEGER,
+    notes TEXT,
+    created_at TEXT DEFAULT (datetime('now')),
+    updated_at TEXT DEFAULT (datetime('now')),
+    FOREIGN KEY (grow_id) REFERENCES grows(id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_phase_events_grow ON phase_events(grow_id, started_at DESC);
+CREATE INDEX IF NOT EXISTS idx_phase_events_phase ON phase_events(phase);
+
+-- Daily Logs Table
+CREATE TABLE IF NOT EXISTS daily_logs (
+    id TEXT PRIMARY KEY,
+    grow_id TEXT NOT NULL,
+    log_date TEXT NOT NULL,
+    watered BOOLEAN DEFAULT 0,
+    fertilized BOOLEAN DEFAULT 0,
+    water_amount_ml INTEGER,
+    fertilizer_type TEXT,
+    fertilizer_amount_ml INTEGER,
+    notes TEXT,
+    plant_height_cm REAL,
+    photos TEXT,
+    created_at TEXT DEFAULT (datetime('now')),
+    updated_at TEXT DEFAULT (datetime('now')),
+    FOREIGN KEY (grow_id) REFERENCES grows(id) ON DELETE CASCADE,
+    UNIQUE(grow_id, log_date)
+);
+
+CREATE INDEX IF NOT EXISTS idx_daily_logs_grow_date ON daily_logs(grow_id, log_date DESC);
+CREATE INDEX IF NOT EXISTS idx_daily_logs_date ON daily_logs(log_date DESC);
+
+-- Phase Milestones Table (v6.21+)
+CREATE TABLE IF NOT EXISTS phase_milestones (
+    id TEXT PRIMARY KEY,
+    phase TEXT NOT NULL,
+    day_offset_min INTEGER NOT NULL,
+    day_offset_max INTEGER,
+    title TEXT NOT NULL,
+    title_en TEXT,
+    description TEXT,
+    icon TEXT,
+    category TEXT,
+    env_params TEXT,
+    is_system BOOLEAN DEFAULT 1,
+    is_enabled BOOLEAN DEFAULT 1,
+    created_at TEXT DEFAULT (datetime('now')),
+    updated_at TEXT DEFAULT (datetime('now'))
+);
+
+CREATE INDEX IF NOT EXISTS idx_milestones_phase ON phase_milestones(phase);
+CREATE INDEX IF NOT EXISTS idx_milestones_category ON phase_milestones(category);
+CREATE INDEX IF NOT EXISTS idx_milestones_enabled ON phase_milestones(is_enabled);
 """
 
 
@@ -194,6 +276,25 @@ class Database:
             raise e
         finally:
             cursor.close()
+
+    @contextmanager
+    def get_connection(self):
+        """
+        Context manager for direct database connection access.
+        Used by calendar_bp and other blueprints for manual transaction control.
+
+        Usage:
+            with db.get_connection() as conn:
+                cursor = conn.cursor()
+                cursor.execute("SELECT ...")
+                conn.commit()
+        """
+        conn = self._get_connection()
+        try:
+            yield conn
+        except Exception as e:
+            conn.rollback()
+            raise e
 
     def initialize(self) -> None:
         """Initialize database schema."""
