@@ -133,7 +133,8 @@ class SystemEvent:
     # Gültige Event-Typen
     VALID_EVENT_TYPES = {
         'service_start', 'service_stop', 'config_change',
-        'sensor_error', 'pwm_error', 'database_error',
+        'sensor_error', 'sensor_read_failure', 'sensor_persistent_error',
+        'pwm_error', 'database_error',
         'sync_start', 'sync_complete', 'sync_error',
         'lamp_change', 'curve_update'
     }

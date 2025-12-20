@@ -6,13 +6,15 @@ Python-basierter Controller-Service für den Raspberry Pi 3B+.
 
 Dieser Controller läuft auf dem Raspberry Pi und steuert Grow-Lampen via PWM.
 
-**Aktueller Stand: v6.18 (2025-12-09)**
+**Aktueller Stand: v6.21.1 (2025-12-20)**
 - Web-Interface auf Port 5000
 - Live-Kamera Livestream (USB-Webcam, 720p, Auto-Detection)
 - Sonnenkurven-Modus mit automatischer Tageszeit-Interpolation
 - 4 PWM-Kanäle für LED-Steuerung
 - Raumklima-Steuerung mit Entfeuchtung
+- **Grow Calendar** mit Phase Tracking & Milestones
 - **CPU-optimiert**: ~28% statt 75% Auslastung
+- **Sensor Robustness**: DHT22 mit Retry-Logik nach Hard-Reset
 
 ## Quick Start (MVP)
 
@@ -159,8 +161,10 @@ pi-controller/
 | 6     | Kosten-Tracking      | ✅ Done (2025-12-06) |
 | 7     | Room Environment     | ✅ Done (2025-12-06) |
 | 8     | **Live-Kamera**      | ✅ Done (2025-12-06) |
-| 9     | Timelapse            | ⏳ Vorbereitet |
-| 10    | RS485 Bodensensoren  | ⏳     |
+| 9     | Timelapse            | ✅ Done (2025-12-09) |
+| 10    | **Grow Calendar**    | ✅ Done (2025-12-17) |
+| 11    | RS485 Bodensensoren  | ⏳ Geplant |
+| 12    | Lokale Plug-Steuerung| ⏳ Geplant (Tuya API-Limit) |
 
 ### Camera API Endpoints
 
@@ -254,8 +258,8 @@ sudo journalctl -u grow-pi -n 50 --no-pager
 ---
 
 **Python Version**: 3.13
-**Aktuelles Level**: v6.7 (CPU-Optimierung)
-**Stand**: 2025-12-06
+**Aktuelles Level**: v6.21.1 (Sensor Robustness)
+**Stand**: 2025-12-20
 **Web-Interface**: http://192.168.0.86:5000
 **Changelog**: [CHANGELOG.md](CHANGELOG.md)
 

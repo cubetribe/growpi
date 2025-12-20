@@ -23,6 +23,7 @@ import json
 import logging
 import os
 import sys
+import time
 import atexit
 from typing import Dict, Tuple, Optional
 from dataclasses import dataclass
@@ -164,11 +165,13 @@ try:
     from .blueprints.dehumidifier_bp import dehumidifier_bp
     from .blueprints.curves_bp import curves_bp, init_blueprint as init_curves_blueprint
     from .blueprints.logs_bp import logs_bp, init_logs_bp
+    from .blueprints.calendar_bp import calendar_bp
     app.register_blueprint(costs_bp)
     app.register_blueprint(dehumidifier_bp)
     app.register_blueprint(curves_bp)
     app.register_blueprint(logs_bp)
-    logging.info("Registered costs_bp, dehumidifier_bp, curves_bp, and logs_bp blueprints")
+    app.register_blueprint(calendar_bp)
+    logging.info("Registered costs_bp, dehumidifier_bp, curves_bp, logs_bp, and calendar_bp blueprints")
 except ImportError as e:
     logging.warning(f"Could not import blueprints: {e}")
 
@@ -218,11 +221,29 @@ except Exception as e:
 # Initialize DHT22 Sensor
 dht_sensor = None
 if DHT_AVAILABLE:
-    try:
-        dht_sensor = adafruit_dht.DHT22(board.D4, use_pulseio=False)
-        logger.info("DHT22 Sensor initialized on GPIO-4")
-    except Exception as e:
-        logger.error(f"Failed to initialize DHT22: {e}")
+    # ROBUSTNESS FIX 2025-12-20: Multiple retry attempts after hard reset
+    max_init_retries = 5
+    init_retry_delay = 2
+
+    for attempt in range(1, max_init_retries + 1):
+        try:
+            dht_sensor = adafruit_dht.DHT22(board.D4, use_pulseio=False)
+            logger.info(f"DHT22 Sensor initialized on GPIO-4 (attempt {attempt}/{max_init_retries})")
+            break
+        except RuntimeError as e:
+            if attempt < max_init_retries:
+                logger.warning(f"DHT22 init attempt {attempt}/{max_init_retries} failed: {e} - retrying in {init_retry_delay}s...")
+                time.sleep(init_retry_delay)
+            else:
+                logger.error(f"DHT22 initialization failed after {max_init_retries} attempts: {e}")
+                logger.error("DHT_AVAILABLE set to False - sensor will return mock data")
+                DHT_AVAILABLE = False
+                dht_sensor = None
+        except Exception as e:
+            logger.error(f"Unexpected DHT22 initialization error: {e}")
+            DHT_AVAILABLE = False
+            dht_sensor = None
+            break
 
 # Initialize DataLogger
 data_logger: Optional['DataLogger'] = None
@@ -308,12 +329,20 @@ def create_response(success: bool, data: Dict = None, error: str = None) -> Dict
 
 
 # Cache for DHT22 readings (sensor needs 2s between reads)
-_dht_cache = {"temp": None, "humidity": None, "timestamp": 0}
+_dht_cache = {"temp": None, "humidity": None, "timestamp": 0, "error_count": 0}
 DHT_CACHE_SECONDS = 30  # Minimum seconds between sensor reads (erhöht für CPU-Optimierung)
+DHT_MAX_CONSECUTIVE_ERRORS = 3  # Invalidate cache after 3 consecutive failed reads
 
 
 def read_dht22() -> Tuple[Optional[float], Optional[float]]:
-    """Read temperature and humidity from DHT22 with caching and retry"""
+    """
+    Read temperature and humidity from DHT22 with caching and retry.
+
+    ROBUSTNESS FIX 2025-12-20:
+    - Invalidates cache after 3 consecutive failed reads
+    - Tracks error count for monitoring
+    - Logs persistent errors for debugging
+    """
     global _dht_cache
     import time
 
@@ -337,15 +366,40 @@ def read_dht22() -> Tuple[Optional[float], Optional[float]]:
                 _dht_cache["temp"] = round(temp, 1)
                 _dht_cache["humidity"] = round(humidity, 1)
                 _dht_cache["timestamp"] = now
+                _dht_cache["error_count"] = 0  # Reset error count on success
                 return (_dht_cache["temp"], _dht_cache["humidity"])
         except RuntimeError as e:
             logger.warning(f"DHT22 read attempt {attempt+1}/3: {e}")
             if attempt < 2:
                 time.sleep(0.5)
 
-    # Return last known good value if available
+    # All 3 attempts failed - increment error counter
+    _dht_cache["error_count"] += 1
+
+    # Invalidate cache if too many consecutive errors
+    if _dht_cache["error_count"] >= DHT_MAX_CONSECUTIVE_ERRORS:
+        logger.error(f"DHT22 failed {_dht_cache['error_count']} times consecutively - invalidating cache")
+        _dht_cache["temp"] = None
+        _dht_cache["humidity"] = None
+        _dht_cache["timestamp"] = 0
+
+        # Log persistent sensor error for monitoring
+        if data_logger:
+            try:
+                data_logger.log_event(
+                    'sensor_persistent_error',
+                    'error',
+                    f'DHT22 failed {_dht_cache["error_count"]} consecutive reads',
+                    {'error_count': _dht_cache["error_count"]}
+                )
+            except Exception:
+                pass  # Don't crash if logging fails
+
+        return (None, None)
+
+    # Return last known good value if available (but warn about errors)
     if _dht_cache["temp"] is not None:
-        logger.info("Returning cached DHT22 value")
+        logger.warning(f"DHT22 read failed (error #{_dht_cache['error_count']}) - returning cached value")
         return (_dht_cache["temp"], _dht_cache["humidity"])
 
     return (None, None)

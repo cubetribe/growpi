@@ -201,11 +201,27 @@ class DataLogger:
             self._stop_event.wait(timeout=self.plug_interval)
 
     def _log_sensors(self) -> None:
-        """Read and log sensor values."""
+        """
+        Read and log sensor values.
+
+        ROBUSTNESS FIX 2025-12-20:
+        - Log system_event when sensor returns None values (indicates sensor failure)
+        """
         if not self._sensor_reader:
             return
 
         temp, humidity = self._sensor_reader()
+
+        # ROBUSTNESS FIX: Log sensor failure as system event
+        if temp is None and humidity is None:
+            logger.warning("Sensor read returned None for both temp and humidity - logging failure event")
+            self.log_event(
+                'sensor_read_failure',
+                'warning',
+                'DHT22 sensor returned None for temperature and humidity',
+                {'timestamp': datetime.now().isoformat()}
+            )
+            return  # Don't insert None values into database
 
         if temp is not None:
             reading = SensorReading(
@@ -215,6 +231,8 @@ class DataLogger:
             )
             self.db.insert_sensor_reading(reading)
             logger.debug(f"Logged temperature: {temp}°C")
+        else:
+            logger.warning("Temperature reading is None - skipping database insert")
 
         if humidity is not None:
             reading = SensorReading(
@@ -224,6 +242,8 @@ class DataLogger:
             )
             self.db.insert_sensor_reading(reading)
             logger.debug(f"Logged humidity: {humidity}%")
+        else:
+            logger.warning("Humidity reading is None - skipping database insert")
 
     def _log_lamps(self, source: str = 'periodic') -> None:
         """Read and log lamp states."""

@@ -2,6 +2,51 @@
 
 Alle wichtigen Änderungen am GrowPi Pi-Controller werden hier dokumentiert.
 
+## [v6.21.1] - 2025-12-20
+
+### Fixed
+- **DHT22 Sensor Robustness**
+  - 5 Retry-Versuche bei Sensor-Initialisierung (nach Hard-Reset)
+  - Cache-Invalidierung nach 3 aufeinanderfolgenden Fehlern
+  - Sauberes Sensor-Cleanup bei Service-Shutdown (`sensor.exit()`)
+  - System-Events für Sensor-Ausfälle (`sensor_read_failure`, `sensor_persistent_error`)
+
+### Known Issues
+- **Tuya Smart Plug API**: Quota-Limit erreicht (Error 28841004)
+  - Ursache: Polling-Intervall zu aggressiv (60s)
+  - Workaround: Lokale Steuerung über `python-kasa` oder `tinytuya` geplant
+
+---
+
+## [v6.21.0] - 2025-12-17
+
+### Fixed
+- **Calendar DB Schema** - `get_connection()` Context Manager für saubere DB-Verbindungen
+- Database Locking Issues behoben
+
+---
+
+## [v6.20.0] - 2025-12-17
+
+### Added
+- **Grow Calendar** mit Phase Tracking
+  - Grow-Phasen: Keimung, Vegetation, Blüte, Ernte
+  - Milestones mit Datum und Beschreibung
+  - Timeline-Visualisierung im Web-Interface
+  - API Endpoints: `/api/calendar/*`
+
+---
+
+## [v6.19.0] - 2025-12-10
+
+### Changed
+- **Camera YUYV Format** für bessere Timelapse-Qualität
+  - Umstellung von MJPEG auf YUYV Raw-Format
+  - Höhere Bildqualität bei gleichem Speicherverbrauch
+  - Optimierte Kompression für Timelapse-Aufnahmen
+
+---
+
 ## [v6.18] - 2025-12-09
 
 ### Added

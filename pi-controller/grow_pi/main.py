@@ -357,6 +357,10 @@ class GrowPiController:
         Lampen werden nur über explizite API-Calls ausgeschaltet.
 
         Siehe: Feature #0 PWM Zero-Downtime (ROADMAP.md)
+
+        ROBUSTNESS FIX 2025-12-20:
+        - Sauberes DHT22 Sensor Cleanup
+        - GPIO ordnungsgemäß freigeben
         """
         logger = logging.getLogger(__name__)
         logger.info("Stopping GrowPi Controller...")
@@ -368,6 +372,24 @@ class GrowPiController:
             current_mode = _get_current_mode()
             save_state(self.pwm_controller, current_mode)
             logger.info("PWM state saved for warm restart")
+
+        # DHT22 Sensor Cleanup (ROBUSTNESS FIX 2025-12-20)
+        try:
+            # Import DHT sensor from api module to ensure we cleanup the same instance
+            from .web.api import dht_sensor, DHT_AVAILABLE
+            if DHT_AVAILABLE and dht_sensor is not None:
+                try:
+                    dht_sensor.exit()
+                    logger.info("DHT22 sensor cleaned up successfully")
+                except AttributeError:
+                    # Older versions might not have .exit() method
+                    logger.debug("DHT22 sensor does not have .exit() method - skipping cleanup")
+                except Exception as e:
+                    logger.warning(f"DHT22 cleanup warning: {e}")
+        except ImportError:
+            logger.debug("Web API not available - skipping sensor cleanup")
+        except Exception as e:
+            logger.warning(f"Unexpected error during sensor cleanup: {e}")
 
         # Nur trennen, PWM bleibt via pigpiod aktiv!
         # NICHT cleanup() aufrufen - das würde all_off() triggern

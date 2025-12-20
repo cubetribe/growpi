@@ -1,8 +1,163 @@
 # GrowPi Roadmap - Geplante Features
 
-**Letzte Aktualisierung**: 2025-12-09
-**Aktuelle Version**: v6.18.0
+**Letzte Aktualisierung**: 2025-12-20
+**Aktuelle Version**: v6.21.0
 **Status**: Active Development - Feature Phase 🚀
+
+---
+
+## 🚨 KRITISCH: Pi Health Monitoring (PRIORITÄT #1)
+
+### Feature: Pi Health Status Dashboard
+
+**Status**: 📋 GEPLANT - KRITISCH
+**Erstellt**: 2025-12-20
+**Geplante Version**: v6.22.0
+**Grund**: Pi-Absturz am 2025-12-20 - keine Vorwarnung möglich
+
+#### Hintergrund
+
+Am 2025-12-20 ist der Raspberry Pi über Nacht abgestürzt. Ohne Gesundheits-Monitoring gab es keine Möglichkeit, den Absturz vorherzusehen oder zu diagnostizieren.
+
+#### Ziel
+
+Auf der **Startseite (Dashboard)** einen "Pi Health" Widget anzeigen mit:
+
+| Metrik | Beschreibung | Warnschwelle |
+|--------|--------------|--------------|
+| **CPU-Temperatur** | Aktuelle CPU-Temp | > 70°C = Warnung, > 80°C = Kritisch |
+| **CPU-Auslastung** | % Nutzung | > 80% = Warnung |
+| **RAM-Nutzung** | Benutzt / Gesamt | > 85% = Warnung |
+| **Disk-Nutzung** | SD-Karte Füllstand | > 90% = Warnung |
+| **Uptime** | Seit wann läuft Pi | Info |
+| **Sensor-Status** | DHT22 OK/Fehler | Rot wenn Fehler |
+
+#### UI-Mockup
+
+```
+┌─────────────────────────────────────────────────────┐
+│ 🖥️ Pi Health Status                    [Aktualisiert: 10:45] │
+├─────────────────────────────────────────────────────┤
+│                                                     │
+│  CPU: 52°C  ████████░░  68%    RAM: 412/1024 MB    │
+│  [=========--------]          [=======-----------]  │
+│                                                     │
+│  Disk: 4.2/16 GB (26%)        Uptime: 3d 14h 22m   │
+│  [=====-----------------]                           │
+│                                                     │
+│  Sensoren: ● DHT22 OK   ● Kamera OK                │
+│                                                     │
+└─────────────────────────────────────────────────────┘
+```
+
+#### API-Endpoints (NEU)
+
+| Endpoint | Beschreibung |
+|----------|--------------|
+| `GET /api/health/system` | CPU-Temp, CPU-%, RAM, Disk, Uptime |
+| `GET /api/health/sensors` | Status aller Sensoren (DHT22, Kamera) |
+
+#### Backend-Implementierung
+
+```python
+# Neue Datei: grow_pi/web/blueprints/health_bp.py
+
+import psutil
+import os
+
+@health_bp.route('/api/health/system')
+def get_system_health():
+    # CPU-Temperatur
+    with open('/sys/class/thermal/thermal_zone0/temp', 'r') as f:
+        cpu_temp = int(f.read()) / 1000.0
+
+    # CPU-Auslastung
+    cpu_percent = psutil.cpu_percent(interval=0.5)
+
+    # RAM
+    memory = psutil.virtual_memory()
+
+    # Disk
+    disk = psutil.disk_usage('/')
+
+    # Uptime
+    with open('/proc/uptime', 'r') as f:
+        uptime_seconds = float(f.readline().split()[0])
+
+    return jsonify({
+        'cpu_temp': round(cpu_temp, 1),
+        'cpu_percent': cpu_percent,
+        'ram_used': memory.used // (1024 * 1024),  # MB
+        'ram_total': memory.total // (1024 * 1024),  # MB
+        'ram_percent': memory.percent,
+        'disk_used': disk.used // (1024 * 1024 * 1024),  # GB
+        'disk_total': disk.total // (1024 * 1024 * 1024),  # GB
+        'disk_percent': disk.percent,
+        'uptime_seconds': int(uptime_seconds),
+        'warnings': get_health_warnings(cpu_temp, memory.percent, disk.percent)
+    })
+```
+
+#### Betroffene Dateien
+
+**Backend (NEU):**
+- `grow_pi/web/blueprints/health_bp.py`
+- `grow_pi/web/api.py` (Blueprint registrieren)
+
+**Frontend:**
+- `static/js/modules/health.js` (NEU)
+- `static/index.html` (Dashboard Widget)
+- `static/css/main.css` (Health Widget Styles)
+
+#### Akzeptanzkriterien
+
+- [ ] CPU-Temperatur wird angezeigt (°C)
+- [ ] CPU-Auslastung wird angezeigt (%)
+- [ ] RAM-Nutzung wird angezeigt (MB / %)
+- [ ] Disk-Nutzung wird angezeigt (GB / %)
+- [ ] Uptime wird angezeigt (Tage, Stunden, Minuten)
+- [ ] Sensor-Status wird angezeigt (OK / Fehler)
+- [ ] Warnungen bei kritischen Werten (farblich)
+- [ ] Auto-Refresh alle 30 Sekunden
+- [ ] Mobile-optimiert
+
+---
+
+### Feature: CPU-Lüftersteuerung (Temperaturgesteuert)
+
+**Status**: 📋 GEPLANT
+**Erstellt**: 2025-12-20
+**Abhängigkeit**: Pi Health Dashboard muss zuerst implementiert sein
+**Hardware**: Noctua-Lüfter (wird später angeschlossen)
+
+#### Ziel
+
+Temperaturgesteuerte Lüftersteuerung für den Raspberry Pi:
+- Lüfter aus wenn CPU < 50°C
+- Lüfter an (50%) wenn CPU 50-60°C
+- Lüfter an (100%) wenn CPU > 60°C
+
+#### Konfiguration
+
+```yaml
+# In config.yaml oder DB
+fan_control:
+  enabled: true
+  gpio_pin: 17  # PWM-fähiger GPIO
+  thresholds:
+    - temp: 50
+      speed: 0
+    - temp: 55
+      speed: 50
+    - temp: 60
+      speed: 75
+    - temp: 70
+      speed: 100
+```
+
+#### Hinweis
+
+Hardware-Anschluss erfolgt später (User hat Noctua-Lüfter). Feature wird vorbereitet.
 
 ---
 
@@ -385,6 +540,149 @@ def _ensure_state(self, target_on: bool, trigger: TriggerType, details: str = ""
 ---
 
 ## 🔧 TECHNISCHE SCHULDEN (Refactoring)
+
+### Refactoring #0: Tuya Cloud API → TinyTuya Migration (KRITISCH)
+
+**Status**: 📋 GEPLANT - KRITISCH
+**Erstellt**: 2025-12-20
+**Geplante Version**: v6.23.0
+**Geschätzter Aufwand**: 3-4 Stunden (einmalig)
+**Ressourcen Pi 3B**: ✅ Ausreichend (sogar leichter als Cloud API)
+
+#### Hintergrund
+
+Die aktuelle Tuya Cloud API hat **strikte Quota Limits** (API Calls pro Monat). Bei intensiver Nutzung werden diese Limits überschritten → Smart Plugs nicht mehr steuerbar. TinyTuya ermöglicht **lokale Kommunikation** ohne Cloud-Abhängigkeit.
+
+#### Vorteile nach Migration
+
+| Vorher (Cloud API) | Nachher (TinyTuya) |
+|--------------------|-------------------|
+| ❌ API Quota Limits | ✅ Keine Limits |
+| ❌ 500-2000ms Latenz | ✅ 50-100ms Latenz |
+| ❌ Internet erforderlich | ✅ Funktioniert offline |
+| ❌ Cloud-Ausfälle | ✅ Nur LAN-Abhängigkeit |
+| ❌ Datenschutz-Bedenken | ✅ Daten bleiben lokal |
+
+#### Phase 1: Vorbereitung (einmalig, braucht noch Cloud)
+
+**1.1 TinyTuya Installation:**
+```bash
+pip install tinytuya
+```
+
+**1.2 Local Keys holen (EINMALIG mit Cloud API):**
+```bash
+python -m tinytuya wizard
+```
+
+**Wizard fragt nach:**
+- API ID (aus Tuya IoT Projekt)
+- API Secret (aus Tuya IoT Projekt)
+- Region (z.B. "eu" für Europa)
+
+**Wizard erstellt:**
+- `devices.json` - Alle Geräte mit Local Keys
+- `tuya-raw.json` - Backup mit allen Infos
+
+**1.3 Firewall/Router Check:**
+```bash
+# Ports freigeben (falls Firewall aktiv): UDP 6666, 6667, 7000 / TCP 6668
+# Test mit Scanner:
+python -m tinytuya scan
+```
+
+#### Phase 2: Code Migration
+
+**Aktueller Code (Cloud API):**
+```python
+# ALT
+from tuya_connector import TuyaOpenAPI
+api = TuyaOpenAPI(endpoint, access_id, access_key)
+status = api.get(f"/v1.0/devices/{device_id}/status")  # ← Quota verbraucht!
+```
+
+**Neuer Code (TinyTuya):**
+```python
+# NEU
+import tinytuya
+device = tinytuya.OutletDevice(
+    dev_id='...',
+    address='192.168.1.100',
+    local_key='...',
+    version=3.3
+)
+status = device.status()  # ← Lokal, kein Quota!
+```
+
+#### Phase 3: Wichtige Unterschiede
+
+**Antwort-Format (DP-Nummern statt "code" Namen):**
+```json
+// Cloud API
+{"result": [{"code": "switch_1", "value": true}], "success": true}
+
+// TinyTuya
+{"dps": {"1": true, "2": 123}}
+```
+
+**DP Mapping ermitteln:**
+```python
+status = device.status()
+print(status['dps'])  # Zeigt alle Data Points
+# DP 1 = Schalter (on/off)
+# DP 18 = Stromverbrauch (Watt) etc.
+```
+
+**IP-Adressen Management:**
+- Lösung 1: Statische IPs im Router (beste Lösung)
+- Lösung 2: TinyTuya Scanner regelmäßig nutzen
+- Lösung 3: Hostname statt IP (wenn Router DNS unterstützt)
+
+#### Betroffene Dateien
+
+**Backend:**
+- `/pi-controller/grow_pi/lamps/smart_plug_controller.py` (Hauptänderung)
+- `/pi-controller/devices.json` (NEU - von Wizard)
+- `/pi-controller/grow_pi/utils/dehumidifier_controller.py` (ggf. anpassen)
+
+**Konfiguration:**
+- Alte ENV: `TUYA_ACCESS_ID`, `TUYA_ACCESS_SECRET`, `TUYA_ENDPOINT`
+- Neue ENV: `TUYA_DEVICES_PATH=/pfad/zu/devices.json`
+
+#### Akzeptanzkriterien
+
+- [ ] `pip install tinytuya` auf Pi
+- [ ] `python -m tinytuya wizard` ausgeführt → `devices.json` erstellt
+- [ ] Local Keys für alle Smart Plugs vorhanden
+- [ ] Netzwerk-Scan findet alle Geräte
+- [ ] `SmartPlugController.py` auf TinyTuya migriert
+- [ ] Gerät schalten (on/off) funktioniert lokal
+- [ ] Status abrufen funktioniert lokal
+- [ ] Energie-Daten auslesen funktioniert
+- [ ] Fehlerbehandlung für Offline-Geräte
+- [ ] 24h Dauertest ohne Cloud-Calls
+
+#### Verlust nach Migration
+
+- ❌ Fernzugriff über Tuya Cloud (nur im LAN)
+- ❌ Tuya App Integration (Geräte nur über GrowPi-Software)
+
+#### Hilfreiche TinyTuya Commands
+
+```bash
+python -m tinytuya scan      # Geräte im Netzwerk scannen
+python -m tinytuya wizard    # Wizard erneut ausführen
+python -m tinytuya version   # Version anzeigen
+```
+
+#### Rollback Plan
+
+1. Code zurückrollen (Git)
+2. Alte Environment Variables reaktivieren
+3. TinyTuya deinstallieren (optional)
+4. Warten bis Quota reset
+
+---
 
 ### Refactoring #1: api.py Modularisierung (KRITISCH)
 
@@ -908,6 +1206,7 @@ NACH RESTART: Ch2: 34%, Ch3: 65%  ← LAMPEN BLIEBEN AN!
 
 | Datum | Änderung | Autor |
 |-------|----------|-------|
+| 2025-12-20 | **NEU:** Refactoring #0 - TinyTuya Migration (Cloud API → Lokal) dokumentiert | Dennis + Claude |
 | 2025-12-07 | **ALLE BUGS BEHOBEN:** Entfeuchter, DHT22, Tuya-ID funktionieren | Dennis + Claude |
 | 2025-12-07 | Refactoring-Plan für api.py erstellt (PLAN_API_REFACTORING.md) | Dennis + Claude |
 | 2025-12-07 | Opus-Agent Analyse: api.py hat 700 Zeilen duplizierten Code | Dennis + Claude |
