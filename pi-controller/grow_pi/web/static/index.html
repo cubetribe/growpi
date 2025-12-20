@@ -100,6 +100,57 @@
                     </div>
                 </section>
 
+                <!-- System Health Widget -->
+                <section class="section system-health-section">
+                    <h2 class="section-title">System-Health</h2>
+                    <div class="health-grid">
+                        <div class="health-metric" id="healthCpuTemp">
+                            <div class="metric-label">CPU Temp</div>
+                            <div class="metric-value">
+                                <span class="metric-number">--</span>
+                                <span class="metric-unit">°C</span>
+                            </div>
+                            <div class="metric-bar">
+                                <div class="metric-fill"></div>
+                            </div>
+                            <div class="metric-status">Normal</div>
+                        </div>
+                        <div class="health-metric" id="healthMemory">
+                            <div class="metric-label">RAM</div>
+                            <div class="metric-value">
+                                <span class="metric-number">--</span>
+                                <span class="metric-unit">%</span>
+                            </div>
+                            <div class="metric-bar">
+                                <div class="metric-fill"></div>
+                            </div>
+                            <div class="metric-status">Normal</div>
+                        </div>
+                        <div class="health-metric" id="healthDisk">
+                            <div class="metric-label">Disk</div>
+                            <div class="metric-value">
+                                <span class="metric-number">--</span>
+                                <span class="metric-unit">%</span>
+                            </div>
+                            <div class="metric-bar">
+                                <div class="metric-fill"></div>
+                            </div>
+                            <div class="metric-status">Normal</div>
+                        </div>
+                        <div class="health-metric" id="healthUptime">
+                            <div class="metric-label">Uptime</div>
+                            <div class="metric-value">
+                                <span class="metric-number">--</span>
+                                <span class="metric-unit">Tage</span>
+                            </div>
+                            <div class="metric-bar">
+                                <div class="metric-fill" style="width: 100%; background: rgba(17, 255, 85, 0.5);"></div>
+                            </div>
+                            <div class="metric-status">Läuft</div>
+                        </div>
+                    </div>
+                </section>
+
                 <section class="section collapsible-section" id="lampSection" data-section-id="beleuchtung">
                     <div class="collapsible-header" data-section="beleuchtung">
                         <h2 class="section-title">Beleuchtung</h2>
@@ -891,6 +942,7 @@
             import { initAccordion } from './js/modules/accordion.js';
             import { initTimelapseModule, cleanupTimelapseModule } from './js/modules/timelapse.js';
             import { initCalendarTab } from './js/modules/calendar.js';
+            import { initHealthMonitoring } from './js/modules/health.js';
 
             // Expose utils to window for modules that rely on them (legacy support)
             window.showError = showError;
@@ -906,6 +958,7 @@
                 initAccordion();
                 initTimelapseModule();
                 initCalendarTab();
+                initHealthMonitoring();
 
                 const historyModule = new HistoryModule();
                 historyModule.initHistoryTab();

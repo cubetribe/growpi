@@ -56,7 +56,7 @@ class DataLogger:
         self.sensor_interval = sensor_interval
         self.sensor_interval = sensor_interval
         self.lamp_interval = lamp_interval
-        self.plug_interval = 60  # Default 60s for plugs
+        self.plug_interval = 60  # 1 minute - local TinyTuya, no quota limits
         self.dedupe_seconds = dedupe_seconds
 
         self.plug_controller = SmartPlugController()

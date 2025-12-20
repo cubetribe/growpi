@@ -2,6 +2,49 @@
 
 Alle wichtigen Änderungen am GrowPi Pi-Controller werden hier dokumentiert.
 
+## [v6.22.0] - 2025-12-20
+
+### Added
+- **Pi Health Monitoring Dashboard Widget**
+  - Live System-Metriken: CPU-Temperatur, RAM, Disk, Uptime
+  - Farbcodierte Status-Anzeigen (normal/warning/critical)
+  - API-Endpoint `/api/health` erweitert mit `system` Object
+  - Frontend-Modul `health.js` mit Auto-Refresh (30s)
+  - Schwellwerte: CPU <60°C, RAM <70%, Disk <70%
+- **TinyTuya Lokale Steuerung**
+  - Scan auf Pi ausgeführt (4 Tuya-Geräte gefunden)
+  - Lokale Verbindung getestet (Main Light: 109.6W @ 233.2V)
+  - `devices.json` auf Pi aktualisiert (ANTELA: BLE → WiFi)
+- **Timelapse Auto-Enable**
+  - Bei Service-Neustart wird Timelapse automatisch aktiviert
+  - Standard-Intervall: 600 Sekunden (10 Minuten)
+  - Verhindert manuelle Konfiguration nach jedem Reboot
+
+### Changed
+- **Performance-Optimierungen**
+  - Cache-TTL reduziert: 60s → 10s (bessere Responsiveness bei lokaler Steuerung)
+  - Plug-Polling-Intervall: 60s (jede Minute Stromerfassung)
+  - System-Metriken-Cache mit 30s TTL (reduziert psutil-Calls)
+- **Version-Management**
+  - `dependencies.py` lädt Version jetzt dynamisch aus VERSION-Datei
+  - Keine hardcodierte Version mehr
+
+### Fixed
+- Tuya Cloud API Quota-Limit umgangen durch lokale TinyTuya-Steuerung
+- Version-Anzeige im Frontend jetzt konsistent mit VERSION-Datei
+
+### Dependencies
+- `psutil` (v5.9.6+) für System-Metriken
+- `tinytuya` (v1.14.1) für lokale Tuya-Steuerung
+
+### Deployment-Hinweis
+Nach Änderungen an der VERSION-Datei oder Code-Updates:
+1. Dateien auf Pi übertragen
+2. Service neu starten: `sudo systemctl restart grow-pi`
+3. Browser Hard-Refresh (Cmd+Shift+R / Strg+Shift+R) für Frontend-Version-Anzeige
+
+---
+
 ## [v6.21.1] - 2025-12-20
 
 ### Fixed

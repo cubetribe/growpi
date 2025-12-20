@@ -166,12 +166,14 @@ try:
     from .blueprints.curves_bp import curves_bp, init_blueprint as init_curves_blueprint
     from .blueprints.logs_bp import logs_bp, init_logs_bp
     from .blueprints.calendar_bp import calendar_bp
+    from .blueprints.status_bp import status_bp
     app.register_blueprint(costs_bp)
     app.register_blueprint(dehumidifier_bp)
     app.register_blueprint(curves_bp)
     app.register_blueprint(logs_bp)
     app.register_blueprint(calendar_bp)
-    logging.info("Registered costs_bp, dehumidifier_bp, curves_bp, logs_bp, and calendar_bp blueprints")
+    app.register_blueprint(status_bp, url_prefix='/api')
+    logging.info("Registered costs_bp, dehumidifier_bp, curves_bp, logs_bp, calendar_bp, and status_bp blueprints")
 except ImportError as e:
     logging.warning(f"Could not import blueprints: {e}")
 
@@ -1153,19 +1155,8 @@ def test_timelapse_brightness():
 # ============================================================================
 # Health & Info
 # ============================================================================
-
-@app.route('/api/health', methods=['GET'])
-def health_check():
-    """Health check endpoint"""
-    return jsonify({
-        "status": "healthy",
-        "version": API_VERSION,
-        "pwm_available": pwm_controller is not None,
-        "sensor_available": dht_sensor is not None or not DHT_AVAILABLE,
-        "logging_available": DB_AVAILABLE and data_logger is not None,
-        "logging_running": data_logger._running if data_logger else False,
-        "curves_available": CURVE_AVAILABLE and curve_controller is not None
-    })
+# NOTE: /api/health moved to status_bp.py (v6.22.0 - Health Monitoring)
+# ============================================================================
 
 
 @app.route('/api/version', methods=['GET'])

@@ -122,13 +122,21 @@ class CameraService:
         self._last_capture_time = 0
         self._min_capture_interval = 0.1  # 100ms minimum between captures
 
-        # Timelapse
-        self.timelapse_config = TimelapseConfig()
+        # Timelapse - AUTO-ENABLE on service start
+        self.timelapse_config = TimelapseConfig(
+            enabled=True,         # AUTO-ENABLED on startup
+            interval_seconds=600  # 10 minutes default
+        )
         self._timelapse_thread: Optional[threading.Thread] = None
         self._timelapse_running = False
 
         if CV2_AVAILABLE:
             self._init_camera()
+
+            # Auto-start timelapse if camera initialized successfully
+            if self._initialized and self.timelapse_config.enabled:
+                self._start_timelapse()
+                logger.info(f"Timelapse auto-enabled on startup (interval: {self.timelapse_config.interval_seconds}s)")
 
     def _init_camera(self) -> bool:
         """Initialize the camera device."""

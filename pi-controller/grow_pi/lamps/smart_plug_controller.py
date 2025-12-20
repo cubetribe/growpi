@@ -27,7 +27,7 @@ class SmartPlugController:
         self.device_info: Dict[str, dict] = {}
         self.last_update: Dict[str, float] = {}
         self.cache: Dict[str, dict] = {}
-        self.cache_ttl = 60.0  # Cache status for 60 seconds (Cloud API rate limits)
+        self.cache_ttl = 10.0  # Cache status for 10 seconds (local control, shorter cache)
         
         self._load_config()
         self.initialized = True
@@ -133,6 +133,7 @@ class SmartPlugController:
 
         # 2. Try Cloud (BLE)
         if self.cloud:
+            logger.warning(f"Falling back to Cloud API for {device_id} (local connection failed or BLE device)")
             try:
                 # Get status from Cloud
                 status = self.cloud.getstatus(device_id)

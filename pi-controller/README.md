@@ -6,9 +6,11 @@ Python-basierter Controller-Service für den Raspberry Pi 3B+.
 
 Dieser Controller läuft auf dem Raspberry Pi und steuert Grow-Lampen via PWM.
 
-**Aktueller Stand: v6.21.1 (2025-12-20)**
+**Aktueller Stand: v6.22.0 (2025-12-20)**
 - Web-Interface auf Port 5000
+- **Pi Health Monitoring**: Live System-Metriken im Dashboard
 - Live-Kamera Livestream (USB-Webcam, 720p, Auto-Detection)
+- **TinyTuya Lokale Steuerung**: Smart Plugs ohne Cloud-API
 - Sonnenkurven-Modus mit automatischer Tageszeit-Interpolation
 - 4 PWM-Kanäle für LED-Steuerung
 - Raumklima-Steuerung mit Entfeuchtung
@@ -150,21 +152,43 @@ pi-controller/
 
 ## Erweiterungs-Roadmap
 
-| Level | Feature              | Status |
-|-------|----------------------|--------|
-| 1     | Feste Lampenwerte    | ✅ Done |
-| 2     | Logging verbessern   | ✅ Done |
-| 3     | DHT22 Sensor         | ✅ Done (2025-12-05) |
-| 4     | Kurven-Interpolation | ✅ Done |
-| 4b    | Web-Interface        | ✅ Done |
-| 5     | SQLite Daten-Logging | ✅ Done (2025-12-05) |
-| 6     | Kosten-Tracking      | ✅ Done (2025-12-06) |
-| 7     | Room Environment     | ✅ Done (2025-12-06) |
-| 8     | **Live-Kamera**      | ✅ Done (2025-12-06) |
-| 9     | Timelapse            | ✅ Done (2025-12-09) |
-| 10    | **Grow Calendar**    | ✅ Done (2025-12-17) |
-| 11    | RS485 Bodensensoren  | ⏳ Geplant |
-| 12    | Lokale Plug-Steuerung| ⏳ Geplant (Tuya API-Limit) |
+| Level | Feature                  | Status |
+|-------|--------------------------|--------|
+| 1     | Feste Lampenwerte        | ✅ Done |
+| 2     | Logging verbessern       | ✅ Done |
+| 3     | DHT22 Sensor             | ✅ Done (2025-12-05) |
+| 4     | Kurven-Interpolation     | ✅ Done |
+| 4b    | Web-Interface            | ✅ Done |
+| 5     | SQLite Daten-Logging     | ✅ Done (2025-12-05) |
+| 6     | Kosten-Tracking          | ✅ Done (2025-12-06) |
+| 7     | Room Environment         | ✅ Done (2025-12-06) |
+| 8     | **Live-Kamera**          | ✅ Done (2025-12-06) |
+| 9     | Timelapse                | ✅ Done (2025-12-09) |
+| 10    | **Grow Calendar**        | ✅ Done (2025-12-17) |
+| 11    | **Pi Health Monitoring** | ✅ Done (2025-12-20) |
+| 12    | **TinyTuya Lokal**       | ✅ Done (2025-12-20) |
+| 13    | RS485 Bodensensoren      | ⏳ Geplant |
+
+### Health Monitoring API
+
+```bash
+# System Health Check (mit CPU-Temp, RAM, Disk, Uptime)
+curl "http://192.168.0.86:5000/api/health"
+# → {
+#     "status": "healthy",
+#     "version": "6.22.0",
+#     "system": {
+#       "cpu_temp": 52.3,
+#       "cpu_temp_status": "normal",
+#       "cpu_load": 28.5,
+#       "memory_percent": 62.1,
+#       "memory_status": "normal",
+#       "disk_percent": 45.3,
+#       "disk_status": "normal",
+#       "uptime_seconds": 345678
+#     }
+#   }
+```
 
 ### Camera API Endpoints
 
@@ -221,6 +245,21 @@ sudo journalctl -u grow-pi -n 100
 
 ## Troubleshooting
 
+### Version im Frontend aktualisieren
+
+Nach Code-Updates oder Änderungen an der VERSION-Datei:
+
+```bash
+# Service neu starten
+sudo systemctl restart grow-pi
+
+# Im Browser: Hard-Refresh für aktuelle Version-Anzeige
+# - macOS: Cmd + Shift + R
+# - Windows/Linux: Strg + Shift + R
+```
+
+Die Version wird im Web-Interface oben rechts angezeigt und sollte mit der VERSION-Datei übereinstimmen.
+
 ### pigpiod nicht gestartet
 
 ```bash
@@ -258,7 +297,7 @@ sudo journalctl -u grow-pi -n 50 --no-pager
 ---
 
 **Python Version**: 3.13
-**Aktuelles Level**: v6.21.1 (Sensor Robustness)
+**Aktuelles Level**: v6.22.0 (Health Monitoring + TinyTuya Lokal)
 **Stand**: 2025-12-20
 **Web-Interface**: http://192.168.0.86:5000
 **Changelog**: [CHANGELOG.md](CHANGELOG.md)

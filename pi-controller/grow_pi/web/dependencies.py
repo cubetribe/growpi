@@ -10,6 +10,7 @@ ensuring blueprints don't directly couple to hardware implementations.
 import logging
 from typing import Optional, Callable, Tuple, Dict
 from .services.lamp_config import get_lamp_channels, LampChannel
+from ..version import get_version
 
 logger = logging.getLogger(__name__)
 
@@ -30,8 +31,8 @@ _db_available = False
 _curve_available = False
 _mode_available = False
 
-# API Version
-_api_version = "6.20.0"
+# API Version - dynamically loaded from VERSION file
+_api_version = get_version()
 
 
 # ============================================================================
