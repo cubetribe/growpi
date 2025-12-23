@@ -179,7 +179,9 @@ def get_status():
         }
     """
     try:
-        from ..dependencies import get_lamp_channels, get_pwm_controller, get_dht_reader, get_data_logger, get_api_version
+        from ..dependencies import get_lamp_channels, get_pwm_controller, get_data_logger, get_api_version
+        # BUGFIX v6.22.2: Use shared sensor cache for consistent values
+        from ...utils.sensor_cache import read_dht22
 
         # Get lamp channels config
         lamp_channels = get_lamp_channels()
@@ -201,9 +203,8 @@ def get_status():
                 "color": config.color
             })
 
-        # Get sensor data
-        dht_reader = get_dht_reader()
-        temp, humidity = dht_reader()
+        # Get sensor data - use shared sensor cache for consistency
+        temp, humidity = read_dht22()
 
         # Check logging status
         data_logger = get_data_logger()

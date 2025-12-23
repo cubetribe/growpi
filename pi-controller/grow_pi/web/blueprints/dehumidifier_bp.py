@@ -70,17 +70,21 @@ def create_response(success: bool, data: dict = None, error: str = None) -> dict
 
 @dehumidifier_bp.route('/api/room', methods=['GET'])
 def get_room_status():
-    """Get room status including temperature, humidity, and dehumidifier state"""
+    """
+    Get room status including temperature, humidity, and dehumidifier state.
+
+    BUGFIX v6.22.2 (2025-12-20): Use shared sensor cache for consistency
+    - Both /api/status and /api/room use the same sensor_cache module
+    - No more circular import issues
+    """
     try:
-        # Read temperature and humidity
-        temp = None
-        humidity = None
-        if _humidity_reader:
-            try:
-                temp, humidity = _humidity_reader()
-            except TypeError:
-                # If reader returns only humidity
-                humidity = _humidity_reader()
+        # BUGFIX v6.22.2: Use shared sensor cache - ensures identical values
+        try:
+            from grow_pi.utils.sensor_cache import read_dht22
+        except ImportError:
+            from ...utils.sensor_cache import read_dht22
+
+        temp, humidity = read_dht22()
 
         response_data = {
             "temperature": temp,
@@ -88,10 +92,13 @@ def get_room_status():
             "timestamp": datetime.now().isoformat()
         }
 
-        # Add dehumidifier status if available
+        # Add dehumidifier status
         controller = _get_dehumidifier()
         if controller:
-            response_data["dehumidifier"] = controller.get_status()
+            status = controller.get_status()
+            # Override controller's humidity with the cached value
+            status["humidity"] = humidity
+            response_data["dehumidifier"] = status
         else:
             response_data["dehumidifier"] = {"available": False}
 

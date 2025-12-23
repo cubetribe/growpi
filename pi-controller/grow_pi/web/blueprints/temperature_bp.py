@@ -60,41 +60,59 @@ DHT_CACHE_SECONDS = 30  # Minimum seconds between sensor reads (erhöht für CPU
 
 
 def read_dht22() -> Tuple[Optional[float], Optional[float]]:
-    """Read temperature and humidity from DHT22 with caching and retry"""
-    global _dht_cache
+    """
+    DEPRECATED v6.22.3: Use sensor_cache.read_dht22() instead!
 
-    if dht_sensor is None:
-        # Return mock data for testing
-        import random
-        return (22.0 + random.uniform(-2, 2), 60.0 + random.uniform(-5, 5))
+    This function is kept for backward compatibility but now delegates
+    to the shared sensor cache to prevent cache inconsistencies.
 
-    # Return cached value if recent enough
-    now = time.time()
-    if now - _dht_cache["timestamp"] < DHT_CACHE_SECONDS:
-        if _dht_cache["temp"] is not None:
-            return (_dht_cache["temp"], _dht_cache["humidity"])
+    Read temperature and humidity from DHT22 with caching and retry
+    """
+    # BUGFIX v6.22.3: Delegate to shared sensor cache instead of maintaining separate cache
+    logger.warning("temperature_bp.read_dht22() is DEPRECATED - use sensor_cache.read_dht22() instead")
 
-    # Try up to 3 times to read the sensor
-    for attempt in range(3):
-        try:
-            temp = dht_sensor.temperature
-            humidity = dht_sensor.humidity
-            if temp is not None and humidity is not None:
-                _dht_cache["temp"] = round(temp, 1)
-                _dht_cache["humidity"] = round(humidity, 1)
-                _dht_cache["timestamp"] = now
-                return (_dht_cache["temp"], _dht_cache["humidity"])
-        except RuntimeError as e:
-            logger.warning(f"DHT22 read attempt {attempt+1}/3: {e}")
-            if attempt < 2:
-                time.sleep(0.5)
+    try:
+        from ..utils.sensor_cache import read_dht22 as sensor_cache_read
+        return sensor_cache_read()
+    except ImportError:
+        from grow_pi.utils.sensor_cache import read_dht22 as sensor_cache_read
+        return sensor_cache_read()
 
-    # Return last known good value if available
-    if _dht_cache["temp"] is not None:
-        logger.info("Returning cached DHT22 value")
-        return (_dht_cache["temp"], _dht_cache["humidity"])
+    # OLD CODE BELOW - DEPRECATED - DO NOT USE
+    # global _dht_cache
 
-    return (None, None)
+    # if dht_sensor is None:
+    #     # Return mock data for testing
+    #     import random
+    #     return (22.0 + random.uniform(-2, 2), 60.0 + random.uniform(-5, 5))
+
+    # # Return cached value if recent enough
+    # now = time.time()
+    # if now - _dht_cache["timestamp"] < DHT_CACHE_SECONDS:
+    #     if _dht_cache["temp"] is not None:
+    #         return (_dht_cache["temp"], _dht_cache["humidity"])
+
+    # # Try up to 3 times to read the sensor
+    # for attempt in range(3):
+    #     try:
+    #         temp = dht_sensor.temperature
+    #         humidity = dht_sensor.humidity
+    #         if temp is not None and humidity is not None:
+    #             _dht_cache["temp"] = round(temp, 1)
+    #             _dht_cache["humidity"] = round(humidity, 1)
+    #             _dht_cache["timestamp"] = now
+    #             return (_dht_cache["temp"], _dht_cache["humidity"])
+    #     except RuntimeError as e:
+    #         logger.warning(f"DHT22 read attempt {attempt+1}/3: {e}")
+    #         if attempt < 2:
+    #             time.sleep(0.5)
+
+    # # Return last known good value if available
+    # if _dht_cache["temp"] is not None:
+    #     logger.info("Returning cached DHT22 value")
+    #     return (_dht_cache["temp"], _dht_cache["humidity"])
+
+    # return (None, None)
 
 
 # ============================================================================

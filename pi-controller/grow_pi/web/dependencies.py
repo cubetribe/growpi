@@ -164,30 +164,24 @@ def get_dht_reader() -> Callable[[], Tuple[Optional[float], Optional[float]]]:
     """
     Get a function to read DHT22 sensor data.
 
+    BUGFIX v6.22.4: Use shared sensor_cache instead of direct sensor access
+    to ensure consistent values and prevent sensor freeze issues.
+
     Returns:
         Callable that returns (temperature, humidity) tuple
     """
-    sensor = get_dht_sensor()
-
-    if sensor and is_dht_available():
-        # Real hardware sensor
-        def read_sensor():
+    # Always use sensor_cache for consistent readings
+    def read_from_cache():
+        try:
             try:
-                temperature = sensor.temperature
-                humidity = sensor.humidity
-                return (temperature, humidity)
-            except Exception as e:
-                logger.error(f"DHT22 read error: {e}")
-                return (None, None)
-        return read_sensor
-    else:
-        # Mock data for development
-        import random
-        def mock_sensor():
-            temp = round(20 + random.uniform(-2, 2), 1)
-            humidity = round(60 + random.uniform(-5, 5), 1)
-            return (temp, humidity)
-        return mock_sensor
+                from grow_pi.utils.sensor_cache import read_dht22
+            except ImportError:
+                from ..utils.sensor_cache import read_dht22
+            return read_dht22()
+        except Exception as e:
+            logger.error(f"DHT22 cache read error: {e}")
+            return (None, None)
+    return read_from_cache
 
 
 def get_lamp_reader() -> Callable[[], Dict[int, Dict]]:

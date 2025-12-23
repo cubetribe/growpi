@@ -330,81 +330,18 @@ def create_response(success: bool, data: Dict = None, error: str = None) -> Dict
     return response
 
 
-# Cache for DHT22 readings (sensor needs 2s between reads)
-_dht_cache = {"temp": None, "humidity": None, "timestamp": 0, "error_count": 0}
-DHT_CACHE_SECONDS = 30  # Minimum seconds between sensor reads (erhöht für CPU-Optimierung)
-DHT_MAX_CONSECUTIVE_ERRORS = 3  # Invalidate cache after 3 consecutive failed reads
+# ============================================================================
+# Shared Sensor Cache (v6.22.2)
+# ============================================================================
+# Use shared sensor cache to ensure consistent values across all endpoints
+try:
+    from ..utils.sensor_cache import read_dht22, get_cached_values, init_sensor, init_data_logger
+except ImportError:
+    from grow_pi.utils.sensor_cache import read_dht22, get_cached_values, init_sensor, init_data_logger
 
-
-def read_dht22() -> Tuple[Optional[float], Optional[float]]:
-    """
-    Read temperature and humidity from DHT22 with caching and retry.
-
-    ROBUSTNESS FIX 2025-12-20:
-    - Invalidates cache after 3 consecutive failed reads
-    - Tracks error count for monitoring
-    - Logs persistent errors for debugging
-    """
-    global _dht_cache
-    import time
-
-    if dht_sensor is None:
-        # Return mock data for testing
-        import random
-        return (22.0 + random.uniform(-2, 2), 60.0 + random.uniform(-5, 5))
-
-    # Return cached value if recent enough
-    now = time.time()
-    if now - _dht_cache["timestamp"] < DHT_CACHE_SECONDS:
-        if _dht_cache["temp"] is not None:
-            return (_dht_cache["temp"], _dht_cache["humidity"])
-
-    # Try up to 3 times to read the sensor
-    for attempt in range(3):
-        try:
-            temp = dht_sensor.temperature
-            humidity = dht_sensor.humidity
-            if temp is not None and humidity is not None:
-                _dht_cache["temp"] = round(temp, 1)
-                _dht_cache["humidity"] = round(humidity, 1)
-                _dht_cache["timestamp"] = now
-                _dht_cache["error_count"] = 0  # Reset error count on success
-                return (_dht_cache["temp"], _dht_cache["humidity"])
-        except RuntimeError as e:
-            logger.warning(f"DHT22 read attempt {attempt+1}/3: {e}")
-            if attempt < 2:
-                time.sleep(0.5)
-
-    # All 3 attempts failed - increment error counter
-    _dht_cache["error_count"] += 1
-
-    # Invalidate cache if too many consecutive errors
-    if _dht_cache["error_count"] >= DHT_MAX_CONSECUTIVE_ERRORS:
-        logger.error(f"DHT22 failed {_dht_cache['error_count']} times consecutively - invalidating cache")
-        _dht_cache["temp"] = None
-        _dht_cache["humidity"] = None
-        _dht_cache["timestamp"] = 0
-
-        # Log persistent sensor error for monitoring
-        if data_logger:
-            try:
-                data_logger.log_event(
-                    'sensor_persistent_error',
-                    'error',
-                    f'DHT22 failed {_dht_cache["error_count"]} consecutive reads',
-                    {'error_count': _dht_cache["error_count"]}
-                )
-            except Exception:
-                pass  # Don't crash if logging fails
-
-        return (None, None)
-
-    # Return last known good value if available (but warn about errors)
-    if _dht_cache["temp"] is not None:
-        logger.warning(f"DHT22 read failed (error #{_dht_cache['error_count']}) - returning cached value")
-        return (_dht_cache["temp"], _dht_cache["humidity"])
-
-    return (None, None)
+# Initialize sensor cache with DHT sensor instance
+init_sensor(dht_sensor, DHT_AVAILABLE)
+logger.info(f"Shared sensor cache initialized (DHT available: {DHT_AVAILABLE})")
 
 
 # Set humidity reader for dehumidifier - BOTH controller AND blueprint need it!
@@ -1197,8 +1134,10 @@ def _get_dehumidifier():
     global dehumidifier_controller
     if DEHUMIDIFIER_AVAILABLE and dehumidifier_controller is None:
         dehumidifier_controller = get_dehumidifier_controller()
-        # Set humidity reader
+        # Set humidity reader (using shared sensor cache)
         def humidity_reader():
+            # BUGFIX v6.22.3: Use sensor_cache instead of temperature_bp.read_dht22()
+            from grow_pi.utils.sensor_cache import read_dht22
             _, humidity = read_dht22()
             return humidity
         dehumidifier_controller.set_humidity_reader(humidity_reader)

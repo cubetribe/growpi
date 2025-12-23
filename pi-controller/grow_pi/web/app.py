@@ -441,14 +441,14 @@ def _register_blueprints(app: Flask) -> None:
             set_dehumidifier_controller(app.dehumidifier_controller)
 
             # Set humidity reader function
+            # BUGFIX v6.22.4: Use sensor_cache instead of temperature_bp to prevent freeze
             def humidity_reader():
-                """Read humidity from DHT22 sensor"""
-                if app.dht_sensor is None:
-                    import random
-                    return 60.0 + random.uniform(-5, 5)
-
-                from .blueprints.temperature_bp import read_dht22 as bp_read_dht22
-                _, humidity = bp_read_dht22()
+                """Read humidity from DHT22 sensor via shared cache"""
+                try:
+                    from grow_pi.utils.sensor_cache import read_dht22
+                except ImportError:
+                    from ..utils.sensor_cache import read_dht22
+                _, humidity = read_dht22()
                 return humidity
 
             set_humidity_reader(humidity_reader)
@@ -506,16 +506,14 @@ def run_server(app: Flask = None, host: str = None, port: int = None, debug: boo
             from .services.lamp_config import get_lamp_channels
 
             # Define sensor reader function
+            # BUGFIX v6.22.4: Use sensor_cache instead of temperature_bp to prevent freeze
             def read_dht22():
-                """Read DHT22 sensor with caching"""
-                if app.dht_sensor is None:
-                    # Return mock data
-                    import random
-                    return (22.0 + random.uniform(-2, 2), 60.0 + random.uniform(-5, 5))
-
-                # Use the sensor reader from temperature blueprint
-                from .blueprints.temperature_bp import read_dht22 as bp_read_dht22
-                return bp_read_dht22()
+                """Read DHT22 sensor with caching via shared cache"""
+                try:
+                    from grow_pi.utils.sensor_cache import read_dht22 as cache_read_dht22
+                except ImportError:
+                    from ..utils.sensor_cache import read_dht22 as cache_read_dht22
+                return cache_read_dht22()
 
             # Define lamp reader function
             def get_lamp_states():
