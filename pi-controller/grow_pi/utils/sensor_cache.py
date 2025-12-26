@@ -37,10 +37,10 @@ DHT_READ_TIMEOUT = 5.0  # v6.22.5: Max seconds to wait for sensor read in isolat
 
 # Circuit breaker opens after 5 failures in evaluation window
 # Stays open for 30 seconds before attempting reset
+# Note: state_storage removed for compatibility with pybreaker 1.4.x
 _sensor_circuit_breaker = pybreaker.CircuitBreaker(
     fail_max=5,
     reset_timeout=30,
-    state_storage=pybreaker.CircuitMemoryStorage(),
     name="DHT22_Sensor"
 )
 
