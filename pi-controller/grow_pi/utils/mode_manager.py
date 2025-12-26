@@ -13,6 +13,11 @@ IMPORTANT:
 - On startup: ALWAYS defaults to 'auto' for plant safety
 - Mode is persisted to /tmp/growpi_mode.txt
 - Single source of truth for mode across all modules
+
+Thread-Safety (v6.23.0):
+- All public methods are thread-safe via self._lock
+- LOCK ORDERING: This is lock #2 in the global lock hierarchy
+  (sensor_cache._cache_lock → mode_manager._lock → pwm_state._lock)
 """
 
 import os
@@ -126,13 +131,25 @@ class ModeManager:
         Register a callback for mode changes.
 
         Callback signature: callback(old_mode: str, new_mode: str)
+
+        v6.23.0: Lock protection already present - thread-safe.
         """
         with self._lock:
             self._callbacks.append(callback)
 
     def _notify_callbacks(self, old_mode: str, new_mode: str) -> None:
-        """Notify all registered callbacks about mode change."""
-        for callback in self._callbacks:
+        """
+        Notify all registered callbacks about mode change.
+
+        v6.23.0: Thread-safe callback iteration.
+        Creates a copy of callbacks list to avoid issues if callbacks modify the list.
+        """
+        # Create a copy of callbacks to iterate safely
+        with self._lock:
+            callbacks_copy = self._callbacks.copy()
+
+        # Execute callbacks outside lock to prevent deadlocks
+        for callback in callbacks_copy:
             try:
                 callback(old_mode, new_mode)
             except Exception as e:

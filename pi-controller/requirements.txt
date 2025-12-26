@@ -9,6 +9,9 @@ Adafruit-Blinka>=8.68.0
 minimalmodbus>=2.0.1
 pyserial>=3.5
 
+# Smart Plugs (Tuya)
+tinytuya>=1.13.0
+
 # Web API
 flask>=3.0.0
 flask-cors>=4.0.0
@@ -23,9 +26,13 @@ httpx>=0.24.0
 
 # Configuration
 PyYAML>=6.0
+python-dotenv>=1.0.0
 
 # System monitoring
 psutil>=5.9.0
+
+# Circuit Breaker (v6.22.5 - Sensor Hardening)
+pybreaker>=1.0.1
 
 # Development
 pytest>=7.0.0

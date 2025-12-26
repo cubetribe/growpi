@@ -2,6 +2,80 @@
 
 Alle wichtigen Änderungen am GrowPi Pi-Controller werden hier dokumentiert.
 
+## [v6.23.0] - 2025-12-26 - Tank-Mode Hardening
+
+### Added
+- **Circuit Breaker Pattern für DHT22 Sensor** (pybreaker)
+  - Automatische Abschaltung nach 5 Fehlern
+  - 30 Sekunden Erholungszeit, dann Auto-Recovery
+  - Graceful Degradation mit Cache-Fallback
+  - Process Isolation verhindert kompletten System-Freeze
+- **Health Check API Endpoints** (Observability Layer)
+  - `GET /api/health/` - Comprehensive Health Check (mit System-Metriken)
+  - `GET /api/health/ready` - Kubernetes Readiness Probe
+  - `GET /api/health/live` - Kubernetes Liveness Probe
+  - `GET /api/health/metrics` - Prometheus-Style Metriken
+- **Incident Snapshot System**
+  - Automatische Snapshots bei kritischen Fehlern
+  - Speicherort: `/var/log/grow-pi/incidents/`
+  - Enthält: Sensor-Status, DB-Status, Thread-Info, System-Metriken
+  - Auto-Cleanup (max 100 Snapshots)
+- **Structured Logging Utilities**
+  - Log-Formatter mit Thread-Info und Modul-Namen
+  - Severity-basierte Farbcodierung
+  - JSON-Export-Option für Log-Aggregation
+- **systemd Watchdog Integration**
+  - Service Type: `notify` mit `WatchdogSec=60`
+  - Watchdog-Ping-Intervall: 30 Sekunden
+  - Automatischer Service-Restart bei Hang (SIGKILL nach 60s)
+  - sd_notify Integration (READY, WATCHDOG, STOPPING)
+
+### Changed
+- **Database Robustness**
+  - SQLite Connect Timeout: 5s → 30s
+  - Retry-on-Busy mit exponential backoff (3 Retries, 100ms base delay)
+  - atexit Handler für sauberes Connection Cleanup
+- **Thread-Safety Improvements**
+  - Sensor Cache: Alle Operationen jetzt thread-safe (RLock)
+  - Mode Manager: Thread-safe get/set Operations (Lock)
+  - PWM State: Thread-safe State Save/Load (Lock + fcntl file lock)
+  - Lock Ordering Convention dokumentiert (Cache → Mode → PWM)
+- **DataLogger Robustness**
+  - Event-basiertes Warten statt busy loops (`threading.Event.wait()`)
+  - 5 Retries pro Loop-Iteration mit exponential backoff
+  - Graceful Degradation bei Fehlern (System läuft weiter)
+  - System-Events für persistente Fehler
+
+### Fixed
+- **Race Conditions** in sensor_cache.py eliminiert
+- **Potential Deadlocks** in mode_manager.py verhindert
+- **Database Connection Leaks** bei ungraceful Shutdown
+- **Sensor Freeze Bug** - DHT22 Freeze blockiert nicht mehr gesamtes System
+
+### Dependencies
+- **pybreaker>=1.0.1** (NEU) - Circuit Breaker Pattern
+- **psutil>=5.9.0** (bereits vorhanden) - System-Metriken
+
+### Technical Debt Reduction
+- Alle kritischen Code-Pfade jetzt thread-safe
+- Lock Ordering Convention dokumentiert (verhindert Deadlocks)
+- Per-Thread SQLite Connections (threading.local())
+- Comprehensive Error Recovery Strategies
+
+### Deployment-Hinweise
+Nach Update auf v6.23.0:
+1. Neue Dependencies installieren: `pip install pybreaker>=1.0.1`
+2. systemd Service-Datei aktualisieren: `sudo cp systemd/grow-pi.service /etc/systemd/system/`
+3. systemd neu laden: `sudo systemctl daemon-reload`
+4. Service neu starten: `sudo systemctl restart grow-pi`
+5. Watchdog verifizieren: `journalctl -u grow-pi -f | grep "Watchdog"`
+6. Health Check testen: `curl http://localhost:5000/api/health`
+
+### Breaking Changes
+Keine - vollständig rückwärtskompatibel
+
+---
+
 ## [v6.22.0] - 2025-12-20
 
 ### Added

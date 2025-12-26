@@ -6,8 +6,18 @@ Python-basierter Controller-Service für den Raspberry Pi 3B+.
 
 Dieser Controller läuft auf dem Raspberry Pi und steuert Grow-Lampen via PWM.
 
-**Aktueller Stand: v6.22.0 (2025-12-20)**
+**Aktueller Stand: v6.23.0 (2025-12-26) - Tank-Mode Hardening**
 - Web-Interface auf Port 5000
+- **Tank-Mode Hardening**: Production-Ready Robustness
+  - Circuit Breaker für DHT22 Sensor (Auto-Recovery nach Freeze)
+  - systemd Watchdog Integration (Auto-Restart bei Hang)
+  - Thread-Safe Operations mit Lock Ordering Convention
+  - Database Retry-on-Busy mit exponential backoff
+- **Observability Layer**: Health Check API & Incident Snapshots
+  - `/api/health/` - Comprehensive Health Check
+  - `/api/health/ready` - Kubernetes Readiness Probe
+  - `/api/health/live` - Liveness Probe
+  - `/api/health/metrics` - Prometheus-Style Metriken
 - **Pi Health Monitoring**: Live System-Metriken im Dashboard
 - Live-Kamera Livestream (USB-Webcam, 720p, Auto-Detection)
 - **TinyTuya Lokale Steuerung**: Smart Plugs ohne Cloud-API
@@ -16,7 +26,6 @@ Dieser Controller läuft auf dem Raspberry Pi und steuert Grow-Lampen via PWM.
 - Raumklima-Steuerung mit Entfeuchtung
 - **Grow Calendar** mit Phase Tracking & Milestones
 - **CPU-optimiert**: ~28% statt 75% Auslastung
-- **Sensor Robustness**: DHT22 mit Retry-Logik nach Hard-Reset
 
 ## Quick Start (MVP)
 
@@ -167,16 +176,18 @@ pi-controller/
 | 10    | **Grow Calendar**        | ✅ Done (2025-12-17) |
 | 11    | **Pi Health Monitoring** | ✅ Done (2025-12-20) |
 | 12    | **TinyTuya Lokal**       | ✅ Done (2025-12-20) |
-| 13    | RS485 Bodensensoren      | ⏳ Geplant |
+| 13    | **Tank-Mode Hardening**  | ✅ Done (2025-12-26) |
+| 14    | RS485 Bodensensoren      | ⏳ Geplant |
 
-### Health Monitoring API
+### Health Monitoring API (v6.23.0 - Enhanced)
 
 ```bash
-# System Health Check (mit CPU-Temp, RAM, Disk, Uptime)
-curl "http://192.168.0.86:5000/api/health"
+# Comprehensive Health Check (mit CPU-Temp, RAM, Disk, Sensor Status)
+curl "http://192.168.0.86:5000/api/health/"
 # → {
 #     "status": "healthy",
-#     "version": "6.22.0",
+#     "version": "6.23.0",
+#     "timestamp": "2025-12-26T10:30:00Z",
 #     "system": {
 #       "cpu_temp": 52.3,
 #       "cpu_temp_status": "normal",
@@ -186,7 +197,34 @@ curl "http://192.168.0.86:5000/api/health"
 #       "disk_percent": 45.3,
 #       "disk_status": "normal",
 #       "uptime_seconds": 345678
+#     },
+#     "sensor": {
+#       "available": true,
+#       "error_count": 0,
+#       "circuit_breaker_state": "closed"
+#     },
+#     "database": {
+#       "available": true,
+#       "active_connections": 3
 #     }
+#   }
+
+# Kubernetes Readiness Probe (Ready to serve traffic?)
+curl "http://192.168.0.86:5000/api/health/ready"
+# → 200 OK or 503 Service Unavailable
+
+# Kubernetes Liveness Probe (Application alive?)
+curl "http://192.168.0.86:5000/api/health/live"
+# → 200 OK or 503 Service Unavailable
+
+# Prometheus-Style Metrics
+curl "http://192.168.0.86:5000/api/health/metrics"
+# → {
+#     "sensor_error_count": 0,
+#     "database_active_connections": 3,
+#     "circuit_breaker_state": "closed",
+#     "system_cpu_load": 28.5,
+#     "system_memory_percent": 62.1
 #   }
 ```
 
@@ -297,10 +335,44 @@ sudo journalctl -u grow-pi -n 50 --no-pager
 ---
 
 **Python Version**: 3.13
-**Aktuelles Level**: v6.22.0 (Health Monitoring + TinyTuya Lokal)
-**Stand**: 2025-12-20
+**Aktuelles Level**: v6.23.0 (Tank-Mode Hardening)
+**Stand**: 2025-12-26
 **Web-Interface**: http://192.168.0.86:5000
 **Changelog**: [CHANGELOG.md](CHANGELOG.md)
+
+---
+
+## Tank-Mode Features (v6.23.0)
+
+### Production-Ready Robustness
+
+**Circuit Breaker Pattern:**
+- Automatische Abschaltung nach 5 Sensor-Fehlern
+- 30s Erholungszeit, dann Auto-Recovery
+- Verhindert kompletten System-Freeze bei DHT22-Problemen
+
+**systemd Watchdog:**
+- Automatischer Service-Restart bei Hang (60s Timeout)
+- Watchdog-Ping alle 30 Sekunden
+- sd_notify Integration (READY, WATCHDOG, STOPPING)
+
+**Thread-Safety:**
+- RLock für Sensor Cache (erlaubt nested calls)
+- Lock für Mode Manager Operations
+- Lock + fcntl für PWM State File
+- Dokumentierte Lock Ordering Convention (verhindert Deadlocks)
+
+**Database Hardening:**
+- 30s Connect Timeout (statt 5s)
+- Retry-on-Busy mit exponential backoff (3 Retries)
+- Per-Thread Connections (threading.local())
+- atexit Handler für Connection Cleanup
+
+**Observability:**
+- Health Check Endpoints (/api/health/*)
+- Incident Snapshots bei kritischen Fehlern
+- Structured Logging mit Thread-Info
+- Prometheus-Style Metriken
 
 ---
 

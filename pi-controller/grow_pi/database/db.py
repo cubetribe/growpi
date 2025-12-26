@@ -8,9 +8,12 @@ import sqlite3
 import logging
 import os
 import threading
+import time
+import atexit
 from datetime import datetime, timedelta
 from typing import Optional, List, Dict, Any
 from contextlib import contextmanager
+from functools import wraps
 
 from .models import SensorReading, LampStateLog, SystemEvent, LampCurve, PlugLog, CurvePreset
 
@@ -20,6 +23,43 @@ logger = logging.getLogger(__name__)
 DEFAULT_DB_PATH = '/opt/grow-pi/data/growpi.db'
 
 # SQL Schema
+def retry_on_busy(max_retries: int = 3, base_delay: float = 0.1):
+    """
+    Decorator für SQLite BUSY retry mit exponential backoff.
+
+    Verhindert SQLITE_BUSY Fehler bei konkurrierenden Zugriffen durch:
+    - Automatische Retry-Versuche mit exponentieller Wartezeit
+    - Max 3 Versuche mit 0.1s, 0.2s, 0.4s Wartezeit
+
+    Usage:
+        @retry_on_busy(max_retries=3, base_delay=0.1)
+        def execute_query(cursor, sql, params):
+            cursor.execute(sql, params)
+    """
+    def decorator(func):
+        @wraps(func)
+        def wrapper(*args, **kwargs):
+            last_error = None
+            for attempt in range(max_retries):
+                try:
+                    return func(*args, **kwargs)
+                except sqlite3.OperationalError as e:
+                    error_str = str(e).lower()
+                    if "database is locked" in error_str or "locked" in error_str:
+                        last_error = e
+                        delay = base_delay * (2 ** attempt)
+                        logger.warning(f"DB locked, retry {attempt+1}/{max_retries} in {delay:.2f}s: {e}")
+                        time.sleep(delay)
+                    else:
+                        # Andere OperationalErrors sofort werfen
+                        raise
+            # Alle Retries aufgebraucht
+            logger.error(f"DB operation failed after {max_retries} retries")
+            raise last_error
+        return wrapper
+    return decorator
+
+
 SCHEMA_SQL = """
 -- Sensor Readings Table
 CREATE TABLE IF NOT EXISTS sensor_readings (
@@ -241,16 +281,22 @@ class Database:
         self._local = threading.local()
         self._lock = threading.Lock()
         self._initialized = False
+        self._all_connections = []  # Track all connections for cleanup
+        self._connections_lock = threading.Lock()
+
+        # Register cleanup handler for graceful shutdown
+        atexit.register(self._cleanup_all_connections)
 
     def _get_connection(self) -> sqlite3.Connection:
-        """Get thread-local database connection."""
+        """Get thread-local database connection with retry-on-busy support."""
         if not hasattr(self._local, 'connection') or self._local.connection is None:
             # Ensure directory exists
             os.makedirs(os.path.dirname(self.db_path), exist_ok=True)
 
-            # Create connection with optimized settings
+            # Create connection with optimized settings + TIMEOUT
             self._local.connection = sqlite3.connect(
                 self.db_path,
+                timeout=30.0,  # CRITICAL: 30s Lock-Timeout (statt default 5s)
                 detect_types=sqlite3.PARSE_DECLTYPES,
                 check_same_thread=False
             )
@@ -261,21 +307,33 @@ class Database:
             # Optimize for performance
             self._local.connection.execute('PRAGMA synchronous=NORMAL')
 
+            # Track connection for cleanup
+            with self._connections_lock:
+                self._all_connections.append(self._local.connection)
+
+            logger.debug(f"Created new DB connection (total: {len(self._all_connections)})")
+
         return self._local.connection
 
     @contextmanager
     def _cursor(self):
-        """Context manager for database cursor with auto-commit."""
+        """Context manager for database cursor with auto-commit and retry logic."""
         conn = self._get_connection()
         cursor = conn.cursor()
         try:
             yield cursor
-            conn.commit()
+            # Commit mit Retry-Logik
+            self._commit_with_retry(conn)
         except Exception as e:
             conn.rollback()
             raise e
         finally:
             cursor.close()
+
+    @retry_on_busy(max_retries=3, base_delay=0.1)
+    def _commit_with_retry(self, conn: sqlite3.Connection) -> None:
+        """Commit with automatic retry on SQLITE_BUSY."""
+        conn.commit()
 
     @contextmanager
     def get_connection(self):
@@ -313,11 +371,53 @@ class Database:
             self._initialized = True
             logger.info("Database initialized successfully")
 
+    def _cleanup_all_connections(self) -> None:
+        """
+        Called on program exit (atexit handler) to close all connections.
+
+        Verhindert "database is locked" Fehler beim Shutdown durch:
+        - Schließen aller thread-local Connections
+        - Thread-safe Cleanup
+        """
+        logger.info("Cleaning up all database connections...")
+        with self._connections_lock:
+            for conn in self._all_connections:
+                try:
+                    conn.close()
+                    logger.debug("Closed DB connection")
+                except Exception as e:
+                    logger.warning(f"Error closing connection: {e}")
+            self._all_connections.clear()
+        logger.info("Database cleanup complete")
+
+    def is_connection_healthy(self) -> bool:
+        """
+        Prüft ob aktuelle Connection funktioniert.
+
+        Returns:
+            True wenn Connection OK, False bei Fehler
+        """
+        try:
+            conn = self._get_connection()
+            conn.execute("SELECT 1")
+            return True
+        except Exception as e:
+            logger.error(f"Connection health check failed: {e}")
+            return False
+
     def close(self) -> None:
-        """Close database connection."""
+        """Close database connection for current thread."""
         if hasattr(self._local, 'connection') and self._local.connection:
-            self._local.connection.close()
-            self._local.connection = None
+            try:
+                self._local.connection.close()
+                # Remove from tracked connections
+                with self._connections_lock:
+                    if self._local.connection in self._all_connections:
+                        self._all_connections.remove(self._local.connection)
+                self._local.connection = None
+                logger.debug("Closed thread-local DB connection")
+            except Exception as e:
+                logger.warning(f"Error closing thread-local connection: {e}")
 
     # =========================================================================
     # Sensor Readings

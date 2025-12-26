@@ -5,7 +5,7 @@ After=network.target pigpiod.service
 Requires=pigpiod.service
 
 [Service]
-Type=simple
+Type=notify
 User=admin
 Group=admin
 WorkingDirectory=/opt/grow-pi
@@ -22,6 +22,12 @@ RuntimeDirectoryPreserve=yes
 # Restart policy - schneller restart für Zero-Downtime
 Restart=always
 RestartSec=5
+
+# Watchdog Configuration (Tank-Mode)
+# Service muss alle 60s ein WATCHDOG=1 Signal senden
+# Sonst wird es als gehangen erkannt und neu gestartet
+WatchdogSec=60
+WatchdogSignal=SIGKILL
 
 # Environment
 Environment=PYTHONUNBUFFERED=1

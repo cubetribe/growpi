@@ -165,37 +165,110 @@ class DataLogger:
         logger.info("DataLogger stopped")
 
     def _sensor_loop(self) -> None:
-        """Background loop for sensor logging."""
+        """
+        Background loop for sensor logging with retry logic.
+
+        ROBUSTNESS: Bei DB-Fehlern retry mit exponential backoff
+        statt Loop zu beenden.
+        """
+        retry_count = 0
+        max_retries = 5
+
         while self._running:
             try:
                 self._log_sensors()
+                retry_count = 0  # Reset bei Erfolg
             except Exception as e:
-                logger.error(f"Sensor logging error: {e}")
-                self.log_event('sensor_error', 'error', str(e))
+                retry_count += 1
+                logger.error(f"Sensor logging error (retry {retry_count}/{max_retries}): {e}")
+
+                # Log system event bei wiederholten Fehlern
+                if retry_count >= 3:
+                    try:
+                        self.log_event('sensor_error', 'error',
+                                     f'Repeated failures: {e}',
+                                     {'retry_count': retry_count})
+                    except Exception as log_err:
+                        logger.error(f"Failed to log event: {log_err}")
+
+                # Bei zu vielen Fehlern: längere Pause
+                if retry_count >= max_retries:
+                    logger.warning(f"Too many sensor errors, increasing wait time")
+                    self._stop_event.wait(timeout=self.sensor_interval * 2)
+                    retry_count = 0  # Reset nach langer Pause
+                    continue
 
             # CPU-effizientes Warten mit Event (statt 120x time.sleep(1))
             self._stop_event.wait(timeout=self.sensor_interval)
 
     def _lamp_loop(self) -> None:
-        """Background loop for lamp state logging."""
+        """
+        Background loop for lamp state logging with retry logic.
+
+        ROBUSTNESS: Bei DB-Fehlern retry mit exponential backoff.
+        """
+        retry_count = 0
+        max_retries = 5
+
         while self._running:
             try:
                 self._log_lamps(source='periodic')
+                retry_count = 0  # Reset bei Erfolg
             except Exception as e:
-                logger.error(f"Lamp logging error: {e}")
-                self.log_event('pwm_error', 'error', str(e))
+                retry_count += 1
+                logger.error(f"Lamp logging error (retry {retry_count}/{max_retries}): {e}")
+
+                # Log system event bei wiederholten Fehlern
+                if retry_count >= 3:
+                    try:
+                        self.log_event('pwm_error', 'error',
+                                     f'Repeated failures: {e}',
+                                     {'retry_count': retry_count})
+                    except Exception as log_err:
+                        logger.error(f"Failed to log event: {log_err}")
+
+                # Bei zu vielen Fehlern: längere Pause
+                if retry_count >= max_retries:
+                    logger.warning(f"Too many lamp logging errors, increasing wait time")
+                    self._stop_event.wait(timeout=self.lamp_interval * 2)
+                    retry_count = 0
+                    continue
 
             # CPU-effizientes Warten mit Event (statt 120x time.sleep(1))
             self._stop_event.wait(timeout=self.lamp_interval)
 
     def _plug_loop(self) -> None:
-        """Background loop for plug logging."""
+        """
+        Background loop for plug logging with retry logic.
+
+        ROBUSTNESS: Bei DB-Fehlern retry mit exponential backoff.
+        """
+        retry_count = 0
+        max_retries = 5
+
         while self._running:
             try:
                 self._log_plugs()
+                retry_count = 0  # Reset bei Erfolg
             except Exception as e:
-                logger.error(f"Plug logging error: {e}")
-                self.log_event('plug_error', 'error', str(e))
+                retry_count += 1
+                logger.error(f"Plug logging error (retry {retry_count}/{max_retries}): {e}")
+
+                # Log system event bei wiederholten Fehlern
+                if retry_count >= 3:
+                    try:
+                        self.log_event('plug_error', 'error',
+                                     f'Repeated failures: {e}',
+                                     {'retry_count': retry_count})
+                    except Exception as log_err:
+                        logger.error(f"Failed to log event: {log_err}")
+
+                # Bei zu vielen Fehlern: längere Pause
+                if retry_count >= max_retries:
+                    logger.warning(f"Too many plug logging errors, increasing wait time")
+                    self._stop_event.wait(timeout=self.plug_interval * 2)
+                    retry_count = 0
+                    continue
 
             # CPU-effizientes Warten mit Event (statt 60x time.sleep(1))
             self._stop_event.wait(timeout=self.plug_interval)

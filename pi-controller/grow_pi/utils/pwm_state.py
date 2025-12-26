@@ -7,6 +7,12 @@ für nahtlose Service-Neustarts ohne LED-Flackern.
 Nutzt die pigpiod-Persistenz: PWM-Werte bleiben stabil,
 solange pigpiod läuft - unabhängig vom Python-Prozess.
 
+Thread-Safety (v6.23.0):
+- File-level locking (fcntl.flock) for inter-process safety
+- Thread-level locking (_state_lock) for intra-process safety
+- LOCK ORDERING: This is lock #3 in the global lock hierarchy
+  (sensor_cache._cache_lock → mode_manager._lock → pwm_state._state_lock)
+
 Author: Dennis Westermann
 Created: 2025-12-06
 """
@@ -14,11 +20,16 @@ Created: 2025-12-06
 import json
 import os
 import fcntl
+import threading
 from datetime import datetime
 from typing import Dict, Optional, Any
 import logging
 
 logger = logging.getLogger(__name__)
+
+# Thread-safety lock for state operations
+# v6.23.0: Prevents race conditions when multiple threads access state
+_state_lock = threading.Lock()
 
 # State-Verzeichnis (tmpfs, wird bei Reboot gelöscht)
 STATE_DIR = '/run/growpi'
@@ -73,6 +84,8 @@ def save_state(pwm_controller, mode: str = 'auto') -> bool:
     """
     Speichert aktuellen PWM-Zustand für Zero-Downtime Restart.
 
+    Thread-safe: Uses both thread lock and file lock for safety.
+
     Args:
         pwm_controller: PWMController Instanz
         mode: Aktueller Modus ('auto' oder 'manual')
@@ -80,132 +93,142 @@ def save_state(pwm_controller, mode: str = 'auto') -> bool:
     Returns:
         True wenn erfolgreich gespeichert
     """
-    ensure_state_dir()
-    _, state_file, lock_file = _get_state_paths()
+    with _state_lock:  # Thread-safety
+        ensure_state_dir()
+        _, state_file, lock_file = _get_state_paths()
 
-    # State-Objekt aufbauen
-    state: Dict[str, Any] = {
-        'version': 1,
-        'timestamp': datetime.now().isoformat(),
-        'mode': mode,
-        'channels': {}
-    }
-
-    # Channel-Daten aus PWMController extrahieren
-    for channel_num, channel_info in pwm_controller.channels.items():
-        state['channels'][str(channel_num)] = {
-            'gpio': channel_info.gpio_pin,
-            'name': channel_info.name,
-            'intensity': channel_info.current_intensity,
-            'source': 'curve' if mode == 'auto' else 'manual',
-            'updated_at': datetime.now().isoformat()
+        # State-Objekt aufbauen
+        state: Dict[str, Any] = {
+            'version': 1,
+            'timestamp': datetime.now().isoformat(),
+            'mode': mode,
+            'channels': {}
         }
 
-    # Atomisches Schreiben mit File-Lock
-    try:
-        # Lock-File erstellen/öffnen
-        with open(lock_file, 'w') as lock:
-            fcntl.flock(lock, fcntl.LOCK_EX)
+        # Channel-Daten aus PWMController extrahieren
+        for channel_num, channel_info in pwm_controller.channels.items():
+            state['channels'][str(channel_num)] = {
+                'gpio': channel_info.gpio_pin,
+                'name': channel_info.name,
+                'intensity': channel_info.current_intensity,
+                'source': 'curve' if mode == 'auto' else 'manual',
+                'updated_at': datetime.now().isoformat()
+            }
 
-            # State schreiben
-            with open(state_file, 'w') as f:
-                json.dump(state, f, indent=2)
+        # Atomisches Schreiben mit File-Lock
+        try:
+            # Lock-File erstellen/öffnen
+            with open(lock_file, 'w') as lock:
+                fcntl.flock(lock, fcntl.LOCK_EX)
 
-            fcntl.flock(lock, fcntl.LOCK_UN)
+                # State schreiben
+                with open(state_file, 'w') as f:
+                    json.dump(state, f, indent=2)
 
-        logger.info(f"PWM state saved to {state_file}")
-        logger.debug(f"State: {state}")
-        return True
+                fcntl.flock(lock, fcntl.LOCK_UN)
 
-    except Exception as e:
-        logger.error(f"Failed to save PWM state: {e}")
-        return False
+            logger.info(f"PWM state saved to {state_file}")
+            logger.debug(f"State: {state}")
+            return True
+
+        except Exception as e:
+            logger.error(f"Failed to save PWM state: {e}")
+            return False
 
 
 def load_state() -> Optional[Dict[str, Any]]:
     """
     Lädt gespeicherten PWM-Zustand.
 
+    Thread-safe: Uses both thread lock and file lock for safety.
+
     Returns:
         State-Dictionary oder None wenn nicht vorhanden/fehlerhaft
     """
-    _, state_file, lock_file = _get_state_paths()
+    with _state_lock:  # Thread-safety
+        _, state_file, lock_file = _get_state_paths()
 
-    if not os.path.exists(state_file):
-        logger.debug(f"No state file found at {state_file}")
-        return None
-
-    try:
-        # Lock für Lesen
-        with open(lock_file, 'w') as lock:
-            fcntl.flock(lock, fcntl.LOCK_SH)
-
-            with open(state_file, 'r') as f:
-                state = json.load(f)
-
-            fcntl.flock(lock, fcntl.LOCK_UN)
-
-        # Version prüfen
-        if state.get('version') != 1:
-            logger.warning(f"Unknown state version: {state.get('version')}")
+        if not os.path.exists(state_file):
+            logger.debug(f"No state file found at {state_file}")
             return None
 
-        logger.info(f"PWM state loaded from {state_file}")
-        logger.debug(f"Loaded state: {state}")
-        return state
+        try:
+            # Lock für Lesen
+            with open(lock_file, 'w') as lock:
+                fcntl.flock(lock, fcntl.LOCK_SH)
 
-    except json.JSONDecodeError as e:
-        logger.error(f"Corrupted state file: {e}")
-        return None
-    except Exception as e:
-        logger.error(f"Failed to load PWM state: {e}")
-        return None
+                with open(state_file, 'r') as f:
+                    state = json.load(f)
+
+                fcntl.flock(lock, fcntl.LOCK_UN)
+
+            # Version prüfen
+            if state.get('version') != 1:
+                logger.warning(f"Unknown state version: {state.get('version')}")
+                return None
+
+            logger.info(f"PWM state loaded from {state_file}")
+            logger.debug(f"Loaded state: {state}")
+            return state
+
+        except json.JSONDecodeError as e:
+            logger.error(f"Corrupted state file: {e}")
+            return None
+        except Exception as e:
+            logger.error(f"Failed to load PWM state: {e}")
+            return None
 
 
 def state_exists() -> bool:
     """
     Prüft ob ein gültiger State-File existiert.
 
+    Thread-safe: Uses thread lock for safety.
+
     Returns:
         True wenn State-File existiert und lesbar ist
     """
-    _, state_file, _ = _get_state_paths()
+    with _state_lock:  # Thread-safety
+        _, state_file, _ = _get_state_paths()
 
-    if not os.path.exists(state_file):
-        return False
+        if not os.path.exists(state_file):
+            return False
 
-    # Prüfe ob Datei lesbar und nicht leer
-    try:
-        with open(state_file, 'r') as f:
-            content = f.read()
-            if not content.strip():
-                return False
-            # Prüfe ob valides JSON
-            json.loads(content)
-            return True
-    except (json.JSONDecodeError, IOError):
-        return False
+        # Prüfe ob Datei lesbar und nicht leer
+        try:
+            with open(state_file, 'r') as f:
+                content = f.read()
+                if not content.strip():
+                    return False
+                # Prüfe ob valides JSON
+                json.loads(content)
+                return True
+        except (json.JSONDecodeError, IOError):
+            return False
 
 
 def clear_state() -> bool:
     """
     Löscht State-Files (für intentionalen Full-Shutdown).
 
+    Thread-safe: Uses thread lock for safety.
+
     Returns:
         True wenn erfolgreich gelöscht
     """
-    _, state_file, lock_file = _get_state_paths()
+    with _state_lock:  # Thread-safety
+        _, state_file, lock_file = _get_state_paths()
 
-    try:
-        if os.path.exists(state_file):
-            os.remove(state_file)
-            logger.info(f"State file removed: {state_file}")
+        try:
+            if os.path.exists(state_file):
+                os.remove(state_file)
+                logger.info(f"State file removed: {state_file}")
 
-        return True
+            return True
 
-    except Exception as e:
-        logger.error(f"Failed to clear state: {e}")
-        return False
+        except Exception as e:
+            logger.error(f"Failed to clear state: {e}")
+            return False
 
 
 def get_state_age_seconds() -> Optional[float]:
@@ -215,10 +238,12 @@ def get_state_age_seconds() -> Optional[float]:
     Nützlich für Watchdog-Logik: Wenn State zu alt,
     könnte der Hauptservice abgestürzt sein.
 
+    Thread-safe: load_state() already uses thread lock.
+
     Returns:
         Alter in Sekunden oder None wenn kein State existiert
     """
-    state = load_state()
+    state = load_state()  # Already thread-safe
     if not state:
         return None
 

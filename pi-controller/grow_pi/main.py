@@ -21,7 +21,9 @@ Per-Channel Kurven (Standard):
 
 import argparse
 import logging
+import os
 import signal
+import socket
 import sys
 import time
 import threading
@@ -79,6 +81,65 @@ from .utils.sun_curve import (
     print_curve_preview,
     CurvePoint,
 )
+
+
+# ============================================================================
+# SYSTEMD WATCHDOG INTEGRATION (Tank-Mode)
+# ============================================================================
+
+def sd_notify(state: str) -> bool:
+    """
+    Send notification to systemd.
+
+    Args:
+        state: Notification string (e.g., "READY=1", "WATCHDOG=1", "STOPPING=1")
+
+    Returns:
+        True if notification was sent successfully
+
+    Reference: systemd.notify(3)
+    """
+    notify_socket = os.environ.get("NOTIFY_SOCKET")
+    if not notify_socket:
+        return False
+
+    try:
+        # Abstract socket notation
+        if notify_socket.startswith("@"):
+            notify_socket = "\0" + notify_socket[1:]
+
+        sock = socket.socket(socket.AF_UNIX, socket.SOCK_DGRAM)
+        sock.connect(notify_socket)
+        sock.sendall(state.encode())
+        sock.close()
+        return True
+    except Exception as e:
+        # Don't spam logs - only warn at startup
+        logger = logging.getLogger(__name__)
+        logger.debug(f"sd_notify failed: {e}")
+        return False
+
+
+def notify_ready() -> None:
+    """Signal systemd that service is ready."""
+    if sd_notify("READY=1"):
+        logger = logging.getLogger(__name__)
+        logger.info("Systemd notified: Service ready")
+
+
+def notify_watchdog() -> None:
+    """Send watchdog ping to systemd."""
+    sd_notify("WATCHDOG=1")
+
+
+def notify_stopping() -> None:
+    """Signal systemd that service is stopping."""
+    if sd_notify("STOPPING=1"):
+        logger = logging.getLogger(__name__)
+        logger.info("Systemd notified: Service stopping")
+
+
+# ============================================================================
 
 
 class GrowPiController:
@@ -218,6 +279,9 @@ class GrowPiController:
         logger.info("Initialization complete!")
         logger.info("=" * 50)
 
+        # Notify systemd that service is ready (Tank-Mode)
+        notify_ready()
+
         return True
 
     def _start_web_api(self) -> None:
@@ -307,10 +371,12 @@ class GrowPiController:
 
         update_interval = 60  # Check curve every 60 seconds
         heartbeat_interval = 300  # Log status every 5 minutes
+        watchdog_interval = 30  # Systemd watchdog ping every 30s (< WatchdogSec/2)
 
         try:
             last_update = 0
             last_heartbeat = time.time()
+            last_watchdog_ping = time.time()
             last_known_mode = _get_current_mode()  # Track mode changes
 
             while self.running:
@@ -334,6 +400,12 @@ class GrowPiController:
                 if self.mode == "curve" and current_mode == "auto" and (now - last_update >= update_interval):
                     self._update_intensity_from_curve()
                     last_update = now
+
+                # Systemd watchdog ping (Tank-Mode)
+                if now - last_watchdog_ping >= watchdog_interval:
+                    notify_watchdog()
+                    last_watchdog_ping = now
+                    logger.debug("Watchdog ping sent to systemd")
 
                 # Periodic status log
                 if now - last_heartbeat >= heartbeat_interval:
@@ -364,6 +436,9 @@ class GrowPiController:
         """
         logger = logging.getLogger(__name__)
         logger.info("Stopping GrowPi Controller...")
+
+        # Notify systemd that we're stopping gracefully (Tank-Mode)
+        notify_stopping()
 
         self.running = False
 
