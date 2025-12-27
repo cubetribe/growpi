@@ -223,6 +223,27 @@ def _read_dht22_with_timeout(timeout_seconds: float = DHT_READ_TIMEOUT) -> Tuple
         raise RuntimeError("No result from sensor process")
 
 
+def _direct_sensor_read() -> Tuple[float, float]:
+    """
+    Direct sensor read without caching or retry logic.
+
+    v6.23.0: Extracted for use with circuit breaker.
+    This function is called by the circuit breaker and should raise
+    an exception if the read fails.
+
+    Returns:
+        Tuple of (temperature, humidity)
+
+    Raises:
+        RuntimeError: If sensor returns None values
+    """
+    temp = _dht_sensor.temperature
+    humidity = _dht_sensor.humidity
+    if temp is None or humidity is None:
+        raise RuntimeError("Sensor returned None values")
+    return (temp, humidity)
+
+
 def read_dht22() -> Tuple[Optional[float], Optional[float]]:
     """
     Read temperature and humidity from DHT22 sensor with caching.
@@ -264,21 +285,13 @@ def read_dht22() -> Tuple[Optional[float], Optional[float]]:
                 return (_sensor_cache["temp"], _sensor_cache["humidity"])
             return (None, None)
 
-    # Try to read from real sensor (up to 3 attempts) with circuit breaker protection
+    # Try to read from real sensor (up to 3 attempts)
+    # v6.23.0: Circuit breaker wraps the actual sensor read, not the retry loop
     for attempt in range(3):
         try:
-            # v6.23.0: Use circuit breaker wrapped sensor read
-            # This will raise CircuitBreakerError if breaker is open
-            # and will track failures/successes for breaker state management
-            @_sensor_circuit_breaker
-            def _protected_sensor_read():
-                temp = _dht_sensor.temperature
-                humidity = _dht_sensor.humidity
-                if temp is None or humidity is None:
-                    raise RuntimeError("Sensor returned None values")
-                return (temp, humidity)
-
-            temp, humidity = _protected_sensor_read()
+            # Use circuit breaker to track failures and protect against persistent errors
+            # The circuit breaker will open after 5 failures and stay open for 30 seconds
+            temp, humidity = _sensor_circuit_breaker.call(_direct_sensor_read)
 
             # Thread-safe cache update
             with _cache_lock:
@@ -289,7 +302,7 @@ def read_dht22() -> Tuple[Optional[float], Optional[float]]:
                 _sensor_cache["error_count"] = 0
                 return (_sensor_cache["temp"], _sensor_cache["humidity"])
         except pybreaker.CircuitBreakerError:
-            # Circuit breaker tripped during our read attempts
+            # Circuit breaker is OPEN - stop trying and return cached value
             logger.warning("Circuit breaker tripped - returning cached value")
             with _cache_lock:
                 if _sensor_cache["temp"] is not None:
