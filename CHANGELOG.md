@@ -7,6 +7,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [6.24.0] - 2025-12-29
+
+### Fixed
+- **CRITICAL: DHT22 Sensor Freeze Bug** - `_direct_sensor_read()` now uses timeout-protected `_read_dht22_with_timeout()` to prevent blocking calls from freezing the entire service
+- Root cause: Direct sensor access (`_dht_sensor.temperature`) could block forever if sensor hardware froze
+- Fix: Delegate to existing process-isolated read with 5-second timeout and force-kill
+
+### Technical Details
+- Changed `_direct_sensor_read()` in `sensor_cache.py` to call `_read_dht22_with_timeout()`
+- The timeout-protected function was already implemented in v6.22.5 but never used
+- Circuit breaker can now properly count timeouts as failures
+- System automatically recovers after sensor freeze (no manual reboot needed)
+
+### Files Changed
+- `pi-controller/grow_pi/utils/sensor_cache.py` - Use timeout-protected read
+
+---
+
 ## [v6.21.0] - 2025-12-16
 
 ### Added

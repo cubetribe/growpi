@@ -6,7 +6,7 @@ Provides a centralized DHT22 sensor cache that can be imported from anywhere
 without circular import issues. This ensures all endpoints return the same
 cached sensor values.
 
-Version: 6.22.5 - Tank-Mode Sensor Hardening
+Version: 6.24.0 - Critical Timeout Fix for Sensor Freeze
 - Process isolation for DHT22 reads with timeout
 - Circuit breaker pattern for persistent failures
 - Graceful degradation with structured logging
@@ -225,23 +225,21 @@ def _read_dht22_with_timeout(timeout_seconds: float = DHT_READ_TIMEOUT) -> Tuple
 
 def _direct_sensor_read() -> Tuple[float, float]:
     """
-    Direct sensor read without caching or retry logic.
+    Direct sensor read with timeout protection.
 
-    v6.23.0: Extracted for use with circuit breaker.
-    This function is called by the circuit breaker and should raise
-    an exception if the read fails.
+    v6.24.0: CRITICAL FIX - Use timeout-protected read.
+    Previous implementation blocked forever if sensor froze.
+    Now delegates to _read_dht22_with_timeout() which runs
+    the read in an isolated process with 5-second timeout.
 
     Returns:
         Tuple of (temperature, humidity)
 
     Raises:
-        RuntimeError: If sensor returns None values
+        TimeoutError: If sensor read exceeds timeout
+        RuntimeError: If sensor read fails
     """
-    temp = _dht_sensor.temperature
-    humidity = _dht_sensor.humidity
-    if temp is None or humidity is None:
-        raise RuntimeError("Sensor returned None values")
-    return (temp, humidity)
+    return _read_dht22_with_timeout(timeout_seconds=DHT_READ_TIMEOUT)
 
 
 def read_dht22() -> Tuple[Optional[float], Optional[float]]:
