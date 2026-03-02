@@ -1,8 +1,12 @@
 [Unit]
 Description=GrowPi Greenhouse Controller
 Documentation=https://github.com/cubetribe/GrowPi
-After=network.target pigpiod.service
+After=network-online.target pigpiod.service
+Wants=network-online.target
 Requires=pigpiod.service
+StartLimitIntervalSec=300
+StartLimitBurst=5
+StartLimitAction=reboot-force
 
 [Service]
 Type=notify
@@ -19,9 +23,10 @@ RuntimeDirectory=growpi
 RuntimeDirectoryMode=0755
 RuntimeDirectoryPreserve=yes
 
-# Restart policy - schneller restart für Zero-Downtime
-Restart=always
-RestartSec=5
+# Restart policy
+Restart=on-failure
+RestartSec=3
+RestartPreventExitStatus=0 SIGTERM SIGINT
 
 # Watchdog Configuration (Tank-Mode)
 # Service muss alle 60s ein WATCHDOG=1 Signal senden
@@ -38,12 +43,24 @@ StandardError=journal
 SyslogIdentifier=grow-pi
 
 # Graceful shutdown - Zeit für State-Save (Zero-Downtime)
+TimeoutStartSec=120
 TimeoutStopSec=30
 KillMode=mixed
 KillSignal=SIGTERM
+OOMPolicy=restart
 
 # Security hardening
 NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/opt/grow-pi /run/growpi
+LockPersonality=true
+MemoryDenyWriteExecute=true
+RestrictRealtime=true
+RestrictSUIDSGID=true
+UMask=0027
+TasksMax=512
 
 [Install]
 WantedBy=multi-user.target

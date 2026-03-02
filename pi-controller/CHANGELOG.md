@@ -2,6 +2,43 @@
 
 Alle wichtigen Änderungen am GrowPi Pi-Controller werden hier dokumentiert.
 
+## [v6.24.1] - 2026-02-03 - Cool White Pin Fix
+
+### Fixed
+- **PWM pin mapping mismatch**: Channel 3 (Cool White) now drives GPIO-18 / Pin 12 as wired on the production Pi; channel 4 (UV) moves to GPIO-12 / Pin 32. This restores Cool White output and keeps UV available for future use.
+
+### Added
+- **Runtime Watchdog Monitor (Controller intern)**
+  - Dedizierter Monitor-Thread prüft Main-Loop-Heartbeat und kritische Worker-Komponenten (Web-Thread, DataLogger, Dehumidifier)
+  - `WATCHDOG=trigger` bei Teil-Ausfällen, damit systemd sofort neu startet statt den Timeout abzuwarten
+  - Watchdog-Ping-Intervall wird dynamisch aus `WATCHDOG_USEC` abgeleitet (50%-Regel)
+- **Background Runtime Health Exports**
+  - `DataLogger.get_runtime_health()` und `DehumidifierController.get_runtime_health()`
+  - `web/api.py:get_runtime_health()` als aggregierter Runtime-Health-Endpoint für den Hauptprozess
+- **Hardware Watchdog Setup**
+  - Neue systemd-Manager-Drop-in-Datei: `systemd/99-growpi-watchdog.conf`
+  - `install.sh` aktiviert Kernel-Watchdog (`dtparam=watchdog=on`) und installiert Manager-Watchdog-Konfiguration
+
+### Changed
+- **systemd Unit Hardening (`systemd/grow-pi.service`)**
+  - Restart-Policy auf `on-failure` mit schnelleren Recovery-Zyklen
+  - Crash-Loop-Schutz mit `StartLimitIntervalSec`, `StartLimitBurst`, `StartLimitAction=reboot-force`
+  - Zusätzliche Sicherheits- und Laufzeitgrenzen (`ProtectSystem`, `ProtectHome`, `PrivateTmp`, `TasksMax`, `OOMPolicy=restart`)
+- **Web API Standalone Start**
+  - Direktstart (`python -m grow_pi.web.api`) läuft jetzt stabil ohne Debug-Reloader (`debug=False`, `use_reloader=False`)
+
+### Validation
+- Unit-Tests ergänzt:
+  - `tests/unit/test_systemd_watchdog.py`
+  - `tests/unit/test_datalogger_runtime_health.py`
+- Testlauf: `147 passed` (`pytest -q tests/unit`)
+
+### Documentation
+- Updated pin tables in `README.md`, `docs/HARDWARE_PINOUT.md`, `docs/SPEC_RASPBERRY_PI.md`, and `CLAUDE.md` to prevent future mis-wiring.
+- Added `reports/v6.24.1/00-analysis-report.md` to capture the failure investigation.
+
+---
+
 ## [v6.23.0] - 2025-12-26 - Tank-Mode Hardening
 
 ### Added

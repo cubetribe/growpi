@@ -6,7 +6,7 @@ Python-basierter Controller-Service für den Raspberry Pi 3B+.
 
 Dieser Controller läuft auf dem Raspberry Pi und steuert Grow-Lampen via PWM.
 
-**Aktueller Stand: v6.23.0 (2025-12-26) - Tank-Mode Hardening**
+**Aktueller Stand: v6.24.1 (2026-03-02) - Stability Hardening**
 - Web-Interface auf Port 5000
 - **Tank-Mode Hardening**: Production-Ready Robustness
   - Circuit Breaker für DHT22 Sensor (Auto-Recovery nach Freeze)
@@ -43,6 +43,12 @@ scp -r pi-controller admin@192.168.0.86:/home/admin/
 cd /home/admin/pi-controller
 chmod +x install.sh
 ./install.sh
+```
+
+Wichtig nach der Installation:
+
+```bash
+sudo reboot
 ```
 
 ### 3. Konfiguration anpassen
@@ -104,8 +110,8 @@ sudo journalctl -u grow-pi -f
 |-------|-------------|------|-----|--------|
 | 1     | Far Red     | 16   | 36  | ✅ Aktiv |
 | 2     | Warm White  | 13   | 33  | ✅ Aktiv |
-| 3     | Cool White  | 12   | 32  | ✅ Aktiv |
-| 4     | UV          | 18   | 12  | ✅ Aktiv |
+| 3     | Cool White  | 18   | 12  | ✅ Aktiv |
+| 4     | UV          | 12   | 32  | ✅ Aktiv |
 
 Detaillierte Pin-Belegung: [`../docs/HARDWARE_PINOUT.md`](../docs/HARDWARE_PINOUT.md)
 
@@ -279,6 +285,19 @@ sudo journalctl -u grow-pi -f
 sudo journalctl -u grow-pi -n 100
 ```
 
+### Watchdog-Checks
+
+```bash
+# Service-Watchdog aus Unit prüfen (WatchdogSec)
+systemctl show grow-pi -p WatchdogUSec
+
+# systemd-Manager-Hardware-Watchdog prüfen
+systemctl show -p RuntimeWatchdogUSec -p RebootWatchdogUSec
+
+# Runtime-Watchdog Ereignisse ansehen
+sudo journalctl -u grow-pi --since "15 min ago" | grep -Ei "watchdog|unhealthy|recovered"
+```
+
 ---
 
 ## Troubleshooting
@@ -325,6 +344,20 @@ python -m grow_pi.main --test
 sudo journalctl -u grow-pi -n 50 --no-pager
 ```
 
+### Service-Reboot-Loop (StartLimit erreicht)
+
+```bash
+# Letzte Fehler ansehen
+sudo journalctl -u grow-pi -n 200 --no-pager
+
+# Unit-Parameter prüfen
+systemctl cat grow-pi
+
+# Nach Fix Startlimit zurücksetzen und neu starten
+sudo systemctl reset-failed grow-pi
+sudo systemctl restart grow-pi
+```
+
 ---
 
 ## Referenzen
@@ -342,7 +375,7 @@ sudo journalctl -u grow-pi -n 50 --no-pager
 
 ---
 
-## Tank-Mode Features (v6.23.0)
+## Tank-Mode Features (v6.24.1)
 
 ### Production-Ready Robustness
 
@@ -353,8 +386,16 @@ sudo journalctl -u grow-pi -n 50 --no-pager
 
 **systemd Watchdog:**
 - Automatischer Service-Restart bei Hang (60s Timeout)
-- Watchdog-Ping alle 30 Sekunden
+- Watchdog-Ping dynamisch aus `WATCHDOG_USEC` (50% Intervall)
 - sd_notify Integration (READY, WATCHDOG, STOPPING)
+- Interner Runtime-Watchdog prüft Main-Loop + kritische Worker-Threads
+- Bei Teil-Ausfällen wird `WATCHDOG=trigger` ausgelöst (sofortige Recovery)
+- Crash-Loop-Schutz mit `StartLimit*` + Reboot-Eskalation
+
+**Hardware Watchdog (Host-Ebene):**
+- Kernel-Watchdog via `dtparam=watchdog=on`
+- systemd Manager Watchdog (`RuntimeWatchdogSec=15s`)
+- Schutz auch bei Host-Freeze außerhalb des Python-Prozesses
 
 **Thread-Safety:**
 - RLock für Sensor Cache (erlaubt nested calls)

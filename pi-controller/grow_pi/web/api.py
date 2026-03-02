@@ -25,7 +25,7 @@ import os
 import sys
 import time
 import atexit
-from typing import Dict, Tuple, Optional
+from typing import Dict, Tuple, Optional, Any
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 
@@ -132,8 +132,8 @@ def load_lamp_channels():
         LAMP_CHANNELS = {
             1: LampChannel(1, "Far Red", 16, "#ff4444"),
             2: LampChannel(2, "Warm White", 13, "#ffbb44"),
-            3: LampChannel(3, "Cool White", 12, "#88ddff"),
-            4: LampChannel(4, "UV", 18, "#cc66ff")
+            3: LampChannel(3, "Cool White", 18, "#88ddff"),
+            4: LampChannel(4, "UV", 12, "#cc66ff")
         }
 
 load_lamp_channels()
@@ -420,6 +420,56 @@ def stop_dehumidifier_controller():
     if controller:
         controller.stop()
         logger.info("DehumidifierController stopped")
+
+
+def get_runtime_health() -> Dict[str, Any]:
+    """
+    Export runtime health of critical background components.
+
+    Used by the main controller watchdog to detect partial failures where the
+    process is alive but worker threads have died.
+    """
+    components: Dict[str, Any] = {}
+    issues = []
+
+    if data_logger is not None:
+        try:
+            if hasattr(data_logger, "get_runtime_health"):
+                logger_health = data_logger.get_runtime_health()
+            else:
+                logger_health = {
+                    "healthy": bool(data_logger._running),
+                    "running": bool(data_logger._running),
+                    "issues": ["runtime_health_not_implemented"]
+                }
+            components["data_logger"] = logger_health
+            if not logger_health.get("healthy", True):
+                issues.append("data_logger_unhealthy")
+        except Exception as exc:
+            components["data_logger"] = {"healthy": False, "error": str(exc)}
+            issues.append("data_logger_check_failed")
+
+    if dehumidifier_controller is not None:
+        try:
+            if hasattr(dehumidifier_controller, "get_runtime_health"):
+                dehumidifier_health = dehumidifier_controller.get_runtime_health()
+            else:
+                dehumidifier_health = {
+                    "healthy": True,
+                    "issues": ["runtime_health_not_implemented"]
+                }
+            components["dehumidifier"] = dehumidifier_health
+            if not dehumidifier_health.get("healthy", True):
+                issues.append("dehumidifier_unhealthy")
+        except Exception as exc:
+            components["dehumidifier"] = {"healthy": False, "error": str(exc)}
+            issues.append("dehumidifier_check_failed")
+
+    return {
+        "healthy": len(issues) == 0,
+        "issues": issues,
+        "components": components
+    }
 
 
 # Register shutdown handlers
@@ -1324,8 +1374,8 @@ def run_server(host: str = API_HOST, port: int = API_PORT, debug: bool = False):
     # Start dehumidifier controller
     start_dehumidifier_controller()
 
-    app.run(host=host, port=port, debug=debug, threaded=True)
+    app.run(host=host, port=port, debug=debug, threaded=True, use_reloader=False)
 
 
 if __name__ == '__main__':
-    run_server(debug=True)
+    run_server(debug=False)

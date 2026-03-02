@@ -28,7 +28,7 @@ import sys
 import time
 import threading
 from datetime import datetime
-from typing import Optional
+from typing import Optional, List, Tuple
 
 from .config import load_config, GrowPiConfig
 from .lamps import PWMController
@@ -61,8 +61,15 @@ except ImportError:
 
 # Try to import web API
 WEB_API_AVAILABLE = False
+get_web_runtime_health = None
 try:
-    from .web.api import app, run_server, start_data_logger, start_dehumidifier_controller
+    from .web.api import (
+        app,
+        run_server,
+        start_data_logger,
+        start_dehumidifier_controller,
+        get_runtime_health as get_web_runtime_health,
+    )
     WEB_API_AVAILABLE = True
 except ImportError:
     pass
@@ -81,6 +88,7 @@ from .utils.sun_curve import (
     print_curve_preview,
     CurvePoint,
 )
+from .utils.systemd_watchdog import get_watchdog_ping_interval
 
 
 # ============================================================================
@@ -132,11 +140,21 @@ def notify_watchdog() -> None:
     sd_notify("WATCHDOG=1")
 
 
+def notify_watchdog_trigger() -> None:
+    """Request immediate watchdog action from systemd."""
+    sd_notify("WATCHDOG=trigger")
+
+
 def notify_stopping() -> None:
     """Signal systemd that service is stopping."""
     if sd_notify("STOPPING=1"):
         logger = logging.getLogger(__name__)
         logger.info("Systemd notified: Service stopping")
+
+
+def notify_status(status: str) -> None:
+    """Publish current service status to systemd."""
+    sd_notify(f"STATUS={status}")
 
 
 # ============================================================================
@@ -162,6 +180,14 @@ class GrowPiController:
         self.sun_curve = get_default_sun_curve()  # Fallback
         self.last_intensities = {}  # Track last intensities per channel
         self.web_thread: Optional[threading.Thread] = None
+        self.watchdog_thread: Optional[threading.Thread] = None
+        self._watchdog_stop_event = threading.Event()
+        self._watchdog_ping_interval = get_watchdog_ping_interval()
+        self._watchdog_startup_grace_seconds = 120.0
+        self._max_main_loop_stall_seconds = max(45.0, self._watchdog_ping_interval * 1.5)
+        self._watchdog_started_at = time.monotonic()
+        self._last_main_loop_heartbeat = self._watchdog_started_at
+        self._last_watchdog_failure: Optional[str] = None
 
         # Initialize ModeManager (single source of truth for mode)
         if MODE_MANAGER_AVAILABLE:
@@ -303,6 +329,106 @@ class GrowPiController:
         self.web_thread.start()
         logger.info("Web API started on http://0.0.0.0:5000")
 
+    def _touch_main_loop_heartbeat(self) -> None:
+        """Update monotonic heartbeat timestamp for the main loop."""
+        self._last_main_loop_heartbeat = time.monotonic()
+
+    def _evaluate_runtime_health(self, now_monotonic: float) -> Tuple[bool, List[str]]:
+        """
+        Evaluate whether critical runtime components are healthy.
+
+        Returns:
+            tuple: (healthy, reasons)
+        """
+        reasons: List[str] = []
+        startup_grace_active = (
+            now_monotonic - self._watchdog_started_at < self._watchdog_startup_grace_seconds
+        )
+
+        main_loop_age = now_monotonic - self._last_main_loop_heartbeat
+        if main_loop_age > self._max_main_loop_stall_seconds:
+            reasons.append(
+                f"main loop stalled for {main_loop_age:.1f}s "
+                f"(limit: {self._max_main_loop_stall_seconds:.1f}s)"
+            )
+
+        if self.enable_web and WEB_API_AVAILABLE:
+            if self.web_thread is None or not self.web_thread.is_alive():
+                if not startup_grace_active:
+                    reasons.append("web thread not alive")
+
+            if get_web_runtime_health:
+                try:
+                    web_health = get_web_runtime_health()
+                    if web_health and not web_health.get("healthy", True):
+                        if not startup_grace_active:
+                            web_issues = web_health.get("issues", [])
+                            if web_issues:
+                                reasons.append(f"web runtime unhealthy: {', '.join(web_issues)}")
+                            else:
+                                reasons.append("web runtime unhealthy")
+                except Exception as exc:
+                    if not startup_grace_active:
+                        reasons.append(f"web runtime check failed: {exc}")
+
+        return len(reasons) == 0, reasons
+
+    def _start_watchdog_monitor(self) -> None:
+        """Start dedicated watchdog monitor thread."""
+        logger = logging.getLogger(__name__)
+
+        if self.watchdog_thread and self.watchdog_thread.is_alive():
+            return
+
+        self._watchdog_stop_event.clear()
+        self._watchdog_started_at = time.monotonic()
+        self._touch_main_loop_heartbeat()
+
+        def watchdog_loop() -> None:
+            logger.info(
+                "Runtime watchdog started (ping interval: %.1fs, startup grace: %.0fs)",
+                self._watchdog_ping_interval,
+                self._watchdog_startup_grace_seconds,
+            )
+            next_ping = time.monotonic() + self._watchdog_ping_interval
+            triggered_for_current_failure = False
+
+            while self.running and not self._watchdog_stop_event.wait(timeout=1.0):
+                now = time.monotonic()
+                healthy, reasons = self._evaluate_runtime_health(now)
+
+                if healthy:
+                    if self._last_watchdog_failure:
+                        logger.info("Runtime watchdog recovered")
+                        self._last_watchdog_failure = None
+                        triggered_for_current_failure = False
+
+                    if now >= next_ping:
+                        notify_watchdog()
+                        logger.debug("Watchdog ping sent to systemd")
+                        next_ping = now + self._watchdog_ping_interval
+                    continue
+
+                failure_reason = "; ".join(reasons)
+                if failure_reason != self._last_watchdog_failure:
+                    self._last_watchdog_failure = failure_reason
+                    logger.error(f"Runtime watchdog unhealthy: {failure_reason}")
+                    notify_status(f"Runtime unhealthy: {failure_reason}")
+                    triggered_for_current_failure = False
+
+                if not triggered_for_current_failure:
+                    notify_watchdog_trigger()
+                    triggered_for_current_failure = True
+
+            logger.info("Runtime watchdog stopped")
+
+        self.watchdog_thread = threading.Thread(
+            target=watchdog_loop,
+            name="RuntimeWatchdog",
+            daemon=True,
+        )
+        self.watchdog_thread.start()
+
     def _update_intensity_from_curve(self) -> bool:
         """
         Update lamp intensity based on current time and curves.
@@ -371,16 +497,16 @@ class GrowPiController:
 
         update_interval = 60  # Check curve every 60 seconds
         heartbeat_interval = 300  # Log status every 5 minutes
-        watchdog_interval = 30  # Systemd watchdog ping every 30s (< WatchdogSec/2)
 
         try:
             last_update = 0
             last_heartbeat = time.time()
-            last_watchdog_ping = time.time()
             last_known_mode = _get_current_mode()  # Track mode changes
+            self._start_watchdog_monitor()
 
             while self.running:
                 time.sleep(5)  # CPU-Optimierung: 5s statt 1s (Mode-Wechsel max 5s Verzögerung)
+                self._touch_main_loop_heartbeat()
                 now = time.time()
 
                 # Get current mode from ModeManager (single source of truth)
@@ -400,12 +526,6 @@ class GrowPiController:
                 if self.mode == "curve" and current_mode == "auto" and (now - last_update >= update_interval):
                     self._update_intensity_from_curve()
                     last_update = now
-
-                # Systemd watchdog ping (Tank-Mode)
-                if now - last_watchdog_ping >= watchdog_interval:
-                    notify_watchdog()
-                    last_watchdog_ping = now
-                    logger.debug("Watchdog ping sent to systemd")
 
                 # Periodic status log
                 if now - last_heartbeat >= heartbeat_interval:
@@ -441,6 +561,10 @@ class GrowPiController:
         notify_stopping()
 
         self.running = False
+        self._watchdog_stop_event.set()
+
+        if self.watchdog_thread and self.watchdog_thread.is_alive():
+            self.watchdog_thread.join(timeout=5)
 
         # Speichere State für schnellen Restart (Zero-Downtime)
         if STATE_PERSISTENCE_AVAILABLE:
