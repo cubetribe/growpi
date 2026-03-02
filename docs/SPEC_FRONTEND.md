@@ -263,7 +263,7 @@ Authenticate user and create session.
 ```json
 {
   "username": "admin",
-  "password": "Mi83xer#"
+  "password": "REDACTED_PASSWORD"
 }
 ```
 
@@ -469,7 +469,7 @@ Register a new Pi device to a zone.
 {
   "apiKey": "zone-api-key",
   "version": "1.0.0",
-  "ipAddress": "192.168.1.100"
+  "ipAddress": "<DEVICE_IP>"
 }
 ```
 

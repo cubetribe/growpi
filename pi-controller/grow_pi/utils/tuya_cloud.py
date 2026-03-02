@@ -197,11 +197,12 @@ def get_tuya_service() -> Optional[TuyaCloudService]:
     access_secret = os.environ.get('TUYA_ACCESS_SECRET')
     region = os.environ.get('TUYA_REGION', 'eu')
 
-    # Fallback to hardcoded (from remote-plug/devices.json)
+    # Never fallback to hardcoded credentials in open-source code.
     if not access_id or not access_secret:
-        access_id = "x7gt474g4ac9nvwredk4"
-        access_secret = "cd29a6ddf61f4197b1965370272a4100"
-        region = "eu"
+        logger.warning(
+            "Tuya credentials missing. Set TUYA_ACCESS_ID/TUYA_ACCESS_SECRET in environment."
+        )
+        return None
 
     if access_id and access_secret:
         _tuya_service = TuyaCloudService(access_id, access_secret, region)

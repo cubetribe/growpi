@@ -3,7 +3,7 @@
 
 # Server Connection
 server:
-  url: "https://growpi.nm-forum.de"
+  url: "https://your-growpi-host.example.com"
   api_key: "your-zone-api-key-here"  # Get from web dashboard
   timeout: 10  # seconds
   retry_attempts: 3

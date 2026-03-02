@@ -905,6 +905,21 @@ class DehumidifierController:
             "available": True
         }
 
+    def get_runtime_health(self) -> Dict:
+        """Return controller loop health for external watchdog checks."""
+        thread_alive = self._thread.is_alive() if self._thread else False
+        issues = []
+
+        if self._running and not thread_alive:
+            issues.append("control_loop_dead")
+
+        return {
+            "healthy": len(issues) == 0,
+            "running": self._running,
+            "issues": issues,
+            "thread_alive": thread_alive
+        }
+
     # =========================================================================
     # Background Control Loop
     # =========================================================================

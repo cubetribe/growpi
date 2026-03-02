@@ -151,7 +151,7 @@ tail -f test_environment/app.log
 
 ```bash
 # 1. Connect to Test Pi
-ssh admin@192.168.0.87  # Example: different IP
+ssh admin@<PI_HOST>  # Example: different IP
 
 # 2. Create backup
 sudo cp -r /opt/grow-pi /opt/grow-pi.backup.v6.4
@@ -178,9 +178,9 @@ sudo journalctl -u grow-pi -f  # Monitor logs
 **Scenario 1: Basic Functionality**
 ```bash
 # Check all tabs load
-curl http://192.168.0.87:5000/api/status
-curl http://192.168.0.87:5000/api/costs?period=today
-curl http://192.168.0.87:5000/api/dehumidifier/status
+curl http://<PI_HOST>:5000/api/status
+curl http://<PI_HOST>:5000/api/costs?period=today
+curl http://<PI_HOST>:5000/api/dehumidifier/status
 
 # Verify response format matches v6.4
 ```
@@ -188,7 +188,7 @@ curl http://192.168.0.87:5000/api/dehumidifier/status
 **Scenario 2: Curve Updates**
 ```bash
 # Edit a curve and save
-curl -X PUT http://192.168.0.87:5000/api/curves/1 \
+curl -X PUT http://<PI_HOST>:5000/api/curves/1 \
   -H "Content-Type: application/json" \
   -d '{"curve": [{"time": "06:00", "intensity": 50}]}'
 
@@ -198,7 +198,7 @@ curl -X PUT http://192.168.0.87:5000/api/curves/1 \
 **Scenario 3: Dehumidifier Control**
 ```bash
 # Test manual override
-curl -X POST http://192.168.0.87:5000/api/dehumidifier/control \
+curl -X POST http://<PI_HOST>:5000/api/dehumidifier/control \
   -H "Content-Type: application/json" \
   -d '{"action": "on"}'
 
@@ -208,8 +208,8 @@ curl -X POST http://192.168.0.87:5000/api/dehumidifier/control \
 **Scenario 4: Cost Calculation**
 ```bash
 # Check cost breakdown for different periods
-curl http://192.168.0.87:5000/api/costs?period=week
-curl http://192.168.0.87:5000/api/costs?period=month
+curl http://<PI_HOST>:5000/api/costs?period=week
+curl http://<PI_HOST>:5000/api/costs?period=month
 
 # Verify calculations are correct
 ```
@@ -217,7 +217,7 @@ curl http://192.168.0.87:5000/api/costs?period=month
 **Scenario 5: Stability Test (run continuously)**
 ```bash
 # Monitor for 24 hours
-watch -n 60 'curl -s http://192.168.0.87:5000/api/health | jq'
+watch -n 60 'curl -s http://<PI_HOST>:5000/api/health | jq'
 
 # Expected: No "500" errors, all services "running"
 # Expected CPU usage: < 10%
@@ -253,7 +253,7 @@ Minimize downtime with blue-green strategy:
 # Leave Blue running
 
 # 2. Create parallel environment for Green
-ssh admin@192.168.0.86
+ssh admin@<PI_HOST>
 sudo mkdir -p /opt/grow-pi-v6.5
 sudo chown admin:admin /opt/grow-pi-v6.5
 
@@ -276,7 +276,7 @@ sleep 5
 sudo systemctl start grow-pi-v6.5      # Start Green
 
 # 6. Verify production
-curl http://192.168.0.86:5000/api/health
+curl http://<PI_HOST>:5000/api/health
 ```
 
 ### Gradual Rollout (Alternative)
@@ -299,8 +299,8 @@ sudo systemctl status grow-pi
 sudo journalctl -u grow-pi --since "30 min ago" -f
 
 # Verify endpoints
-curl http://192.168.0.86:5000/api/status
-curl http://192.168.0.86:5000/api/costs?period=today
+curl http://<PI_HOST>:5000/api/status
+curl http://<PI_HOST>:5000/api/costs?period=today
 
 # Check database integrity
 sqlite3 /opt/grow-pi/data/growpi.db ".tables"
@@ -326,7 +326,7 @@ sudo cp -r /opt/grow-pi.backup.v6.4 /opt/grow-pi
 sudo systemctl start grow-pi
 
 # 4. Verify
-curl http://192.168.0.86:5000/api/status
+curl http://<PI_HOST>:5000/api/status
 ```
 
 ### Graceful Rollback (Git reset)
@@ -389,7 +389,7 @@ sudo systemctl status grow-pi
 sudo journalctl -u grow-pi -n 50
 
 # Response Times
-curl -w "@curl-format.txt" -o /dev/null http://192.168.0.86:5000/api/status
+curl -w "@curl-format.txt" -o /dev/null http://<PI_HOST>:5000/api/status
 ```
 
 ### Alerting Setup
@@ -404,7 +404,7 @@ sudo journalctl -u grow-pi -f | grep -i "error\|exception\|failed"
 sqlite3 /opt/grow-pi/data/growpi.db "SELECT COUNT(*) FROM sensor_readings LIMIT 1"
 
 # Watch for API failures
-curl -s http://192.168.0.86:5000/api/health | jq '.status'
+curl -s http://<PI_HOST>:5000/api/health | jq '.status'
 ```
 
 ### Performance Baselines
@@ -463,7 +463,7 @@ sqlite3 /opt/grow-pi/data/growpi.db "VACUUM"
 sudo journalctl -u grow-pi -n 100 -p err
 
 # Check Flask config
-curl -i http://192.168.0.86:5000/api/health
+curl -i http://<PI_HOST>:5000/api/health
 ```
 
 ---
@@ -491,14 +491,14 @@ After rollback, confirm:
 
 ```bash
 # Check version
-curl http://192.168.0.86:5000/api/version
+curl http://<PI_HOST>:5000/api/version
 
 # Verify old endpoints work
-curl http://192.168.0.86:5000/api/status
-curl http://192.168.0.86:5000/api/lamps
+curl http://<PI_HOST>:5000/api/status
+curl http://<PI_HOST>:5000/api/lamps
 
 # Check no new v6.5 features appear
-curl http://192.168.0.86:5000/api/costs  # Should 404
+curl http://<PI_HOST>:5000/api/costs  # Should 404
 ```
 
 ---

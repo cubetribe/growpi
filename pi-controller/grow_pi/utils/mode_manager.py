@@ -27,8 +27,29 @@ from typing import Optional, Callable, Dict, List
 
 logger = logging.getLogger(__name__)
 
-# Mode file location - /tmp is cleared on reboot, ensuring 'auto' default
-MODE_FILE = "/tmp/growpi_mode.txt"
+# Mode file location:
+# - Preferred: /run/growpi/mode.txt (shared across split services)
+# - Fallback: /tmp/growpi_mode.txt (local/dev environments without /run access)
+DEFAULT_MODE_FILE = "/run/growpi/mode.txt"
+FALLBACK_MODE_FILE = "/tmp/growpi_mode.txt"
+
+
+def _resolve_mode_file() -> str:
+    configured = os.environ.get("GROWPI_MODE_FILE", DEFAULT_MODE_FILE)
+    directory = os.path.dirname(configured) or "."
+
+    try:
+        os.makedirs(directory, exist_ok=True)
+    except Exception:
+        pass
+
+    if os.access(directory, os.W_OK):
+        return configured
+
+    return FALLBACK_MODE_FILE
+
+
+MODE_FILE = _resolve_mode_file()
 
 # Valid modes
 MODES = ('auto', 'manual')
@@ -57,12 +78,14 @@ class ModeManager:
         self._mode: str = "auto"
         self._lock = threading.Lock()
         self._callbacks: List[Callable[[str, str], None]] = []
+        self._mode_file_mtime: Optional[float] = None
         self._load_mode()
 
     def _load_mode(self) -> None:
         """Load mode from file, default to 'auto' if not exists."""
         try:
             if os.path.exists(MODE_FILE):
+                self._mode_file_mtime = os.path.getmtime(MODE_FILE)
                 with open(MODE_FILE, 'r') as f:
                     mode = f.read().strip()
                     if mode in MODES:
@@ -74,21 +97,50 @@ class ModeManager:
             else:
                 logger.info("No mode file found, defaulting to 'auto'")
                 self._mode = "auto"
+                self._mode_file_mtime = None
         except Exception as e:
             logger.error(f"Error loading mode: {e}, defaulting to 'auto'")
             self._mode = "auto"
+            self._mode_file_mtime = None
 
     def _save_mode(self) -> None:
         """Save mode to file."""
         try:
+            os.makedirs(os.path.dirname(MODE_FILE), exist_ok=True)
             with open(MODE_FILE, 'w') as f:
                 f.write(self._mode)
+            self._mode_file_mtime = os.path.getmtime(MODE_FILE)
         except Exception as e:
             logger.error(f"Error saving mode: {e}")
+
+    def _sync_mode_from_file(self) -> None:
+        """
+        Sync mode with persistent state file for cross-process consistency.
+
+        In split-process mode the web and controller services run in separate
+        processes. This method ensures both processes observe mode changes.
+        """
+        try:
+            if not os.path.exists(MODE_FILE):
+                self._mode_file_mtime = None
+                return
+
+            with open(MODE_FILE, 'r') as f:
+                mode = f.read().strip()
+
+            self._mode_file_mtime = os.path.getmtime(MODE_FILE)
+
+            if mode in MODES and mode != self._mode:
+                old_mode = self._mode
+                self._mode = mode
+                logger.info(f"Mode synced from file: {old_mode} -> {mode}")
+        except Exception as e:
+            logger.error(f"Error syncing mode from file: {e}")
 
     def get_mode(self) -> str:
         """Get current mode (thread-safe)."""
         with self._lock:
+            self._sync_mode_from_file()
             return self._mode
 
     def set_mode(self, mode: str) -> bool:

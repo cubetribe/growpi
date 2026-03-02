@@ -444,6 +444,46 @@ class DataLogger:
             'database': stats
         }
 
+    def get_runtime_health(self) -> Dict[str, Any]:
+        """
+        Return runtime thread health for watchdog integration.
+
+        A logger is considered unhealthy when it should be running but one of
+        its required worker threads is dead.
+        """
+        sensor_alive = self._sensor_thread.is_alive() if self._sensor_thread else False
+        lamp_alive = self._lamp_thread.is_alive() if self._lamp_thread else False
+        plug_alive = self._plug_thread.is_alive() if self._plug_thread else False
+
+        issues: List[str] = []
+        if self._running:
+            if self._sensor_reader and not sensor_alive:
+                issues.append("sensor_thread_dead")
+            if self._lamp_reader and not lamp_alive:
+                issues.append("lamp_thread_dead")
+            if not plug_alive:
+                issues.append("plug_thread_dead")
+
+        return {
+            "healthy": len(issues) == 0,
+            "running": self._running,
+            "issues": issues,
+            "threads": {
+                "sensor": {
+                    "enabled": self._sensor_reader is not None,
+                    "alive": sensor_alive
+                },
+                "lamp": {
+                    "enabled": self._lamp_reader is not None,
+                    "alive": lamp_alive
+                },
+                "plug": {
+                    "enabled": True,
+                    "alive": plug_alive
+                }
+            }
+        }
+
 
 # Global logger instance
 _logger_instance: Optional[DataLogger] = None

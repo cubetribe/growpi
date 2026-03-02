@@ -3,7 +3,7 @@
 # Usage: ./test_calendar_api.sh
 
 BASE_URL="http://localhost:5000"
-# Für Production: BASE_URL="http://growpi.nm-forum.de:5000"
+# Für Production: BASE_URL="http://your-growpi-host.example.com:5000"
 
 echo "=========================================="
 echo "Calendar API Test Script"

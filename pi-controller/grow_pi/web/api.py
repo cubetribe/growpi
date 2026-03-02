@@ -25,7 +25,7 @@ import os
 import sys
 import time
 import atexit
-from typing import Dict, Tuple, Optional
+from typing import Dict, Tuple, Optional, Any
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 
@@ -132,8 +132,8 @@ def load_lamp_channels():
         LAMP_CHANNELS = {
             1: LampChannel(1, "Far Red", 16, "#ff4444"),
             2: LampChannel(2, "Warm White", 13, "#ffbb44"),
-            3: LampChannel(3, "Cool White", 12, "#88ddff"),
-            4: LampChannel(4, "UV", 18, "#cc66ff")
+            3: LampChannel(3, "Cool White", 18, "#88ddff"),
+            4: LampChannel(4, "UV", 12, "#cc66ff")
         }
 
 load_lamp_channels()
@@ -248,6 +248,7 @@ if DHT_AVAILABLE:
             break
 
 # Initialize DataLogger
+db = None
 data_logger: Optional['DataLogger'] = None
 if DB_AVAILABLE:
     try:
@@ -290,6 +291,27 @@ if MODE_MANAGER_AVAILABLE:
         logger.info(f"ModeManager initialized (current mode: {mode_manager.get_mode()})")
     except Exception as e:
         logger.error(f"Failed to initialize ModeManager: {e}")
+
+# Register shared dependencies for blueprints (status/health/etc.)
+try:
+    from . import dependencies as web_dependencies
+    web_dependencies.init_pwm_controller(pwm_controller)
+    web_dependencies.init_dht_sensor(
+        dht_sensor,
+        DHT_AVAILABLE and dht_sensor is not None
+    )
+    web_dependencies.init_data_logger(data_logger, db)
+    web_dependencies.init_curve_controller(
+        curve_controller,
+        curve_controller is not None
+    )
+    web_dependencies.init_mode_manager(
+        mode_manager if MODE_MANAGER_AVAILABLE else None,
+        MODE_MANAGER_AVAILABLE and mode_manager is not None
+    )
+    logger.info("Blueprint dependencies initialized")
+except Exception as e:
+    logger.warning(f"Failed to initialize blueprint dependencies: {e}")
 
 # Initialize DehumidifierController and inject into blueprint
 dehumidifier_controller = None
@@ -422,6 +444,56 @@ def stop_dehumidifier_controller():
         logger.info("DehumidifierController stopped")
 
 
+def get_runtime_health() -> Dict[str, Any]:
+    """
+    Export runtime health of critical background components.
+
+    Used by the main controller watchdog to detect partial failures where the
+    process is alive but worker threads have died.
+    """
+    components: Dict[str, Any] = {}
+    issues = []
+
+    if data_logger is not None:
+        try:
+            if hasattr(data_logger, "get_runtime_health"):
+                logger_health = data_logger.get_runtime_health()
+            else:
+                logger_health = {
+                    "healthy": bool(data_logger._running),
+                    "running": bool(data_logger._running),
+                    "issues": ["runtime_health_not_implemented"]
+                }
+            components["data_logger"] = logger_health
+            if not logger_health.get("healthy", True):
+                issues.append("data_logger_unhealthy")
+        except Exception as exc:
+            components["data_logger"] = {"healthy": False, "error": str(exc)}
+            issues.append("data_logger_check_failed")
+
+    if dehumidifier_controller is not None:
+        try:
+            if hasattr(dehumidifier_controller, "get_runtime_health"):
+                dehumidifier_health = dehumidifier_controller.get_runtime_health()
+            else:
+                dehumidifier_health = {
+                    "healthy": True,
+                    "issues": ["runtime_health_not_implemented"]
+                }
+            components["dehumidifier"] = dehumidifier_health
+            if not dehumidifier_health.get("healthy", True):
+                issues.append("dehumidifier_unhealthy")
+        except Exception as exc:
+            components["dehumidifier"] = {"healthy": False, "error": str(exc)}
+            issues.append("dehumidifier_check_failed")
+
+    return {
+        "healthy": len(issues) == 0,
+        "issues": issues,
+        "components": components
+    }
+
+
 # Register shutdown handlers
 atexit.register(stop_data_logger)
 atexit.register(stop_dehumidifier_controller)
@@ -513,7 +585,11 @@ def set_lamp(channel: int):
             return jsonify(create_response(False, error="Intensity must be 0-100")), 400
 
         # Set lamp intensity
-        pwm_controller.set_intensity(channel, intensity)
+        if not pwm_controller.set_intensity(channel, intensity):
+            logger.error(
+                f"Failed to set lamp {channel} ({LAMP_CHANNELS[channel].name}) to {intensity}%"
+            )
+            return jsonify(create_response(False, error="Failed to set PWM intensity")), 500
         logger.info(f"Set lamp {channel} ({LAMP_CHANNELS[channel].name}) to {intensity}%")
 
         # Log the change
@@ -713,8 +789,14 @@ def _apply_curve_values() -> dict:
     if curve_controller and pwm_controller:
         intensities = curve_controller.get_current_intensities()
         for channel, intensity in intensities.items():
-            pwm_controller.set_intensity(channel, intensity)
-            applied[channel] = intensity
+            if pwm_controller.set_intensity(channel, intensity):
+                applied[channel] = intensity
+            else:
+                logger.warning(
+                    "Failed to apply curve intensity on mode switch for channel %s: target=%s%%",
+                    channel,
+                    intensity,
+                )
         logger.info(f"Applied curve intensities: {applied}")
     return applied
 
@@ -1324,8 +1406,8 @@ def run_server(host: str = API_HOST, port: int = API_PORT, debug: bool = False):
     # Start dehumidifier controller
     start_dehumidifier_controller()
 
-    app.run(host=host, port=port, debug=debug, threaded=True)
+    app.run(host=host, port=port, debug=debug, threaded=True, use_reloader=False)
 
 
 if __name__ == '__main__':
-    run_server(debug=True)
+    run_server(debug=False)

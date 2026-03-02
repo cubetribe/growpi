@@ -69,8 +69,8 @@ def load_lamp_channels() -> Dict[int, LampChannel]:
         _LAMP_CHANNELS = {
             1: LampChannel(1, "Far Red", 16, "#ff4444"),
             2: LampChannel(2, "Warm White", 13, "#ffbb44"),
-            3: LampChannel(3, "Cool White", 12, "#88ddff"),
-            4: LampChannel(4, "UV", 18, "#cc66ff")
+            3: LampChannel(3, "Cool White", 18, "#88ddff"),
+            4: LampChannel(4, "UV", 12, "#cc66ff")
         }
 
     return _LAMP_CHANNELS

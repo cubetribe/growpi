@@ -150,7 +150,7 @@ pi-controller/test_environment/
 ## [2025-12-06 v5.3] - Smart Plug Integration (Gemini)
 
 **Status**: Production-Ready
-**Platform**: Raspberry Pi 3B+ (growpi @ 192.168.0.86)
+**Platform**: Raspberry Pi 3B+ (growpi @ <PI_HOST>)
 
 ### Summary
 
@@ -182,7 +182,7 @@ Integration von Bluetooth-gesteuerten Smart Plugs (Tuya/ANTELA) zur Überwachung
 ## [2025-12-06 v5.2] - System Hardening (Gemini)
 
 **Status**: Production-Ready
-**Platform**: Raspberry Pi 3B+ (growpi @ 192.168.0.86)
+**Platform**: Raspberry Pi 3B+ (growpi @ <PI_HOST>)
 
 ### Summary
 
@@ -204,8 +204,8 @@ System-Härtung für den produktiven Einsatz:
 ## [2025-12-05 v5.1] - Singleton Fix & Mode Management (Gemini)
 
 **Status**: Production-Ready
-**Platform**: Raspberry Pi 3B+ (growpi @ 192.168.0.86)
-**Web Interface**: http://192.168.0.86:5000
+**Platform**: Raspberry Pi 3B+ (growpi @ <PI_HOST>)
+**Web Interface**: http://<PI_HOST>:5000
 **API Version**: 1.2.1
 
 ### Summary
@@ -265,8 +265,8 @@ if current_mode == "auto" and last_known_mode != "auto":
 ## [2025-12-05 v4] - Per-Channel Lighting Curves
 
 **Status**: Production-Ready mit individuellem Kurven-Editor pro Lampe
-**Platform**: Raspberry Pi 3B+ (growpi @ 192.168.0.86)
-**Web Interface**: http://192.168.0.86:5000
+**Platform**: Raspberry Pi 3B+ (growpi @ <PI_HOST>)
+**Web Interface**: http://<PI_HOST>:5000
 **API Version**: 1.2.0
 
 ### Summary
@@ -319,8 +319,8 @@ Individuelle Lichtkurven pro Kanal für realistische Sonnenauf-/untergangs-Seque
 ## [2025-12-05 v3] - SQLite Logging System Complete
 
 **Status**: Production-Ready mit vollständigem Daten-Logging
-**Platform**: Raspberry Pi 3B+ (growpi @ 192.168.0.86)
-**Web Interface**: http://192.168.0.86:5000
+**Platform**: Raspberry Pi 3B+ (growpi @ <PI_HOST>)
+**Web Interface**: http://<PI_HOST>:5000
 **API Version**: 1.1.0
 
 ### Summary
@@ -378,8 +378,8 @@ system_events (id, event_type, severity, message, details, created_at)
 ## [2025-12-05 v2] - DHT22 Sensor Integration Complete
 
 **Status**: Production-Ready mit echten Sensordaten
-**Platform**: Raspberry Pi 3B+ (growpi @ 192.168.0.86)
-**Web Interface**: http://192.168.0.86:5000
+**Platform**: Raspberry Pi 3B+ (growpi @ <PI_HOST>)
+**Web Interface**: http://<PI_HOST>:5000
 
 ### Summary
 
@@ -422,8 +422,8 @@ gpiod
 ## [2025-12-05] - MVP Complete: Web Interface & Final Pin Configuration
 
 **Status**: Production-Ready
-**Platform**: Raspberry Pi 3B+ (growpi @ 192.168.0.86)
-**Web Interface**: http://192.168.0.86:5000
+**Platform**: Raspberry Pi 3B+ (growpi @ <PI_HOST>)
+**Web Interface**: http://<PI_HOST>:5000
 
 ### Summary
 
@@ -440,7 +440,7 @@ Vollständiges MVP mit Web-Interface für Smartphone-Steuerung:
 | ----- | ---------- | ---- | --- | ---------- |
 | 1     | Far Red    | 16   | 36  | #ff4444    |
 | 2     | Warm White | 13   | 33  | #ffbb44    |
-| 3     | Cool White | 12   | 32  | #88ddff    |
+| 3     | Cool White | 18   | 12  | #88ddff    |
 | 4     | UV         | 18   | 12  | #cc66ff    |
 
 ### Neue Features
@@ -467,7 +467,7 @@ Vollständiges MVP mit Web-Interface für Smartphone-Steuerung:
 ## [2025-12-04 v2] - MVP Level 1: Pi Auto-Start Controller
 
 **Status**: Superseded by 2025-12-05
-**Platform**: Raspberry Pi 3B+ (growpi @ 192.168.0.86)
+**Platform**: Raspberry Pi 3B+ (growpi @ <PI_HOST>)
 
 ### Summary
 
@@ -502,7 +502,7 @@ Erster funktionierender MVP des Pi-Controllers:
 ## [2025-12-04] - Raspberry Pi Hardware Integration - Phase 2 ✅
 
 **Status**: Hardware Testing Phase Complete
-**Platform**: Raspberry Pi 3B+ (growpi @ 192.168.0.86)
+**Platform**: Raspberry Pi 3B+ (growpi @ <PI_HOST>)
 **OS**: Raspberry Pi OS (Debian, Linux 6.12.47+rpt-rpi-v8 aarch64)
 **Python**: 3.13.5
 
@@ -548,7 +548,7 @@ Luftfeuchtigkeit: 64.0%
 
 ## [2025-12-03 v2] - Production-Ready Polish & Bug Fixes ✅
 
-**Status**: Deployed to http://growpi.nm-forum.de
+**Status**: Deployed to http://your-growpi-host.example.com
 **Build**: Success
 **Tests**: All passing
 **Ready for**: Customer Presentation
@@ -594,7 +594,7 @@ Luftfeuchtigkeit: 64.0%
 
 ### Project Overview
 
-Greenhouse control system for Raspberry Pi with web interface, deployed to VPS at growpi.nm-forum.de
+Greenhouse control system for Raspberry Pi with web interface, deployed to VPS at your-growpi-host.example.com
 
 ### Completed Tasks
 
@@ -627,7 +627,7 @@ Greenhouse control system for Raspberry Pi with web interface, deployed to VPS a
 
 **Infrastructure**:
 - VPS: Ubuntu 24.04 at 5.182.17.148
-- Domain: growpi.nm-forum.de
+- Domain: your-growpi-host.example.com
 - Node.js: v20.18.1
 - PM2: Process manager with ecosystem.config.js
 - NGINX: Reverse proxy on port 80 → localhost:3001

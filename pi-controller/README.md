@@ -6,7 +6,7 @@ Python-basierter Controller-Service für den Raspberry Pi 3B+.
 
 Dieser Controller läuft auf dem Raspberry Pi und steuert Grow-Lampen via PWM.
 
-**Aktueller Stand: v6.23.0 (2025-12-26) - Tank-Mode Hardening**
+**Aktueller Stand: v6.25.3 (2026-03-02) - Public Release Hardening**
 - Web-Interface auf Port 5000
 - **Tank-Mode Hardening**: Production-Ready Robustness
   - Circuit Breaker für DHT22 Sensor (Auto-Recovery nach Freeze)
@@ -33,7 +33,7 @@ Dieser Controller läuft auf dem Raspberry Pi und steuert Grow-Lampen via PWM.
 
 ```bash
 # Vom Entwicklungs-PC:
-scp -r pi-controller admin@192.168.0.86:/home/admin/
+scp -r pi-controller admin@<PI_HOST>:/home/admin/
 ```
 
 ### 2. Installation
@@ -43,6 +43,12 @@ scp -r pi-controller admin@192.168.0.86:/home/admin/
 cd /home/admin/pi-controller
 chmod +x install.sh
 ./install.sh
+```
+
+Wichtig nach der Installation:
+
+```bash
+sudo reboot
 ```
 
 ### 3. Konfiguration anpassen
@@ -81,13 +87,16 @@ lamps:
 
 ```bash
 sudo systemctl start grow-pi
+sudo systemctl start growpi-web
 sudo systemctl status grow-pi
+sudo systemctl status growpi-web
 ```
 
 ### 5. Logs prüfen
 
 ```bash
 sudo journalctl -u grow-pi -f
+sudo journalctl -u growpi-web -f
 ```
 
 ---
@@ -96,7 +105,7 @@ sudo journalctl -u grow-pi -f
 
 - **Platform**: Raspberry Pi 3B+
 - **Hostname**: growpi
-- **IP**: 192.168.0.86
+- **IP**: <PI_HOST>
 
 ### PWM Kanäle (FINAL - 2025-12-05)
 
@@ -104,8 +113,8 @@ sudo journalctl -u grow-pi -f
 |-------|-------------|------|-----|--------|
 | 1     | Far Red     | 16   | 36  | ✅ Aktiv |
 | 2     | Warm White  | 13   | 33  | ✅ Aktiv |
-| 3     | Cool White  | 12   | 32  | ✅ Aktiv |
-| 4     | UV          | 18   | 12  | ✅ Aktiv |
+| 3     | Cool White  | 18   | 12  | ✅ Aktiv |
+| 4     | UV          | 12   | 32  | ✅ Aktiv |
 
 Detaillierte Pin-Belegung: [`../docs/HARDWARE_PINOUT.md`](../docs/HARDWARE_PINOUT.md)
 
@@ -183,7 +192,7 @@ pi-controller/
 
 ```bash
 # Comprehensive Health Check (mit CPU-Temp, RAM, Disk, Sensor Status)
-curl "http://192.168.0.86:5000/api/health/"
+curl "http://<PI_HOST>:5000/api/health/"
 # → {
 #     "status": "healthy",
 #     "version": "6.23.0",
@@ -210,15 +219,15 @@ curl "http://192.168.0.86:5000/api/health/"
 #   }
 
 # Kubernetes Readiness Probe (Ready to serve traffic?)
-curl "http://192.168.0.86:5000/api/health/ready"
+curl "http://<PI_HOST>:5000/api/health/ready"
 # → 200 OK or 503 Service Unavailable
 
 # Kubernetes Liveness Probe (Application alive?)
-curl "http://192.168.0.86:5000/api/health/live"
+curl "http://<PI_HOST>:5000/api/health/live"
 # → 200 OK or 503 Service Unavailable
 
 # Prometheus-Style Metrics
-curl "http://192.168.0.86:5000/api/health/metrics"
+curl "http://<PI_HOST>:5000/api/health/metrics"
 # → {
 #     "sensor_error_count": 0,
 #     "database_active_connections": 3,
@@ -232,10 +241,10 @@ curl "http://192.168.0.86:5000/api/health/metrics"
 
 ```bash
 # Live-Snapshot (JPEG)
-curl "http://192.168.0.86:5000/api/camera/snapshot" -o snapshot.jpg
+curl "http://<PI_HOST>:5000/api/camera/snapshot" -o snapshot.jpg
 
 # Kamera-Status
-curl "http://192.168.0.86:5000/api/camera/status"
+curl "http://<PI_HOST>:5000/api/camera/status"
 # → {"available": true, "resolution": "1280x720", ...}
 ```
 
@@ -243,16 +252,16 @@ curl "http://192.168.0.86:5000/api/camera/status"
 
 ```bash
 # Sensor-Historie (letzte 24h)
-curl "http://192.168.0.86:5000/api/logs/sensors?type=temperature&hours=24"
+curl "http://<PI_HOST>:5000/api/logs/sensors?type=temperature&hours=24"
 
 # Lampen-Historie für Kanal 1
-curl "http://192.168.0.86:5000/api/logs/lamps?channel=1&hours=24"
+curl "http://<PI_HOST>:5000/api/logs/lamps?channel=1&hours=24"
 
 # System-Events
-curl "http://192.168.0.86:5000/api/logs/events"
+curl "http://<PI_HOST>:5000/api/logs/events"
 
 # Logging-Statistiken
-curl "http://192.168.0.86:5000/api/logs/stats"
+curl "http://<PI_HOST>:5000/api/logs/stats"
 ```
 
 ---
@@ -262,21 +271,55 @@ curl "http://192.168.0.86:5000/api/logs/stats"
 ```bash
 # Status
 sudo systemctl status grow-pi
+sudo systemctl status growpi-web
 
 # Start / Stop / Restart
 sudo systemctl start grow-pi
+sudo systemctl start growpi-web
 sudo systemctl stop grow-pi
+sudo systemctl stop growpi-web
 sudo systemctl restart grow-pi
+sudo systemctl restart growpi-web
 
 # Auto-Start aktivieren/deaktivieren
 sudo systemctl enable grow-pi
+sudo systemctl enable growpi-web
 sudo systemctl disable grow-pi
+sudo systemctl disable growpi-web
 
 # Logs (live)
 sudo journalctl -u grow-pi -f
+sudo journalctl -u growpi-web -f
 
 # Logs (letzte 100 Zeilen)
 sudo journalctl -u grow-pi -n 100
+sudo journalctl -u growpi-web -n 100
+```
+
+### GitHub Actions Auto-Deploy (Self-Hosted Runner)
+
+Der Pi kann Deployments nach `git push` automatisch selbst ausführen.
+
+- Workflow: `../.github/workflows/pi-autodeploy.yml`
+- Deploy-Skript: `../scripts/pi/github_runner_deploy.sh`
+- Setup/Architektur: `../docs/GITHUB_ACTIONS_PI_AUTODEPLOY.md`
+
+Wichtig:
+- Keine eingehenden Ports im Router erforderlich
+- Runner verbindet sich nur ausgehend per HTTPS zu GitHub
+- Deployment-Feedback (PASS/FAIL + Logs) erscheint direkt im GitHub Actions Run
+
+### Watchdog-Checks
+
+```bash
+# Service-Watchdog aus Unit prüfen (WatchdogSec)
+systemctl show grow-pi -p WatchdogUSec
+
+# systemd-Manager-Hardware-Watchdog prüfen
+systemctl show -p RuntimeWatchdogUSec -p RebootWatchdogUSec
+
+# Runtime-Watchdog Ereignisse ansehen
+sudo journalctl -u grow-pi --since "15 min ago" | grep -Ei "watchdog|unhealthy|recovered"
 ```
 
 ---
@@ -325,6 +368,20 @@ python -m grow_pi.main --test
 sudo journalctl -u grow-pi -n 50 --no-pager
 ```
 
+### Service-Reboot-Loop (StartLimit erreicht)
+
+```bash
+# Letzte Fehler ansehen
+sudo journalctl -u grow-pi -n 200 --no-pager
+
+# Unit-Parameter prüfen
+systemctl cat grow-pi
+
+# Nach Fix Startlimit zurücksetzen und neu starten
+sudo systemctl reset-failed grow-pi
+sudo systemctl restart grow-pi
+```
+
 ---
 
 ## Referenzen
@@ -335,14 +392,15 @@ sudo journalctl -u grow-pi -n 50 --no-pager
 ---
 
 **Python Version**: 3.13
-**Aktuelles Level**: v6.23.0 (Tank-Mode Hardening)
-**Stand**: 2025-12-26
-**Web-Interface**: http://192.168.0.86:5000
+**Aktuelles Level**: v6.25.3 (Public Release Hardening)
+**Stand**: 2026-03-02
+**Web-Interface**: http://<PI_HOST>:5000
 **Changelog**: [CHANGELOG.md](CHANGELOG.md)
+**Lizenz**: Siehe [`../LICENSE`](../LICENSE) (private Nutzung frei, kommerziell nur mit Freigabe)
 
 ---
 
-## Tank-Mode Features (v6.23.0)
+## Tank-Mode Features (v6.25.3)
 
 ### Production-Ready Robustness
 
@@ -353,8 +411,22 @@ sudo journalctl -u grow-pi -n 50 --no-pager
 
 **systemd Watchdog:**
 - Automatischer Service-Restart bei Hang (60s Timeout)
-- Watchdog-Ping alle 30 Sekunden
+- Watchdog-Ping dynamisch aus `WATCHDOG_USEC` (50% Intervall)
 - sd_notify Integration (READY, WATCHDOG, STOPPING)
+- Interner Runtime-Watchdog prüft Main-Loop + kritische Worker-Threads
+- Bei Teil-Ausfällen wird `WATCHDOG=trigger` ausgelöst (sofortige Recovery)
+- Crash-Loop-Schutz mit `StartLimit*` + Reboot-Eskalation
+
+**Hardware Watchdog (Host-Ebene):**
+- Kernel-Watchdog via `dtparam=watchdog=on`
+- systemd Manager Watchdog (`RuntimeWatchdogSec=15s`)
+- Schutz auch bei Host-Freeze außerhalb des Python-Prozesses
+
+**Process Splitting (neu):**
+- `grow-pi.service` steuert nur den Controller (`--no-web`)
+- `growpi-web.service` betreibt die API separat
+- Modus-Synchronisierung läuft prozessübergreifend über `/run/growpi/mode.txt`
+- Teilausfälle bleiben isoliert und werden je Service separat neu gestartet
 
 **Thread-Safety:**
 - RLock für Sensor Cache (erlaubt nested calls)

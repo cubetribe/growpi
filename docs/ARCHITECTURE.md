@@ -54,7 +54,7 @@ GET  /api/history/:sensor     # Historische Daten
 - **Modell**: TBD (wird beim ersten SSH-Zugriff ermittelt)
 - **OS**: Raspberry Pi OS
 - **Hostname**: growpi
-- **IP**: 192.168.0.86
+- **IP**: <PI_HOST>
 - **SSH**: Port 22
 
 **Angeschlossene Hardware**:
@@ -94,7 +94,7 @@ GET  /api/history/:sensor     # Historische Daten
 ## Sicherheit
 
 ### Development
-- Lokales Netzwerk (192.168.0.x)
+- Lokales Netzwerk (<LAN_SUBNET>)
 - SSH mit Passwort (später: SSH-Keys)
 - Keine externe Exposition
 

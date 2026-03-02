@@ -1,7 +1,11 @@
 [Unit]
 Description=GrowPi Web API
-After=network.target pigpiod.service
-Requires=pigpiod.service
+After=network-online.target pigpiod.service grow-pi.service
+Wants=network-online.target
+Requires=pigpiod.service grow-pi.service
+PartOf=grow-pi.service
+StartLimitIntervalSec=300
+StartLimitBurst=8
 
 [Service]
 Type=simple
@@ -9,12 +13,24 @@ User=admin
 Group=admin
 WorkingDirectory=/opt/grow-pi
 ExecStart=/opt/grow-pi/venv/bin/python -m grow_pi.web.api
-Restart=always
-RestartSec=10
+RuntimeDirectory=growpi
+RuntimeDirectoryMode=0755
+RuntimeDirectoryPreserve=yes
+Restart=on-failure
+RestartSec=3
+RestartPreventExitStatus=0 SIGTERM SIGINT
+TimeoutStartSec=120
+TimeoutStopSec=30
+KillSignal=SIGTERM
 Environment=PYTHONUNBUFFERED=1
 StandardOutput=journal
 StandardError=journal
 SyslogIdentifier=growpi-web
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/opt/grow-pi /run/growpi
 
 [Install]
 WantedBy=multi-user.target

@@ -1,0 +1,42 @@
+name: Pi Auto Deploy
+
+on:
+  push:
+    branches:
+      - main
+      - 'codex/**'
+  workflow_dispatch:
+
+concurrency:
+  group: pi-autodeploy
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: Deploy To Raspberry Pi
+    runs-on:
+      - self-hosted
+      - linux
+      - ARM64
+      - growpi
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Show run context
+        run: |
+          echo "Repository: $GITHUB_REPOSITORY"
+          echo "Branch: $GITHUB_REF_NAME"
+          echo "Commit: $GITHUB_SHA"
+          echo "Runner: $RUNNER_NAME"
+
+      - name: Deploy on Pi
+        run: ./scripts/pi/github_runner_deploy.sh
+
+      - name: Post-deploy summary
+        run: |
+          curl -fsS http://127.0.0.1:5000/api/version
+          echo
+          curl -fsS http://127.0.0.1:5000/api/health

@@ -253,6 +253,15 @@ class CurveController:
         logger.error(f"Failed to update curve for channel {channel}")
         return False
 
+    def reload_from_database(self) -> None:
+        """
+        Reload all curves from database.
+
+        Required in split-process mode where curve edits happen in the web
+        service process and the controller process must pick up updates.
+        """
+        self._load_curves()
+
     def set_enabled(self, channel: int, enabled: bool) -> bool:
         """Enable or disable a channel's curve."""
         if channel not in self._curves:

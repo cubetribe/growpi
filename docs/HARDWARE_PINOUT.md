@@ -1,6 +1,6 @@
 # GrowPi - Raspberry Pi 3B+ Hardware Pin-Belegung
 
-**Hardware**: Raspberry Pi 3B+ **Hostname**: growpi **IP**: 192.168.0.86
+**Hardware**: Raspberry Pi 3B+ **Hostname**: growpi **IP**: <PI_HOST>
 **Dokumentiert**: 2025-12-05 **Status**: ✅ FINAL - Alle 4 PWM Kanäle verifiziert
 
 ---
@@ -13,8 +13,8 @@
 |-------|------|------|-----|---------|------------|--------|
 | 1 | Far Red | **GPIO-16** | **Pin 36** | Software PWM | #ff4444 | ✅ Aktiv |
 | 2 | Warm White | **GPIO-13** | **Pin 33** | Hardware PWM | #ffbb44 | ✅ Aktiv |
-| 3 | Cool White | **GPIO-12** | **Pin 32** | Hardware PWM | #88ddff | ✅ Aktiv |
-| 4 | UV | **GPIO-18** | **Pin 12** | Hardware PWM | #cc66ff | ✅ Aktiv |
+| 3 | Cool White | **GPIO-18** | **Pin 12** | Hardware PWM | #88ddff | ✅ Aktiv |
+| 4 | UV | **GPIO-12** | **Pin 32** | Hardware PWM | #cc66ff | ✅ Aktiv |
 
 ### Sensoren
 
@@ -46,7 +46,7 @@
    [ 5]    GPIO3 ──────────── GND    🟢  [ 6]
    [ 7] 🟢 GPIO4 ──────────── GPIO14     [ 8]   ← DHT22 DATA ✅
    [ 9]    GND ────────────── GPIO15     [10]
-   [11]    GPIO17 ──────────── GPIO18 🔴 [12]   ← Kanal 4 (UV) ✅
+   [11]    GPIO17 ──────────── GPIO18 🔴 [12]   ← Kanal 3 (Cool White) ✅
    [13]    GPIO27 ──────────── GND        [14]
    [15]    GPIO22 ──────────── GPIO23     [16]
    [17]    3.3V ────────────── GPIO24     [18]
@@ -56,7 +56,7 @@
    [25]    GND ────────────── GPIO7      [26]
    [27]    GPIO0 ────────────── GPIO1     [28]
    [29]    GPIO5 ────────────── GND        [30]
-   [31]    GPIO6 ────────────── GPIO12 🔴 [32]   ← Kanal 3 (Cool White) ✅
+   [31]    GPIO6 ────────────── GPIO12 🔴 [32]   ← Kanal 4 (UV) ✅
    [33] 🔴 GPIO13 ──────────── GND        [34]   ← Kanal 2 (Warm White) ✅
    [35]    GPIO19 ──────────── GPIO16 🔴  [36]   ← Kanal 1 (Far Red) ✅
    [37]    GPIO26 ──────────── GPIO20     [38]
@@ -124,8 +124,8 @@ python3 -c "import board; import adafruit_dht; d=adafruit_dht.DHT22(board.D4); p
 |-------|-------|----------|----------------|---------|--------|
 | 1 | Far Red | **GPIO-16** | **Pin 36** | Software PWM | ✅ Aktiv |
 | 2 | Warm White | **GPIO-13** | **Pin 33** | Hardware PWM | ✅ Aktiv |
-| 3 | Cool White | **GPIO-12** | **Pin 32** | Hardware PWM | ✅ Aktiv |
-| 4 | UV | **GPIO-18** | **Pin 12** | Hardware PWM | ✅ Aktiv |
+| 3 | Cool White | **GPIO-18** | **Pin 12** | Hardware PWM | ✅ Aktiv |
+| 4 | UV | **GPIO-12** | **Pin 32** | Hardware PWM | ✅ Aktiv |
 
 ### Produktions-Verkabelung
 
@@ -135,8 +135,8 @@ python3 -c "import board; import adafruit_dht; d=adafruit_dht.DHT22(board.D4); p
 │                                                              │
 │  Pin 36 (GPIO-16) ──────┬──── PWM Kanal 1 (Far Red)    ✅   │
 │  Pin 33 (GPIO-13) ──────┼──── PWM Kanal 2 (Warm White) ✅   │
-│  Pin 32 (GPIO-12) ──────┼──── PWM Kanal 3 (Cool White) ✅   │
-│  Pin 12 (GPIO-18) ──────┼──── PWM Kanal 4 (UV)         ✅   │
+│  Pin 32 (GPIO-12) ──────┼──── PWM Kanal 4 (UV)         ✅   │
+│  Pin 12 (GPIO-18) ──────┼──── PWM Kanal 3 (Cool White) ✅   │
 │                         │                                    │
 │  Pin 34 (GND) ──────────┴──── Common Ground (alle Kanäle)   │
 │                                                              │
@@ -177,8 +177,8 @@ Mehrere GND-Pins verfügbar (alle intern verbunden):
 | Pin 1 | 3.3V | Power | DHT22 VCC ✅ |
 | Pin 6 | GND | Ground | DHT22 GND ✅ |
 | Pin 7 | GPIO-4 | Input | DHT22 DATA ✅ |
-| Pin 12 | GPIO-18 | PWM Output | Kanal 4 (UV) ✅ |
-| Pin 32 | GPIO-12 | PWM Output | Kanal 3 (Cool White) ✅ |
+| Pin 12 | GPIO-18 | PWM Output | Kanal 3 (Cool White) ✅ |
+| Pin 32 | GPIO-12 | PWM Output | Kanal 4 (UV) ✅ |
 | Pin 33 | GPIO-13 | PWM Output | Kanal 2 (Warm White) ✅ |
 | Pin 34 | GND | Ground | Lampen Ground |
 | Pin 36 | GPIO-16 | PWM Output | Kanal 1 (Far Red) ✅ |
@@ -215,7 +215,7 @@ Pi GPIO → LED direkt (NIEMALS!)
 ```
 ┌──────────────────────────────────────────────────────────────┐
 │                  Raspberry Pi 3B+ (growpi)                    │
-│                  IP: 192.168.0.86                             │
+│                  IP: <PI_HOST>                             │
 │                                                               │
 │  Power: 5V/2.5A Micro-USB                                    │
 │                                                               │
@@ -229,8 +229,8 @@ Pi GPIO → LED direkt (NIEMALS!)
 │  │                                                       │    │
 │  │  Pin 36 (GPIO-16) ────┬──── PWM Kanal 1 (Far Red)   │    │
 │  │  Pin 33 (GPIO-13) ────┼──── PWM Kanal 2 (Warm White)│    │
-│  │  Pin 32 (GPIO-12) ────┼──── PWM Kanal 3 (Cool White)│    │
-│  │  Pin 12 (GPIO-18) ────┼──── PWM Kanal 4 (UV)        │    │
+│  │  Pin 32 (GPIO-12) ────┼──── PWM Kanal 4 (UV)        │    │
+│  │  Pin 12 (GPIO-18) ────┼──── PWM Kanal 3 (Cool White)│    │
 │  │                       │                              │    │
 │  │  Pin 34 (GND) ────────┴──── Common Ground           │    │
 │  │                                                       │    │
@@ -269,8 +269,8 @@ Pi GPIO → LED direkt (NIEMALS!)
 | 2025-12-05 | **FINALE KONFIGURATION**: 4 Kanäle statt 5 | ✅ |
 | 2025-12-05 | Kanal 1 (Far Red): GPIO-16 / Pin 36 | ✅ |
 | 2025-12-05 | Kanal 2 (Warm White): GPIO-13 / Pin 33 | ✅ |
-| 2025-12-05 | Kanal 3 (Cool White): GPIO-12 / Pin 32 | ✅ |
-| 2025-12-05 | Kanal 4 (UV): GPIO-18 / Pin 12 | ✅ |
+| 2026-02-03 | Kanal 3 (Cool White): GPIO-18 / Pin 12 | ✅ |
+| 2026-02-03 | Kanal 4 (UV): GPIO-12 / Pin 32 | ✅ |
 | 2025-12-04 | DHT22 auf GPIO-4 (Pin 7) verifiziert | ✅ |
 | 2025-12-04 | PWM GPIO-18 (Pin 12) initial getestet | ✅ |
 

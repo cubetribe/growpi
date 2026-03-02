@@ -2,6 +2,137 @@
 
 Alle wichtigen Änderungen am GrowPi Pi-Controller werden hier dokumentiert.
 
+## [v6.25.3] - 2026-03-02 - Public Release Hardening & License Update
+
+### Security
+- **Hardcoded credential fallback entfernt**
+  - `grow_pi/utils/tuya_cloud.py` nutzt keine eingebauten Tuya-Cloud-Credentials mehr
+  - Cloud-Integration funktioniert nur noch mit gesetzten Umgebungsvariablen (`TUYA_ACCESS_ID`, `TUYA_ACCESS_SECRET`)
+
+### Changed
+- `VERSION` auf `6.25.3` erhöht (wird im Frontend über `/api/version` angezeigt)
+- Dokumentation auf public/sanitized Stand gebracht (keine internen Host/IP-Werte mehr)
+- Lizenzmodell auf Non-Commercial Source-Available umgestellt (siehe Root-`LICENSE`)
+
+## [v6.25.2] - 2026-03-02 - Split-Process Consistency Hardening
+
+### Fixed
+- **`/api/status` liefert wieder echte Lampenwerte**
+  - Blueprint-Dependencies werden im aktiven `web/api.py` jetzt korrekt initialisiert
+  - Status-Endpoint liest den PWM-State pro Request nur einmal und gibt konsistente Kanalwerte zurück
+- **Fehler beim PWM-Setzen werden nicht mehr als Erfolg behandelt**
+  - `set_lamp` liefert bei fehlgeschlagenem Hardware-Write jetzt einen 500-Fehler
+  - Mode-Wechsel (`manual`/`auto`) protokolliert fehlgeschlagene Kanal-Updates statt stillschweigend fortzufahren
+- **Auto-Kurven-Update robuster bei Hardwarefehlern**
+  - Controller aktualisiert `last_intensities` nur noch bei erfolgreichem PWM-Write
+  - Verhindert Cache-Drift zwischen Sollwert und realem Lampenzustand
+
+### Changed
+- **Kurven-Intensitäten API aktualisiert Kurven explizit aus DB**
+  - `/api/curves/intensities` lädt vor der Berechnung neu aus der Datenbank
+  - Erhöht Konsistenz in Split-Process-Szenarien
+
+### Added
+- Unit-Tests für Controller-Kurven-Synchronisierung:
+  - `tests/unit/test_main_curve_sync.py`
+- GitHub Actions Auto-Deploy Unterstützung:
+  - `../.github/workflows/pi-autodeploy.yml`
+  - `../scripts/pi/github_runner_deploy.sh`
+  - `../scripts/pi/install_github_runner.sh`
+  - `../docs/GITHUB_ACTIONS_PI_AUTODEPLOY.md`
+
+### Infrastructure
+- Self-hosted Runner auf Pi möglich ohne eingehende Ports
+- Deployment-Status wird direkt im GitHub Actions Run zurückgemeldet
+
+### Validation
+- `venv/bin/python -m pytest -q tests/unit` -> **156 passed**
+- `venv/bin/python -m py_compile` auf geänderten Modulen -> **PASS**
+
+## [v6.25.1] - 2026-03-02 - Curve/State Sync Hardening
+
+### Fixed
+- **Auto-Kurven nach Process-Splitting synchronisiert**
+  - Controller lädt Kurven vor jedem Auto-Update aus der Datenbank nach (`reload_from_database()`)
+  - Änderungen aus der Web-UI werden dadurch im Controller-Prozess zuverlässig wirksam
+- **Ist-Zustand aus echter Hardware statt Prozess-Cache**
+  - `PWMController.get_current_state()` liest bei pigpio die aktuellen Duty-Cycles direkt vom Daemon
+  - Web-Status und physischer Lampenzustand bleiben konsistent auch bei getrennten Prozessen
+
+### Added
+- Unit-Tests für PWM-State-Synchronisierung:
+  - `tests/unit/test_pwm_controller_state_sync.py`
+
+---
+
+## [v6.25.0] - 2026-03-02 - Process Splitting & Runtime Hardening
+
+### Added
+- **Process Splitting (Controller/Web)**
+  - `grow-pi.service` läuft jetzt als reiner Controller-Prozess (`python -m grow_pi.main --no-web`)
+  - `growpi-web.service` läuft separat als Web/API-Prozess
+  - Installer aktiviert beide Services automatisch
+- **Cross-Process Mode Synchronization**
+  - `ModeManager.get_mode()` synchronisiert den Modus bei Dateiveränderungen (`/run/growpi/mode.txt`)
+  - Auto/Manual-Mode bleibt konsistent zwischen Controller- und Web-Prozess
+
+### Changed
+- **Lazy Web Import in Controller**
+  - `main.py` lädt `grow_pi.web.api` nur noch bei aktiviertem Web-Betrieb
+  - Verhindert unnötige Web/Sensor-Initialisierung im Controller-Prozess bei `--no-web`
+- **Web Service Hardening**
+  - `growpi-web.service`: `Restart=on-failure`, Startlimits, Security-Hardening, kontrollierte Stop-/Start-Timeouts
+  - Gemeinsames `RuntimeDirectory=growpi` für prozessübergreifende Runtime-Dateien
+- **Deployment Workflow**
+  - `install.sh` installiert/aktiviert jetzt `grow-pi.service` und `growpi-web.service`
+  - Hardware-Watchdog-Setup bleibt enthalten
+- **System Event Logging Robustness**
+  - `SystemEvent` validiert `event_type` jetzt schema-basiert statt mit starrer Whitelist
+  - Verhindert Laufzeitfehler bei neuen Event-Typen wie `mode_change` und `sensor_reinit`
+
+### Validation
+- `pytest -q tests/unit` -> **147 passed**
+- `python3 -m py_compile` auf geänderten Kernmodulen -> **PASS**
+
+---
+
+## [v6.24.1] - 2026-02-03 - Cool White Pin Fix
+
+### Fixed
+- **PWM pin mapping mismatch**: Channel 3 (Cool White) now drives GPIO-18 / Pin 12 as wired on the production Pi; channel 4 (UV) moves to GPIO-12 / Pin 32. This restores Cool White output and keeps UV available for future use.
+
+### Added
+- **Runtime Watchdog Monitor (Controller intern)**
+  - Dedizierter Monitor-Thread prüft Main-Loop-Heartbeat und kritische Worker-Komponenten (Web-Thread, DataLogger, Dehumidifier)
+  - `WATCHDOG=trigger` bei Teil-Ausfällen, damit systemd sofort neu startet statt den Timeout abzuwarten
+  - Watchdog-Ping-Intervall wird dynamisch aus `WATCHDOG_USEC` abgeleitet (50%-Regel)
+- **Background Runtime Health Exports**
+  - `DataLogger.get_runtime_health()` und `DehumidifierController.get_runtime_health()`
+  - `web/api.py:get_runtime_health()` als aggregierter Runtime-Health-Endpoint für den Hauptprozess
+- **Hardware Watchdog Setup**
+  - Neue systemd-Manager-Drop-in-Datei: `systemd/99-growpi-watchdog.conf`
+  - `install.sh` aktiviert Kernel-Watchdog (`dtparam=watchdog=on`) und installiert Manager-Watchdog-Konfiguration
+
+### Changed
+- **systemd Unit Hardening (`systemd/grow-pi.service`)**
+  - Restart-Policy auf `on-failure` mit schnelleren Recovery-Zyklen
+  - Crash-Loop-Schutz mit `StartLimitIntervalSec`, `StartLimitBurst`, `StartLimitAction=reboot-force`
+  - Zusätzliche Sicherheits- und Laufzeitgrenzen (`ProtectSystem`, `ProtectHome`, `PrivateTmp`, `TasksMax`, `OOMPolicy=restart`)
+- **Web API Standalone Start**
+  - Direktstart (`python -m grow_pi.web.api`) läuft jetzt stabil ohne Debug-Reloader (`debug=False`, `use_reloader=False`)
+
+### Validation
+- Unit-Tests ergänzt:
+  - `tests/unit/test_systemd_watchdog.py`
+  - `tests/unit/test_datalogger_runtime_health.py`
+- Testlauf: `147 passed` (`pytest -q tests/unit`)
+
+### Documentation
+- Updated pin tables in `README.md`, `docs/HARDWARE_PINOUT.md`, `docs/SPEC_RASPBERRY_PI.md`, and `CLAUDE.md` to prevent future mis-wiring.
+- Added `reports/v6.24.1/00-analysis-report.md` to capture the failure investigation.
+
+---
+
 ## [v6.23.0] - 2025-12-26 - Tank-Mode Hardening
 
 ### Added

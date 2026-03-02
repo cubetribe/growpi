@@ -59,7 +59,7 @@ def test_heartbeat(client: GrowPiClient) -> bool:
         result = client.send_heartbeat(
             uptime_seconds=3600,
             version='1.0.0',
-            ip_local='192.168.1.100',
+            ip_local='<DEVICE_IP>',
             last_sensor_read=datetime.now()
         )
 
@@ -198,7 +198,7 @@ def main():
     elif args.local:
         server_url = 'http://localhost:3001'
     else:
-        server_url = 'https://growpi.nm-forum.de'
+        server_url = 'https://your-growpi-host.example.com'
 
     print("=" * 50)
     print("GrowPi VPS Client Test Suite")

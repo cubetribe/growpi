@@ -40,7 +40,7 @@ Clean Separation: •	Config/BaseURL.swift → Dev/Prod URLs
 
 4. Base-URLs (lokal vs. VPS)
 
-#if DEBUG let BASE_URL = URL(string: "http://192.168.0.86:5000")! // Raspberry
+#if DEBUG let BASE_URL = URL(string: "http://<PI_HOST>:5000")! // Raspberry
 Pi #else let BASE_URL = URL(string: "https://growpi.de")! // VPS #endif
 
 ⸻

@@ -2588,3 +2588,110 @@ input[type="range"]::-moz-range-thumb {
         padding: 12px;
     }
 }
+
+/* ==========================================
+   Sensor Status Panel & Circuit Breaker
+   v6.24.1
+   ========================================== */
+
+.sensor-status-panel {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 12px 16px;
+    margin-bottom: 16px;
+    background: rgba(30, 30, 30, 0.8);
+    border-radius: 10px;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    flex-wrap: wrap;
+    gap: 12px;
+}
+
+.sensor-status-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.sensor-status-label {
+    font-size: 13px;
+    color: #888;
+}
+
+.sensor-status-value {
+    font-size: 13px;
+    font-weight: 600;
+    padding: 4px 10px;
+    border-radius: 12px;
+    background: rgba(100, 100, 100, 0.2);
+    color: #888;
+}
+
+.sensor-status-value.status-closed {
+    background: rgba(17, 255, 85, 0.15);
+    color: #11ff55;
+    border: 1px solid rgba(17, 255, 85, 0.3);
+}
+
+.sensor-status-value.status-open {
+    background: rgba(255, 68, 68, 0.2);
+    color: #ff4444;
+    border: 1px solid rgba(255, 68, 68, 0.4);
+    animation: pulse-critical 1.5s infinite;
+}
+
+.sensor-status-value.status-half-open {
+    background: rgba(255, 187, 68, 0.15);
+    color: #ffbb44;
+    border: 1px solid rgba(255, 187, 68, 0.3);
+}
+
+.sensor-status-actions {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+.btn-reset {
+    background: rgba(255, 187, 68, 0.15) !important;
+    color: #ffbb44 !important;
+    border: 1px solid rgba(255, 187, 68, 0.3) !important;
+}
+
+.btn-reset:hover {
+    background: rgba(255, 187, 68, 0.25) !important;
+    box-shadow: 0 0 10px rgba(255, 187, 68, 0.3);
+}
+
+.btn-restart {
+    background: rgba(255, 68, 68, 0.15) !important;
+    color: #ff6666 !important;
+    border: 1px solid rgba(255, 68, 68, 0.3) !important;
+}
+
+.btn-restart:hover {
+    background: rgba(255, 68, 68, 0.25) !important;
+    box-shadow: 0 0 10px rgba(255, 68, 68, 0.3);
+}
+
+.btn-small {
+    padding: 6px 12px !important;
+    font-size: 11px !important;
+    border-radius: 6px;
+}
+
+/* Responsive */
+@media (max-width: 480px) {
+    .sensor-status-panel {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    .sensor-status-header {
+        justify-content: center;
+    }
+
+    .sensor-status-actions {
+        justify-content: center;
+    }
+}

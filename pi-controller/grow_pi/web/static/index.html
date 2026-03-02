@@ -103,6 +103,23 @@
                 <!-- System Health Widget -->
                 <section class="section system-health-section">
                     <h2 class="section-title">System-Health</h2>
+
+                    <!-- Sensor Status & Circuit Breaker -->
+                    <div class="sensor-status-panel" id="sensorStatusPanel">
+                        <div class="sensor-status-header">
+                            <span class="sensor-status-label">Sensor-Sicherung:</span>
+                            <span class="sensor-status-value" id="circuitBreakerStatus">--</span>
+                        </div>
+                        <div class="sensor-status-actions">
+                            <button class="btn btn-small btn-reset" id="btnResetCircuitBreaker" title="Sensor-Sicherung zurücksetzen">
+                                Sicherung Reset
+                            </button>
+                            <button class="btn btn-small btn-restart" id="btnRestartService" title="GrowPi Service neu starten">
+                                Service Neustart
+                            </button>
+                        </div>
+                    </div>
+
                     <div class="health-grid">
                         <div class="health-metric" id="healthCpuTemp">
                             <div class="metric-label">CPU Temp</div>

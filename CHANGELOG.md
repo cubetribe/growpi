@@ -7,6 +7,59 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [6.25.3] - 2026-03-02
+
+### Added
+- `LICENSE` with custom terms:
+  - private/personal non-commercial use is free
+  - commercial/professional use requires prior permission from rights holder
+
+### Changed
+- Root `README.md` rewritten for public repository release readiness:
+  - consistent architecture/runtime description
+  - explicit CI/CD (GitHub Actions -> Raspberry Pi runner) documentation
+  - explicit source-available license note
+- Public metadata cleanup in docs/examples:
+  - internal host/IP values replaced with placeholders
+  - internal agent/refactoring/report artifacts removed from tracked content
+
+### Security
+- Removed hardcoded Tuya cloud credential fallback from `pi-controller/grow_pi/utils/tuya_cloud.py`
+- Tuya cloud integration now requires env vars only (`TUYA_ACCESS_ID`, `TUYA_ACCESS_SECRET`)
+
+---
+
+## [6.25.2] - 2026-03-02
+
+### Added
+- **GitHub Actions Auto-Deploy to Raspberry Pi**
+  - New workflow: `.github/workflows/pi-autodeploy.yml`
+  - New deploy script: `scripts/pi/github_runner_deploy.sh`
+  - New setup helper: `scripts/pi/install_github_runner.sh`
+  - New documentation: `docs/GITHUB_ACTIONS_PI_AUTODEPLOY.md`
+
+### Changed
+- README updated with current version and CI/CD deployment flow
+- `.gitignore` updated to ignore local agent/report artifact folders
+
+### Infrastructure
+- Self-hosted GitHub Actions runner installed on Raspberry Pi (`growpi-01`, labels: `growpi,prod`)
+- Deploy feedback now comes directly from Pi execution logs in GitHub Actions
+- No inbound ports required (outbound HTTPS from runner only)
+
+---
+
+## [6.24.1] - 2026-02-03
+
+### Fixed
+- **PWM pin mapping**: Cool White (channel 3) now drives GPIO-18 / Pin 12; UV (channel 4) uses GPIO-12 / Pin 32. This matches the physical wiring on the production Pi so the Cool White channel responds again.
+
+### Updated
+- Documentation (`README.md`, `CLAUDE.md`, `docs/HARDWARE_PINOUT.md`, `docs/SPEC_RASPBERRY_PI.md`) refreshed to reflect the corrected wiring.
+- Added troubleshooting report for v6.24.1 in `reports/v6.24.1/`.
+
+---
+
 ## [6.24.0] - 2025-12-29
 
 ### Fixed
@@ -55,7 +108,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `pi-controller/grow_pi/web/static/index.html`
 
 ### Deployment
-- ✅ Deployed auf Pi @ 192.168.0.86
+- ✅ Deployed auf Pi @ <PI_HOST>
 - ⏳ User-Test ausstehend
 
 ---
@@ -100,7 +153,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `pi-controller/grow_pi/web/static/css/calendar.css`
 
 ### Deployment
-- ✅ Deployed auf Pi @ 192.168.0.86
+- ✅ Deployed auf Pi @ <PI_HOST>
 - ⏳ User-Test ausstehend
 
 ---
@@ -291,7 +344,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - 🟡 Smartphone UI-Probleme - Layout muss noch optimiert werden
 
 ### Deployment
-- ✅ Deployed auf Pi @ 192.168.0.86
+- ✅ Deployed auf Pi @ <PI_HOST>
 - ✅ Grundfunktionalität getestet
 
 ---
@@ -322,7 +375,7 @@ Dehumidifier OFF (trigger: manual, manual off)
 ```
 
 ### Deployment
-- ✅ Deployed auf Pi @ 192.168.0.86
+- ✅ Deployed auf Pi @ <PI_HOST>
 - ✅ Service neugestartet
 - ✅ Manuelles Schalten funktioniert
 
@@ -348,7 +401,7 @@ Dehumidifier OFF (trigger: manual, manual off)
 - Automation sollte jetzt zuverlässig funktionieren
 
 ### Deployment
-- ✅ Deployed auf Pi @ 192.168.0.86
+- ✅ Deployed auf Pi @ <PI_HOST>
 - ✅ Service neugestartet
 
 ---
@@ -376,7 +429,7 @@ Dehumidifier OFF (trigger: manual, manual off)
 - Stromverbrauch-Chart auf Verlauf-Seite zeigt jetzt alle historischen Daten
 
 ### Deployment
-- ✅ Deployed auf Pi @ 192.168.0.86
+- ✅ Deployed auf Pi @ <PI_HOST>
 - ✅ Service neugestartet
 
 ---
@@ -401,7 +454,7 @@ Dehumidifier OFF (trigger: manual, manual off)
   - Jetzt: Alle 3 Charts synchron mit gleicher X-Achse
 
 ### Deployment
-- ✅ Deployed auf Pi @ 192.168.0.86
+- ✅ Deployed auf Pi @ <PI_HOST>
 - ✅ history.js komplett überarbeitet
 - ✅ Chart.js Date-Adapter hinzugefügt
 
@@ -440,7 +493,7 @@ Dehumidifier OFF (trigger: manual, manual off)
 - Checkbox-basierte Kanalauswahl statt Tab-Wechsel
 
 ### Deployment
-- ✅ Deployed auf Pi @ 192.168.0.86
+- ✅ Deployed auf Pi @ <PI_HOST>
 - ✅ Multi-Line Chart funktioniert
 - ✅ Accordion funktioniert
 - ✅ Preset-Fix deployed
@@ -468,7 +521,7 @@ Dehumidifier OFF (trigger: manual, manual off)
   - "PWM state restored - Zero-Downtime active!"
 
 ### Deployment
-- ✅ Deployed auf Pi @ 192.168.0.86
+- ✅ Deployed auf Pi @ <PI_HOST>
 - ✅ Getestet mit mehreren Service-Restarts
 - ✅ Lampen bleiben jetzt wirklich an (kein Flackern mehr!)
 
@@ -511,7 +564,7 @@ Dehumidifier OFF (trigger: manual, manual off)
 - PWM-Werte bleiben IMMER erhalten, auch bei `systemctl stop`
 
 ### Deployment
-- ✅ Deployed auf Pi @ 192.168.0.86
+- ✅ Deployed auf Pi @ <PI_HOST>
 - ✅ Getestet mit mehreren Restarts (kein Flackern)
 - ✅ Logs zeigen "PWM preserved" bei Shutdown
 
@@ -605,7 +658,7 @@ Dehumidifier OFF (trigger: manual, manual off)
 ### Testing
 - All 14 API endpoints verified ✅
 - 140/140 integration tests passing ✅
-- User-validated on Pi @ 192.168.0.86 ✅
+- User-validated on Pi @ <PI_HOST> ✅
 
 ---
 
@@ -711,7 +764,7 @@ Archiviert:
 
 ---
 
-**Projekt**: GrowPi Commercial Greenhouse Management
-**Entwickler**: Dennis Westermann (d.westermann@ol-mg.de)
-**Lizenz**: Proprietary
-**Platform**: Raspberry Pi 3B+ + VPS Deployment
+**Projekt**: GrowPi Raspberry Pi Greenhouse Controller
+**Rechteinhaber**: Dennis Westermann
+**Lizenz**: GrowPi Non-Commercial License v1.0
+**Plattform**: Raspberry Pi 3B+ + optional VPS/CI Integration
