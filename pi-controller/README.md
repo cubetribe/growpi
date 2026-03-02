@@ -411,7 +411,7 @@ sudo systemctl restart grow-pi
 **Process Splitting (neu):**
 - `grow-pi.service` steuert nur den Controller (`--no-web`)
 - `growpi-web.service` betreibt die API separat
-- Modus-Synchronisierung läuft prozessübergreifend über persistente Mode-Datei
+- Modus-Synchronisierung läuft prozessübergreifend über `/run/growpi/mode.txt`
 - Teilausfälle bleiben isoliert und werden je Service separat neu gestartet
 
 **Thread-Safety:**

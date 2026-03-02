@@ -27,8 +27,29 @@ from typing import Optional, Callable, Dict, List
 
 logger = logging.getLogger(__name__)
 
-# Mode file location - /tmp is cleared on reboot, ensuring 'auto' default
-MODE_FILE = "/tmp/growpi_mode.txt"
+# Mode file location:
+# - Preferred: /run/growpi/mode.txt (shared across split services)
+# - Fallback: /tmp/growpi_mode.txt (local/dev environments without /run access)
+DEFAULT_MODE_FILE = "/run/growpi/mode.txt"
+FALLBACK_MODE_FILE = "/tmp/growpi_mode.txt"
+
+
+def _resolve_mode_file() -> str:
+    configured = os.environ.get("GROWPI_MODE_FILE", DEFAULT_MODE_FILE)
+    directory = os.path.dirname(configured) or "."
+
+    try:
+        os.makedirs(directory, exist_ok=True)
+    except Exception:
+        pass
+
+    if os.access(directory, os.W_OK):
+        return configured
+
+    return FALLBACK_MODE_FILE
+
+
+MODE_FILE = _resolve_mode_file()
 
 # Valid modes
 MODES = ('auto', 'manual')
@@ -85,6 +106,7 @@ class ModeManager:
     def _save_mode(self) -> None:
         """Save mode to file."""
         try:
+            os.makedirs(os.path.dirname(MODE_FILE), exist_ok=True)
             with open(MODE_FILE, 'w') as f:
                 f.write(self._mode)
             self._mode_file_mtime = os.path.getmtime(MODE_FILE)

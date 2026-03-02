@@ -10,7 +10,7 @@ Alle wichtigen Änderungen am GrowPi Pi-Controller werden hier dokumentiert.
   - `growpi-web.service` läuft separat als Web/API-Prozess
   - Installer aktiviert beide Services automatisch
 - **Cross-Process Mode Synchronization**
-  - `ModeManager.get_mode()` synchronisiert den Modus bei Dateiveränderungen (`/tmp/growpi_mode.txt`)
+  - `ModeManager.get_mode()` synchronisiert den Modus bei Dateiveränderungen (`/run/growpi/mode.txt`)
   - Auto/Manual-Mode bleibt konsistent zwischen Controller- und Web-Prozess
 
 ### Changed
@@ -19,6 +19,7 @@ Alle wichtigen Änderungen am GrowPi Pi-Controller werden hier dokumentiert.
   - Verhindert unnötige Web/Sensor-Initialisierung im Controller-Prozess bei `--no-web`
 - **Web Service Hardening**
   - `growpi-web.service`: `Restart=on-failure`, Startlimits, Security-Hardening, kontrollierte Stop-/Start-Timeouts
+  - Gemeinsames `RuntimeDirectory=growpi` für prozessübergreifende Runtime-Dateien
 - **Deployment Workflow**
   - `install.sh` installiert/aktiviert jetzt `grow-pi.service` und `growpi-web.service`
   - Hardware-Watchdog-Setup bleibt enthalten
