@@ -23,6 +23,9 @@ Alle wichtigen Änderungen am GrowPi Pi-Controller werden hier dokumentiert.
 - **Deployment Workflow**
   - `install.sh` installiert/aktiviert jetzt `grow-pi.service` und `growpi-web.service`
   - Hardware-Watchdog-Setup bleibt enthalten
+- **System Event Logging Robustness**
+  - `SystemEvent` validiert `event_type` jetzt schema-basiert statt mit starrer Whitelist
+  - Verhindert Laufzeitfehler bei neuen Event-Typen wie `mode_change` und `sensor_reinit`
 
 ### Validation
 - `pytest -q tests/unit` -> **147 passed**

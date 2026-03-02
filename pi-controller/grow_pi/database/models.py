@@ -144,8 +144,10 @@ class SystemEvent:
 
     def __post_init__(self):
         """Validate event_type and severity."""
-        if self.event_type not in self.VALID_EVENT_TYPES:
-            raise ValueError(f"Invalid event_type: {self.event_type}")
+        if not isinstance(self.event_type, str) or not self.event_type.strip():
+            raise ValueError("event_type must be a non-empty string")
+        if len(self.event_type) > 64:
+            raise ValueError("event_type too long (max 64 chars)")
         if self.severity not in self.VALID_SEVERITIES:
             raise ValueError(f"Invalid severity: {self.severity}")
 
