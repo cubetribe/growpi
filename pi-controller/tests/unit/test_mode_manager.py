@@ -144,6 +144,18 @@ class TestModeManagerPersistence:
             # Restore permissions for cleanup
             Path(temp_mode_file).chmod(0o644)
 
+    def test_mode_syncs_when_file_changes_externally(self, temp_mode_file):
+        """get_mode() should sync when another process updates the mode file."""
+        with patch('grow_pi.utils.mode_manager.MODE_FILE', temp_mode_file):
+            manager = ModeManager()
+            assert manager.get_mode() == "auto"
+
+            time.sleep(0.01)
+            with open(temp_mode_file, 'w') as f:
+                f.write("manual")
+
+            assert manager.get_mode() == "manual"
+
 
 class TestModeManagerBooleanHelpers:
     """Test is_auto() and is_manual() helper methods."""

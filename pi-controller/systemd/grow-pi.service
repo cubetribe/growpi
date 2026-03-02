@@ -15,7 +15,7 @@ Group=admin
 WorkingDirectory=/opt/grow-pi
 
 # Main executable
-ExecStart=/opt/grow-pi/venv/bin/python -m grow_pi.main
+ExecStart=/opt/grow-pi/venv/bin/python -m grow_pi.main --no-web
 
 # Runtime directory für PWM State-Files (Zero-Downtime Feature #0)
 # Wird von systemd erstellt unter /run/growpi/

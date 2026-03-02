@@ -2,6 +2,33 @@
 
 Alle wichtigen Änderungen am GrowPi Pi-Controller werden hier dokumentiert.
 
+## [v6.25.0] - 2026-03-02 - Process Splitting & Runtime Hardening
+
+### Added
+- **Process Splitting (Controller/Web)**
+  - `grow-pi.service` läuft jetzt als reiner Controller-Prozess (`python -m grow_pi.main --no-web`)
+  - `growpi-web.service` läuft separat als Web/API-Prozess
+  - Installer aktiviert beide Services automatisch
+- **Cross-Process Mode Synchronization**
+  - `ModeManager.get_mode()` synchronisiert den Modus bei Dateiveränderungen (`/tmp/growpi_mode.txt`)
+  - Auto/Manual-Mode bleibt konsistent zwischen Controller- und Web-Prozess
+
+### Changed
+- **Lazy Web Import in Controller**
+  - `main.py` lädt `grow_pi.web.api` nur noch bei aktiviertem Web-Betrieb
+  - Verhindert unnötige Web/Sensor-Initialisierung im Controller-Prozess bei `--no-web`
+- **Web Service Hardening**
+  - `growpi-web.service`: `Restart=on-failure`, Startlimits, Security-Hardening, kontrollierte Stop-/Start-Timeouts
+- **Deployment Workflow**
+  - `install.sh` installiert/aktiviert jetzt `grow-pi.service` und `growpi-web.service`
+  - Hardware-Watchdog-Setup bleibt enthalten
+
+### Validation
+- `pytest -q tests/unit` -> **147 passed**
+- `python3 -m py_compile` auf geänderten Kernmodulen -> **PASS**
+
+---
+
 ## [v6.24.1] - 2026-02-03 - Cool White Pin Fix
 
 ### Fixed

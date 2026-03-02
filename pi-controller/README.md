@@ -6,7 +6,7 @@ Python-basierter Controller-Service für den Raspberry Pi 3B+.
 
 Dieser Controller läuft auf dem Raspberry Pi und steuert Grow-Lampen via PWM.
 
-**Aktueller Stand: v6.24.1 (2026-03-02) - Stability Hardening**
+**Aktueller Stand: v6.25.0 (2026-03-02) - Process-Splitting Hardening**
 - Web-Interface auf Port 5000
 - **Tank-Mode Hardening**: Production-Ready Robustness
   - Circuit Breaker für DHT22 Sensor (Auto-Recovery nach Freeze)
@@ -87,13 +87,16 @@ lamps:
 
 ```bash
 sudo systemctl start grow-pi
+sudo systemctl start growpi-web
 sudo systemctl status grow-pi
+sudo systemctl status growpi-web
 ```
 
 ### 5. Logs prüfen
 
 ```bash
 sudo journalctl -u grow-pi -f
+sudo journalctl -u growpi-web -f
 ```
 
 ---
@@ -268,21 +271,29 @@ curl "http://192.168.0.86:5000/api/logs/stats"
 ```bash
 # Status
 sudo systemctl status grow-pi
+sudo systemctl status growpi-web
 
 # Start / Stop / Restart
 sudo systemctl start grow-pi
+sudo systemctl start growpi-web
 sudo systemctl stop grow-pi
+sudo systemctl stop growpi-web
 sudo systemctl restart grow-pi
+sudo systemctl restart growpi-web
 
 # Auto-Start aktivieren/deaktivieren
 sudo systemctl enable grow-pi
+sudo systemctl enable growpi-web
 sudo systemctl disable grow-pi
+sudo systemctl disable growpi-web
 
 # Logs (live)
 sudo journalctl -u grow-pi -f
+sudo journalctl -u growpi-web -f
 
 # Logs (letzte 100 Zeilen)
 sudo journalctl -u grow-pi -n 100
+sudo journalctl -u growpi-web -n 100
 ```
 
 ### Watchdog-Checks
@@ -375,7 +386,7 @@ sudo systemctl restart grow-pi
 
 ---
 
-## Tank-Mode Features (v6.24.1)
+## Tank-Mode Features (v6.25.0)
 
 ### Production-Ready Robustness
 
@@ -396,6 +407,12 @@ sudo systemctl restart grow-pi
 - Kernel-Watchdog via `dtparam=watchdog=on`
 - systemd Manager Watchdog (`RuntimeWatchdogSec=15s`)
 - Schutz auch bei Host-Freeze außerhalb des Python-Prozesses
+
+**Process Splitting (neu):**
+- `grow-pi.service` steuert nur den Controller (`--no-web`)
+- `growpi-web.service` betreibt die API separat
+- Modus-Synchronisierung läuft prozessübergreifend über persistente Mode-Datei
+- Teilausfälle bleiben isoliert und werden je Service separat neu gestartet
 
 **Thread-Safety:**
 - RLock für Sensor Cache (erlaubt nested calls)

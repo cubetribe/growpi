@@ -150,10 +150,12 @@ echo "  Dependencies installiert"
 
 # Step 6: Install systemd service
 echo ""
-echo -e "${GREEN}[6/7] Installiere systemd Service...${NC}"
+echo -e "${GREEN}[6/7] Installiere systemd Services (Controller + Web)...${NC}"
 sudo cp ${SCRIPT_DIR}/systemd/grow-pi.service /etc/systemd/system/
+sudo cp ${SCRIPT_DIR}/systemd/growpi-web.service /etc/systemd/system/
 sudo systemctl daemon-reload
 sudo systemctl enable grow-pi
+sudo systemctl enable growpi-web
 
 # Step 7: Configure hardware watchdog
 echo ""
@@ -175,15 +177,18 @@ echo "   nano ${INSTALL_DIR}/config/config.yaml"
 echo ""
 echo "2. Service starten:"
 echo "   sudo systemctl start grow-pi"
+echo "   sudo systemctl start growpi-web"
 echo ""
 echo "3. Status prüfen:"
 echo "   sudo systemctl status grow-pi"
+echo "   sudo systemctl status growpi-web"
 echo ""
 echo "4. Reboot durchführen (aktiviert Hardware-Watchdog):"
 echo "   sudo reboot"
 echo ""
 echo "5. Logs anzeigen:"
 echo "   sudo journalctl -u grow-pi -f"
+echo "   sudo journalctl -u growpi-web -f"
 echo ""
 echo "6. Test-Modus (ohne dauerhaft zu laufen):"
 echo "   cd ${INSTALL_DIR} && source venv/bin/activate"
