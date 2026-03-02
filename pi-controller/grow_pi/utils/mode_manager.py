@@ -103,14 +103,10 @@ class ModeManager:
                 self._mode_file_mtime = None
                 return
 
-            current_mtime = os.path.getmtime(MODE_FILE)
-            if self._mode_file_mtime is not None and current_mtime <= self._mode_file_mtime:
-                return
-
             with open(MODE_FILE, 'r') as f:
                 mode = f.read().strip()
 
-            self._mode_file_mtime = current_mtime
+            self._mode_file_mtime = os.path.getmtime(MODE_FILE)
 
             if mode in MODES and mode != self._mode:
                 old_mode = self._mode
