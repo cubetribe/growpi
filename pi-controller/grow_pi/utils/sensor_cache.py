@@ -471,3 +471,50 @@ def get_cache_state() -> dict:
                 "reinit_threshold": DHT_REINIT_AFTER_ERRORS
             }
         }
+
+
+def reset_circuit_breaker() -> dict:
+    """
+    Manually reset the circuit breaker to CLOSED state.
+
+    v6.24.1: Added for manual recovery from circuit breaker OPEN state.
+    This allows users to reset the circuit breaker via the web UI
+    without requiring a full service restart.
+
+    Returns:
+        Dictionary with reset result and new state
+    """
+    global _sensor_cache
+
+    try:
+        # Get current state before reset
+        old_state = str(_sensor_circuit_breaker.current_state)
+        old_fail_count = _sensor_circuit_breaker.fail_counter
+
+        # Reset the circuit breaker by calling the internal reset
+        # pybreaker doesn't have a public reset method, so we manipulate state
+        _sensor_circuit_breaker._state = pybreaker.CircuitClosedState(_sensor_circuit_breaker)
+        _sensor_circuit_breaker._fail_counter = 0
+
+        # Also reset error count in cache
+        with _cache_lock:
+            _sensor_cache["error_count"] = 0
+            _sensor_cache["timestamp"] = 0  # Force fresh read on next call
+
+        logger.warning(f"Circuit breaker manually reset: {old_state} -> closed (fail_count: {old_fail_count} -> 0)")
+
+        return {
+            "success": True,
+            "old_state": old_state,
+            "new_state": "closed",
+            "old_fail_count": old_fail_count,
+            "new_fail_count": 0,
+            "message": "Circuit breaker reset successfully"
+        }
+    except Exception as e:
+        logger.error(f"Failed to reset circuit breaker: {e}")
+        return {
+            "success": False,
+            "error": str(e),
+            "message": "Failed to reset circuit breaker"
+        }

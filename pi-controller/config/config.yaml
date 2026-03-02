@@ -4,12 +4,12 @@
 # Hostname: growpi
 # IP: 192.168.0.86
 #
-# PIN BELEGUNG (FINAL - ACTIVE 2025-12-05):
+# PIN BELEGUNG (FINAL - ACTIVE 2026-02-03):
 # -----------------------------------------
 # Kanal 1: Far Red     -> GPIO 16 -> Pin 36
 # Kanal 2: Warm White  -> GPIO 13 -> Pin 33
-# Kanal 3: Cool White  -> GPIO 12 -> Pin 32
-# Kanal 4: UV          -> GPIO 18 -> Pin 12
+# Kanal 3: Cool White  -> GPIO 18 -> Pin 12
+# Kanal 4: UV          -> GPIO 12 -> Pin 32
 # -----------------------------------------
 
 lamps:
@@ -30,17 +30,17 @@ lamps:
       pwm_frequency: 1000
       default_intensity: 10
 
-    # Kanal 3: Cool White (GPIO 12 / Pin 32)
+    # Kanal 3: Cool White (GPIO 18 / Pin 12)
     - channel: 3
       name: "Cool White"
-      gpio_pin: 12
+      gpio_pin: 18
       pwm_frequency: 1000
       default_intensity: 10
 
-    # Kanal 4: UV (GPIO 18 / Pin 12)
+    # Kanal 4: UV (GPIO 12 / Pin 32)
     - channel: 4
       name: "UV"
-      gpio_pin: 18
+      gpio_pin: 12
       pwm_frequency: 1000
       default_intensity: 0
 

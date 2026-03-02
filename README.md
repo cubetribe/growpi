@@ -3,7 +3,7 @@
 Professional greenhouse automation and monitoring platform powered by Raspberry Pi.
 
 **Live Demo**: http://growpi.nm-forum.de
-**Version**: v6.16.0 (2025-12-08)
+**Version**: v6.25.2 (2026-03-02)
 **Status**: Production-Ready
 
 > **Note**: This repository contains the **Raspberry Pi backend** (pi-controller).
@@ -102,6 +102,19 @@ pytest tests/ -v
 python -m grow_pi.web.api
 ```
 
+### Automatic Pi Deployment (GitHub Actions)
+
+This repository supports auto-deploy to Raspberry Pi via a **self-hosted GitHub Actions runner**.
+
+- Workflow: `.github/workflows/pi-autodeploy.yml`
+- Deploy script: `scripts/pi/github_runner_deploy.sh`
+- Setup guide: `docs/GITHUB_ACTIONS_PI_AUTODEPLOY.md`
+
+Important:
+- No inbound router ports are required.
+- The Pi runner connects outbound to GitHub over HTTPS and executes jobs locally.
+- GitHub Actions shows direct PASS/FAIL feedback from the Pi deployment.
+
 ### Access Web Interface
 
 ```
@@ -123,8 +136,8 @@ http://192.168.0.86:5000
 |---------|------|------|-----|--------|
 | 1 | Far Red | 16 | 36 | Active |
 | 2 | Warm White | 13 | 33 | Active |
-| 3 | Cool White | 12 | 32 | Active |
-| 4 | UV | 18 | 12 | Active |
+| 3 | Cool White | 18 | 12 | Active |
+| 4 | UV | 12 | 32 | Active |
 | - | DHT22 Sensor | 4 | 7 | Verified |
 
 ---

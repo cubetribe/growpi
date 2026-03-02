@@ -5,13 +5,14 @@ Health Check Blueprint
 Provides comprehensive health check endpoints for external monitoring,
 Kubernetes-style probes, and system metrics.
 
-Version: 6.22.5
+Version: 6.24.1 - Added sensor health and circuit breaker management
 """
 
 import time
 import os
+import subprocess
 import logging
-from flask import Blueprint, jsonify
+from flask import Blueprint, jsonify, request
 from typing import Dict, Any
 
 logger = logging.getLogger(__name__)
@@ -22,21 +23,59 @@ health_bp = Blueprint('health', __name__, url_prefix='/api/health')
 START_TIME = time.time()
 
 
-@health_bp.route('/', methods=['GET'])
+@health_bp.route('/', methods=['GET', 'POST'])
 def health_check() -> tuple:
     """
     Comprehensive health check endpoint.
 
-    Returns detailed status of all subsystems including:
+    GET: Returns detailed status of all subsystems including:
     - Application version and uptime
     - Database connectivity
     - Sensor health (including circuit breaker state)
     - System metrics (CPU, memory, disk)
     - Active threads
 
+    POST: Execute actions:
+    - action: "reset_circuit_breaker" - Reset the sensor circuit breaker
+    - action: "restart_service" - Restart the grow-pi service
+
     Returns:
         JSON response with health status and 200/503 status code
     """
+    # Handle POST actions
+    if request.method == 'POST':
+        try:
+            data = request.get_json() or {}
+            action = data.get('action', '')
+
+            if action == 'reset_circuit_breaker':
+                from grow_pi.utils.sensor_cache import reset_circuit_breaker
+                result = reset_circuit_breaker()
+                return jsonify(result), 200 if result.get('success') else 500
+
+            elif action == 'restart_service':
+                logger.warning("Service restart requested via API")
+                subprocess.Popen(
+                    ['sudo', 'systemctl', 'restart', 'grow-pi'],
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.PIPE
+                )
+                return jsonify({
+                    "success": True,
+                    "message": "Service restart initiated"
+                }), 200
+
+            else:
+                return jsonify({
+                    "success": False,
+                    "error": f"Unknown action: {action}",
+                    "valid_actions": ["reset_circuit_breaker", "restart_service"]
+                }), 400
+
+        except Exception as e:
+            logger.error(f"Health POST action failed: {e}")
+            return jsonify({"success": False, "error": str(e)}), 500
+
     from grow_pi.version import __version__
 
     health = {
@@ -69,10 +108,11 @@ def health_check() -> tuple:
         health["status"] = "degraded"
         logger.error(f"Database health check failed: {e}")
 
-    # Sensor health check
+    # Sensor health check (including circuit breaker status)
     try:
-        from grow_pi.utils.sensor_cache import get_cache_status
+        from grow_pi.utils.sensor_cache import get_cache_status, get_sensor_health
         sensor_status = get_cache_status()
+        sensor_health = get_sensor_health()
 
         # Determine sensor health based on error count and cache freshness
         sensor_healthy = True
@@ -91,7 +131,8 @@ def health_check() -> tuple:
             "error_count": sensor_status.get("error_count", 0),
             "cache_age": round(sensor_status.get("cache_age", 0), 2),
             "temp": sensor_status.get("temp"),
-            "humidity": sensor_status.get("humidity")
+            "humidity": sensor_status.get("humidity"),
+            "circuit_breaker": sensor_health.get("circuit_breaker", {})
         }
 
         if sensor_issues:
@@ -281,3 +322,95 @@ def metrics() -> tuple:
     except Exception as e:
         logger.error(f"Metrics endpoint failed: {e}")
         return jsonify({"error": str(e)}), 500
+
+
+@health_bp.route('/sensor', methods=['GET'])
+def sensor_health() -> tuple:
+    """
+    Get detailed sensor health including circuit breaker status.
+
+    v6.24.1: Added for web UI sensor monitoring.
+
+    Returns:
+        JSON response with sensor health details
+    """
+    try:
+        from grow_pi.utils.sensor_cache import get_sensor_health
+
+        health = get_sensor_health()
+        return jsonify({
+            "success": True,
+            **health
+        }), 200
+
+    except Exception as e:
+        logger.error(f"Sensor health endpoint failed: {e}")
+        return jsonify({
+            "success": False,
+            "error": str(e)
+        }), 500
+
+
+@health_bp.route('/sensor/reset', methods=['POST'])
+def reset_sensor_circuit_breaker() -> tuple:
+    """
+    Manually reset the sensor circuit breaker.
+
+    v6.24.1: Added for web UI circuit breaker management.
+    Allows users to reset the circuit breaker without service restart.
+
+    Returns:
+        JSON response with reset result
+    """
+    try:
+        from grow_pi.utils.sensor_cache import reset_circuit_breaker
+
+        result = reset_circuit_breaker()
+
+        if result["success"]:
+            return jsonify(result), 200
+        else:
+            return jsonify(result), 500
+
+    except Exception as e:
+        logger.error(f"Circuit breaker reset failed: {e}")
+        return jsonify({
+            "success": False,
+            "error": str(e)
+        }), 500
+
+
+@health_bp.route('/service/restart', methods=['POST'])
+def restart_service() -> tuple:
+    """
+    Restart the grow-pi service via systemctl.
+
+    v6.24.1: Added for web UI service management.
+    Uses subprocess to call systemctl restart grow-pi.
+
+    Returns:
+        JSON response with restart status
+    """
+    try:
+        logger.warning("Service restart requested via API")
+
+        # Use subprocess to restart the service
+        # The restart happens asynchronously - this request will be interrupted
+        result = subprocess.Popen(
+            ['sudo', 'systemctl', 'restart', 'grow-pi'],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE
+        )
+
+        # Return immediately - the service will restart
+        return jsonify({
+            "success": True,
+            "message": "Service restart initiated. Connection will be lost briefly."
+        }), 200
+
+    except Exception as e:
+        logger.error(f"Service restart failed: {e}")
+        return jsonify({
+            "success": False,
+            "error": str(e)
+        }), 500

@@ -440,7 +440,7 @@ Vollständiges MVP mit Web-Interface für Smartphone-Steuerung:
 | ----- | ---------- | ---- | --- | ---------- |
 | 1     | Far Red    | 16   | 36  | #ff4444    |
 | 2     | Warm White | 13   | 33  | #ffbb44    |
-| 3     | Cool White | 12   | 32  | #88ddff    |
+| 3     | Cool White | 18   | 12  | #88ddff    |
 | 4     | UV         | 18   | 12  | #cc66ff    |
 
 ### Neue Features

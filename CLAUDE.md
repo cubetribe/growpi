@@ -65,8 +65,8 @@ This is **CRITICAL** for deployment verification. The user must be able to immed
 |---------|------|------|-----|
 | 1 | Far Red | 16 | 36 |
 | 2 | Warm White | 13 | 33 |
-| 3 | Cool White | 12 | 32 |
-| 4 | UV | 18 | 12 |
+| 3 | Cool White | 18 | 12 |
+| 4 | UV | 12 | 32 |
 
 ---
 

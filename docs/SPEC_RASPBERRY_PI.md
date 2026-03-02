@@ -46,8 +46,8 @@ Raspberry Pi 3B+ (growpi / 192.168.0.86)
 ├── GPIO Pins (PWM Output) - ACTIVE CONFIG 2025-12-05
 │   ├── GPIO 16 (Pin 36) → Lamp Channel 1 (Far Red)
 │   ├── GPIO 13 (Pin 33) → Lamp Channel 2 (Warm White)
-│   ├── GPIO 12 (Pin 32) → Lamp Channel 3 (Cool White)
-│   └── GPIO 18 (Pin 12) → Lamp Channel 4 (UV)
+│   ├── GPIO 18 (Pin 12) → Lamp Channel 3 (Cool White)
+│   └── GPIO 12 (Pin 32) → Lamp Channel 4 (UV)
 │
 ├── GPIO Pins (Sensor Input)
 │   ├── GPIO 4  → DHT22 (Temperature + Humidity)
@@ -253,12 +253,12 @@ lamps:
 
         - channel: 3
           name: "Cool White"
-          gpio_pin: 12 # Pin 32
+          gpio_pin: 18 # Pin 12
           pwm_frequency: 1000
 
         - channel: 4
           name: "UV"
-          gpio_pin: 18 # Pin 12
+          gpio_pin: 12 # Pin 32
           pwm_frequency: 1000
 
 # Offline Mode

@@ -234,7 +234,7 @@ Defined in `services/lamp_config.py`:
 LAMP_CHANNELS = {
     1: LampChannel(id=1, name="Far Red", color="#ff4444", gpio=16),
     2: LampChannel(id=2, name="Warm White", color="#ffbb44", gpio=13),
-    3: LampChannel(id=3, name="Cool White", color="#88ddff", gpio=12),
+    3: LampChannel(id=3, name="Cool White", color="#88ddff", gpio=18),
     4: LampChannel(id=4, name="UV", color="#cc66ff", gpio=18),
 }
 ```

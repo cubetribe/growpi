@@ -23,6 +23,15 @@ Alle wichtigen Änderungen am GrowPi Pi-Controller werden hier dokumentiert.
 ### Added
 - Unit-Tests für Controller-Kurven-Synchronisierung:
   - `tests/unit/test_main_curve_sync.py`
+- GitHub Actions Auto-Deploy Unterstützung:
+  - `../.github/workflows/pi-autodeploy.yml`
+  - `../scripts/pi/github_runner_deploy.sh`
+  - `../scripts/pi/install_github_runner.sh`
+  - `../docs/GITHUB_ACTIONS_PI_AUTODEPLOY.md`
+
+### Infrastructure
+- Self-hosted Runner auf Pi möglich ohne eingehende Ports
+- Deployment-Status wird direkt im GitHub Actions Run zurückgemeldet
 
 ### Validation
 - `venv/bin/python -m pytest -q tests/unit` -> **156 passed**

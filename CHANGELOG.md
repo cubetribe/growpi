@@ -7,6 +7,37 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [6.25.2] - 2026-03-02
+
+### Added
+- **GitHub Actions Auto-Deploy to Raspberry Pi**
+  - New workflow: `.github/workflows/pi-autodeploy.yml`
+  - New deploy script: `scripts/pi/github_runner_deploy.sh`
+  - New setup helper: `scripts/pi/install_github_runner.sh`
+  - New documentation: `docs/GITHUB_ACTIONS_PI_AUTODEPLOY.md`
+
+### Changed
+- README updated with current version and CI/CD deployment flow
+- `.gitignore` updated to ignore local agent/report artifact folders
+
+### Infrastructure
+- Self-hosted GitHub Actions runner installed on Raspberry Pi (`growpi-01`, labels: `growpi,prod`)
+- Deploy feedback now comes directly from Pi execution logs in GitHub Actions
+- No inbound ports required (outbound HTTPS from runner only)
+
+---
+
+## [6.24.1] - 2026-02-03
+
+### Fixed
+- **PWM pin mapping**: Cool White (channel 3) now drives GPIO-18 / Pin 12; UV (channel 4) uses GPIO-12 / Pin 32. This matches the physical wiring on the production Pi so the Cool White channel responds again.
+
+### Updated
+- Documentation (`README.md`, `CLAUDE.md`, `docs/HARDWARE_PINOUT.md`, `docs/SPEC_RASPBERRY_PI.md`) refreshed to reflect the corrected wiring.
+- Added troubleshooting report for v6.24.1 in `reports/v6.24.1/`.
+
+---
+
 ## [6.24.0] - 2025-12-29
 
 ### Fixed

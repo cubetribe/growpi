@@ -103,6 +103,11 @@ def create_app(config: Optional[dict] = None) -> Flask:
     @app.route('/<path:path>')
     def serve_static(path):
         """Serve static files or fallback to index.html for SPA routing"""
+        # Skip API paths - let Flask handle them via blueprints
+        if path.startswith('api/'):
+            from flask import jsonify
+            return jsonify({"error": "Endpoint not found", "path": path}), 404
+
         file_path = os.path.join(static_dir, path)
         if os.path.exists(file_path) and os.path.isfile(file_path):
             return send_from_directory(static_dir, path)

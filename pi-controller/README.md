@@ -296,6 +296,19 @@ sudo journalctl -u grow-pi -n 100
 sudo journalctl -u growpi-web -n 100
 ```
 
+### GitHub Actions Auto-Deploy (Self-Hosted Runner)
+
+Der Pi kann Deployments nach `git push` automatisch selbst ausführen.
+
+- Workflow: `../.github/workflows/pi-autodeploy.yml`
+- Deploy-Skript: `../scripts/pi/github_runner_deploy.sh`
+- Setup/Architektur: `../docs/GITHUB_ACTIONS_PI_AUTODEPLOY.md`
+
+Wichtig:
+- Keine eingehenden Ports im Router erforderlich
+- Runner verbindet sich nur ausgehend per HTTPS zu GitHub
+- Deployment-Feedback (PASS/FAIL + Logs) erscheint direkt im GitHub Actions Run
+
 ### Watchdog-Checks
 
 ```bash

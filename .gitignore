@@ -121,3 +121,10 @@ temp/
 *.backup
 *.old
 *_backup/
+
+# ============================================
+# Local Agent/Report Artifacts
+# ============================================
+/Agents/
+/agents/
+/CC-GodMode-Prompts/

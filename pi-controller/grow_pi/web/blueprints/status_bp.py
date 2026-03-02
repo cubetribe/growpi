@@ -224,10 +224,15 @@ def get_status():
         return jsonify(create_response(False, error=str(e))), 500
 
 
-@status_bp.route('/health', methods=['GET'])
+@status_bp.route('/health', methods=['GET', 'POST'])
 def health_check():
     """
     Health check endpoint to verify component availability and system health.
+
+    GET: Returns JSON with health status and metrics
+    POST: Execute actions (v6.24.1):
+        - action: "reset_circuit_breaker" - Reset sensor circuit breaker
+        - action: "restart_service" - Restart grow-pi service
 
     Returns:
         JSON response with:
@@ -239,6 +244,7 @@ def health_check():
         - logging_running: Whether data logger is actively running
         - curves_available: Whether curve controller is available
         - system: System health metrics (CPU temp, RAM, disk, uptime)
+        - circuit_breaker: Sensor circuit breaker status (v6.24.1)
 
     Example Response:
         {
@@ -249,18 +255,44 @@ def health_check():
             "logging_available": true,
             "logging_running": true,
             "curves_available": true,
-            "system": {
-                "cpu_temp": 52.3,
-                "cpu_temp_status": "normal",
-                "cpu_load": 45.2,
-                "memory_percent": 62.1,
-                "memory_status": "normal",
-                "disk_percent": 78.5,
-                "disk_status": "warning",
-                "uptime_seconds": 345678
-            }
+            "system": {...},
+            "circuit_breaker": {"state": "closed", "fail_count": 0}
         }
     """
+    # v6.24.1: Handle POST actions for circuit breaker reset and service restart
+    if request.method == 'POST':
+        import subprocess
+        try:
+            data = request.get_json() or {}
+            action = data.get('action', '')
+
+            if action == 'reset_circuit_breaker':
+                from grow_pi.utils.sensor_cache import reset_circuit_breaker
+                result = reset_circuit_breaker()
+                return jsonify(result), 200 if result.get('success') else 500
+
+            elif action == 'restart_service':
+                logger.warning("Service restart requested via API")
+                subprocess.Popen(
+                    ['sudo', 'systemctl', 'restart', 'grow-pi'],
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.PIPE
+                )
+                return jsonify({
+                    "success": True,
+                    "message": "Service restart initiated"
+                }), 200
+
+            else:
+                return jsonify({
+                    "success": False,
+                    "error": f"Unknown action: {action}",
+                    "valid_actions": ["reset_circuit_breaker", "restart_service"]
+                }), 400
+
+        except Exception as e:
+            logger.error(f"Health POST action failed: {e}")
+            return jsonify({"success": False, "error": str(e)}), 500
     try:
         from ..dependencies import (
             get_pwm_controller,
@@ -281,6 +313,16 @@ def health_check():
         # Collect system metrics
         system_metrics = get_system_metrics()
 
+        # v6.24.1: Get circuit breaker status
+        circuit_breaker_info = {}
+        try:
+            from grow_pi.utils.sensor_cache import get_sensor_health
+            sensor_health = get_sensor_health()
+            circuit_breaker_info = sensor_health.get("circuit_breaker", {})
+        except Exception as cb_err:
+            logger.warning(f"Could not get circuit breaker status: {cb_err}")
+            circuit_breaker_info = {"state": "unknown", "error": str(cb_err)}
+
         # Determine overall status based on system health
         overall_status = "healthy"
         if system_metrics.get("cpu_temp_status") == "critical" or \
@@ -300,7 +342,8 @@ def health_check():
             "logging_available": is_db_available() and data_logger is not None,
             "logging_running": data_logger._running if data_logger else False,
             "curves_available": is_curve_available() and curve_controller is not None,
-            "system": system_metrics
+            "system": system_metrics,
+            "circuit_breaker": circuit_breaker_info  # v6.24.1
         })
 
     except Exception as e:

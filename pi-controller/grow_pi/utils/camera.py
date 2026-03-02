@@ -27,18 +27,32 @@ except ImportError:
     logger.warning("OpenCV (cv2) not available - camera features disabled")
 
 
-def find_lifecam_device() -> int:
+def find_usb_camera_device() -> int:
     """
-    Find Microsoft LifeCam HD-3000 device ID dynamically.
+    Find USB camera device ID dynamically.
 
     USB cameras can change device numbers after reboot/reconnect.
     This function finds the camera by name instead of hardcoded ID.
+
+    Supported cameras:
+    - Microsoft LifeCam HD-3000
+    - Generic "USB 2.0 Camera"
+    - Any UVC-compatible USB webcam
 
     Returns:
         Device ID (0, 1, etc.) or 0 as fallback
     """
     import subprocess
     import re
+
+    # Camera names to search for (case-insensitive patterns)
+    CAMERA_PATTERNS = [
+        'USB 2.0 Camera',
+        'USB Camera',
+        'LifeCam',
+        'Webcam',
+        'UVC',
+    ]
 
     try:
         result = subprocess.run(
@@ -50,16 +64,19 @@ def find_lifecam_device() -> int:
 
         lines = result.stdout.split('\n')
         for i, line in enumerate(lines):
-            if 'LifeCam' in line or 'lifecam' in line.lower():
-                # Next non-empty line contains /dev/videoX
-                for j in range(i + 1, min(i + 3, len(lines))):
-                    match = re.search(r'/dev/video(\d+)', lines[j])
-                    if match:
-                        device_id = int(match.group(1))
-                        logger.info(f"Auto-detected LifeCam at /dev/video{device_id}")
-                        return device_id
+            # Check if line matches any known camera pattern
+            line_lower = line.lower()
+            for pattern in CAMERA_PATTERNS:
+                if pattern.lower() in line_lower:
+                    # Next non-empty line contains /dev/videoX
+                    for j in range(i + 1, min(i + 3, len(lines))):
+                        match = re.search(r'/dev/video(\d+)', lines[j])
+                        if match:
+                            device_id = int(match.group(1))
+                            logger.info(f"Auto-detected camera '{pattern}' at /dev/video{device_id}")
+                            return device_id
 
-        logger.warning("LifeCam not found by name, trying fallback detection")
+        logger.warning("No known camera found by name, trying fallback detection")
 
         # Fallback: Try video0, video1, video2
         if CV2_AVAILABLE:
@@ -82,11 +99,15 @@ def find_lifecam_device() -> int:
 @dataclass
 class CameraConfig:
     """Camera configuration."""
-    device_id: int = -1  # -1 = auto-detect LifeCam, or specific device number
-    width: int = 1920
-    height: int = 1080
-    preview_fps: int = 2  # Low FPS for live preview (resource-friendly)
+    device_id: int = -1  # -1 = auto-detect USB camera, or specific device number
+    # Preview/Stream settings (YUYV format, resource-friendly)
+    preview_width: int = 1280
+    preview_height: int = 720
+    preview_fps: int = 2  # Low FPS for live preview
     preview_jpeg_quality: int = 70  # Lower quality OK for preview
+    # Timelapse settings (MJPEG format for high resolution)
+    timelapse_width: int = 1920
+    timelapse_height: int = 1080
     timelapse_jpeg_quality: int = 95  # High quality for timelapse photos
 
 
@@ -96,7 +117,7 @@ class TimelapseConfig:
     enabled: bool = False
     interval_seconds: int = 300  # 5 minutes default
     output_dir: str = "/opt/grow-pi/data/timelapse"
-    max_images: int = 1000  # Maximum stored images (rolling buffer)
+    max_images: int = 25000  # Maximum stored images (~4 Monate bei 10min Interval)
     # v6.17.0: Brightness detection for dark image filtering
     skip_dark_images: bool = True
     brightness_threshold: int = 15  # 0-255, images below this average are "too dark"
@@ -143,7 +164,7 @@ class CameraService:
         try:
             # Auto-detect device if set to -1
             if self.config.device_id == -1:
-                self.config.device_id = find_lifecam_device()
+                self.config.device_id = find_usb_camera_device()
 
             # Use V4L2 backend on Linux for better compatibility
             self._camera = cv2.VideoCapture(self.config.device_id, cv2.CAP_V4L2)
@@ -152,22 +173,28 @@ class CameraService:
                 logger.error(f"Failed to open camera device {self.config.device_id}")
                 return False
 
-            # Try YUYV (uncompressed) for better quality, fallback to MJPEG
-            yuyv_fourcc = cv2.VideoWriter_fourcc('Y', 'U', 'Y', 'V')
-            mjpeg_fourcc = cv2.VideoWriter_fourcc('M', 'J', 'P', 'G')
+            # YUYV only supports 640x480 on most USB cameras
+            # For higher resolutions (720p+), MJPEG is required
+            self._yuyv_fourcc = cv2.VideoWriter_fourcc('Y', 'U', 'Y', 'V')
+            self._mjpeg_fourcc = cv2.VideoWriter_fourcc('M', 'J', 'P', 'G')
 
-            self._camera.set(cv2.CAP_PROP_FOURCC, yuyv_fourcc)
-            actual_fourcc = int(self._camera.get(cv2.CAP_PROP_FOURCC))
-
-            if actual_fourcc == yuyv_fourcc:
-                logger.info("Camera using YUYV format (uncompressed) for better quality")
+            # Determine format based on resolution
+            # YUYV: better quality but limited to 640x480
+            # MJPEG: supports all resolutions including 720p and 1080p
+            if self.config.preview_width <= 640 and self.config.preview_height <= 480:
+                # Low resolution: use YUYV for better quality
+                self._camera.set(cv2.CAP_PROP_FOURCC, self._yuyv_fourcc)
+                self._preview_format = 'YUYV'
+                logger.info("Camera using YUYV format (uncompressed) for 640x480 preview")
             else:
-                logger.warning("YUYV not supported, falling back to MJPEG")
-                self._camera.set(cv2.CAP_PROP_FOURCC, mjpeg_fourcc)
+                # Higher resolution: MJPEG required (720p, 1080p)
+                self._camera.set(cv2.CAP_PROP_FOURCC, self._mjpeg_fourcc)
+                self._preview_format = 'MJPEG'
+                logger.info(f"Camera using MJPEG format for {self.config.preview_width}x{self.config.preview_height} preview")
 
-            # Set resolution
-            self._camera.set(cv2.CAP_PROP_FRAME_WIDTH, self.config.width)
-            self._camera.set(cv2.CAP_PROP_FRAME_HEIGHT, self.config.height)
+            # Set preview resolution
+            self._camera.set(cv2.CAP_PROP_FRAME_WIDTH, self.config.preview_width)
+            self._camera.set(cv2.CAP_PROP_FRAME_HEIGHT, self.config.preview_height)
 
             # Set FPS (low FPS for preview to reduce CPU load)
             self._camera.set(cv2.CAP_PROP_FPS, self.config.preview_fps)
@@ -176,7 +203,7 @@ class CameraService:
             actual_width = int(self._camera.get(cv2.CAP_PROP_FRAME_WIDTH))
             actual_height = int(self._camera.get(cv2.CAP_PROP_FRAME_HEIGHT))
 
-            logger.info(f"Camera initialized: {actual_width}x{actual_height}")
+            logger.info(f"Camera initialized for preview: {actual_width}x{actual_height} @ {self.config.preview_fps} FPS")
             self._initialized = True
             return True
 
@@ -238,7 +265,8 @@ class CameraService:
             'available': self.is_available,
             'opencv_available': CV2_AVAILABLE,
             'device_id': self.config.device_id,
-            'resolution': f"{self.config.width}x{self.config.height}",
+            'preview_resolution': f"{self.config.preview_width}x{self.config.preview_height}",
+            'timelapse_resolution': f"{self.config.timelapse_width}x{self.config.timelapse_height}",
             'timelapse_enabled': self.timelapse_config.enabled,
             'timelapse_interval': self.timelapse_config.interval_seconds
         }
@@ -252,10 +280,14 @@ class CameraService:
 
     def update_config(self, **kwargs) -> dict:
         """Update camera configuration."""
-        if 'width' in kwargs:
-            self.config.width = int(kwargs['width'])
-        if 'height' in kwargs:
-            self.config.height = int(kwargs['height'])
+        if 'preview_width' in kwargs:
+            self.config.preview_width = int(kwargs['preview_width'])
+        if 'preview_height' in kwargs:
+            self.config.preview_height = int(kwargs['preview_height'])
+        if 'timelapse_width' in kwargs:
+            self.config.timelapse_width = int(kwargs['timelapse_width'])
+        if 'timelapse_height' in kwargs:
+            self.config.timelapse_height = int(kwargs['timelapse_height'])
         if 'preview_jpeg_quality' in kwargs:
             self.config.preview_jpeg_quality = int(kwargs['preview_jpeg_quality'])
         if 'timelapse_jpeg_quality' in kwargs:
@@ -387,6 +419,8 @@ class CameraService:
         Capture and save a timelapse image with darkness detection.
 
         v6.17.0: Added brightness check to skip dark images.
+        v6.25.0: Temporarily switches to MJPEG/1080p for high-res timelapse.
+
         Images are now organized in date-based folders.
 
         Returns:
@@ -399,18 +433,46 @@ class CameraService:
         if not self.is_available:
             return {'success': False, 'reason': 'camera_unavailable'}
 
-        # Capture frame directly (not via capture_snapshot to get raw frame)
+        # Capture frame with temporary switch to high resolution (1080p)
         with self._lock:
             try:
+                # Switch to MJPEG/1080p for timelapse capture
+                self._camera.set(cv2.CAP_PROP_FOURCC, self._mjpeg_fourcc)
+                self._camera.set(cv2.CAP_PROP_FRAME_WIDTH, self.config.timelapse_width)
+                self._camera.set(cv2.CAP_PROP_FRAME_HEIGHT, self.config.timelapse_height)
+
+                # Discard first frame (may be old buffer)
+                self._camera.read()
+
+                # Capture high-res frame
                 ret, frame = self._camera.read()
+
+                # Switch back to preview settings
+                if self._preview_format == 'YUYV':
+                    self._camera.set(cv2.CAP_PROP_FOURCC, self._yuyv_fourcc)
+                # else: already MJPEG, just change resolution
+                self._camera.set(cv2.CAP_PROP_FRAME_WIDTH, self.config.preview_width)
+                self._camera.set(cv2.CAP_PROP_FRAME_HEIGHT, self.config.preview_height)
+
                 if not ret or frame is None:
                     logger.warning("Timelapse: Failed to capture frame")
                     return {'success': False, 'reason': 'capture_failed'}
+
+                actual_h, actual_w = frame.shape[:2]
+                logger.debug(f"Timelapse captured at {actual_w}x{actual_h}")
 
                 # Rotate 180 degrees (camera mounted upside down)
                 frame = cv2.rotate(frame, cv2.ROTATE_180)
             except Exception as e:
                 logger.error(f"Timelapse capture error: {e}")
+                # Try to restore preview settings
+                try:
+                    if self._preview_format == 'YUYV':
+                        self._camera.set(cv2.CAP_PROP_FOURCC, self._yuyv_fourcc)
+                    self._camera.set(cv2.CAP_PROP_FRAME_WIDTH, self.config.preview_width)
+                    self._camera.set(cv2.CAP_PROP_FRAME_HEIGHT, self.config.preview_height)
+                except:
+                    pass
                 return {'success': False, 'reason': str(e)}
 
         # Check brightness if darkness filter is enabled
