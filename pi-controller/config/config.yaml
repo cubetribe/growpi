@@ -2,7 +2,7 @@
 # ================================
 # Hardware: Raspberry Pi 3B+
 # Hostname: growpi
-# IP: 192.168.0.86
+# IP: <PI_HOST>
 #
 # PIN BELEGUNG (FINAL - ACTIVE 2026-02-03):
 # -----------------------------------------
@@ -53,7 +53,7 @@ logging:
 
 # Server Connection (Level 5)
 # server:
-#   url: "https://growpi.nm-forum.de"
+#   url: "https://your-growpi-host.example.com"
 #   api_key: "your-zone-api-key-here"
 #   timeout: 10
 #   retry_attempts: 3

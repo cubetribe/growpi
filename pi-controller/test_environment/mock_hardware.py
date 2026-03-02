@@ -512,7 +512,7 @@ class MockSmartPlugController:
                 'device_id': 'mock_plug_1',
                 'name': 'Test Plug 1',
                 'connection': 'wifi',
-                'ip': '192.168.1.100'
+                'ip': '<DEVICE_IP>'
             }
         ]
         logger.info("MockSmartPlugController initialized")

@@ -6,7 +6,7 @@ Python-basierter Controller-Service für den Raspberry Pi 3B+.
 
 Dieser Controller läuft auf dem Raspberry Pi und steuert Grow-Lampen via PWM.
 
-**Aktueller Stand: v6.25.2 (2026-03-02) - Split-Process Consistency Hardening**
+**Aktueller Stand: v6.25.3 (2026-03-02) - Public Release Hardening**
 - Web-Interface auf Port 5000
 - **Tank-Mode Hardening**: Production-Ready Robustness
   - Circuit Breaker für DHT22 Sensor (Auto-Recovery nach Freeze)
@@ -33,7 +33,7 @@ Dieser Controller läuft auf dem Raspberry Pi und steuert Grow-Lampen via PWM.
 
 ```bash
 # Vom Entwicklungs-PC:
-scp -r pi-controller admin@192.168.0.86:/home/admin/
+scp -r pi-controller admin@<PI_HOST>:/home/admin/
 ```
 
 ### 2. Installation
@@ -105,7 +105,7 @@ sudo journalctl -u growpi-web -f
 
 - **Platform**: Raspberry Pi 3B+
 - **Hostname**: growpi
-- **IP**: 192.168.0.86
+- **IP**: <PI_HOST>
 
 ### PWM Kanäle (FINAL - 2025-12-05)
 
@@ -192,7 +192,7 @@ pi-controller/
 
 ```bash
 # Comprehensive Health Check (mit CPU-Temp, RAM, Disk, Sensor Status)
-curl "http://192.168.0.86:5000/api/health/"
+curl "http://<PI_HOST>:5000/api/health/"
 # → {
 #     "status": "healthy",
 #     "version": "6.23.0",
@@ -219,15 +219,15 @@ curl "http://192.168.0.86:5000/api/health/"
 #   }
 
 # Kubernetes Readiness Probe (Ready to serve traffic?)
-curl "http://192.168.0.86:5000/api/health/ready"
+curl "http://<PI_HOST>:5000/api/health/ready"
 # → 200 OK or 503 Service Unavailable
 
 # Kubernetes Liveness Probe (Application alive?)
-curl "http://192.168.0.86:5000/api/health/live"
+curl "http://<PI_HOST>:5000/api/health/live"
 # → 200 OK or 503 Service Unavailable
 
 # Prometheus-Style Metrics
-curl "http://192.168.0.86:5000/api/health/metrics"
+curl "http://<PI_HOST>:5000/api/health/metrics"
 # → {
 #     "sensor_error_count": 0,
 #     "database_active_connections": 3,
@@ -241,10 +241,10 @@ curl "http://192.168.0.86:5000/api/health/metrics"
 
 ```bash
 # Live-Snapshot (JPEG)
-curl "http://192.168.0.86:5000/api/camera/snapshot" -o snapshot.jpg
+curl "http://<PI_HOST>:5000/api/camera/snapshot" -o snapshot.jpg
 
 # Kamera-Status
-curl "http://192.168.0.86:5000/api/camera/status"
+curl "http://<PI_HOST>:5000/api/camera/status"
 # → {"available": true, "resolution": "1280x720", ...}
 ```
 
@@ -252,16 +252,16 @@ curl "http://192.168.0.86:5000/api/camera/status"
 
 ```bash
 # Sensor-Historie (letzte 24h)
-curl "http://192.168.0.86:5000/api/logs/sensors?type=temperature&hours=24"
+curl "http://<PI_HOST>:5000/api/logs/sensors?type=temperature&hours=24"
 
 # Lampen-Historie für Kanal 1
-curl "http://192.168.0.86:5000/api/logs/lamps?channel=1&hours=24"
+curl "http://<PI_HOST>:5000/api/logs/lamps?channel=1&hours=24"
 
 # System-Events
-curl "http://192.168.0.86:5000/api/logs/events"
+curl "http://<PI_HOST>:5000/api/logs/events"
 
 # Logging-Statistiken
-curl "http://192.168.0.86:5000/api/logs/stats"
+curl "http://<PI_HOST>:5000/api/logs/stats"
 ```
 
 ---
@@ -392,14 +392,15 @@ sudo systemctl restart grow-pi
 ---
 
 **Python Version**: 3.13
-**Aktuelles Level**: v6.25.2 (Split-Process Consistency Hardening)
+**Aktuelles Level**: v6.25.3 (Public Release Hardening)
 **Stand**: 2026-03-02
-**Web-Interface**: http://192.168.0.86:5000
+**Web-Interface**: http://<PI_HOST>:5000
 **Changelog**: [CHANGELOG.md](CHANGELOG.md)
+**Lizenz**: Siehe [`../LICENSE`](../LICENSE) (private Nutzung frei, kommerziell nur mit Freigabe)
 
 ---
 
-## Tank-Mode Features (v6.25.2)
+## Tank-Mode Features (v6.25.3)
 
 ### Production-Ready Robustness
 

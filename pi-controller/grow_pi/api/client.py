@@ -3,7 +3,7 @@ GrowPi VPS Sync Client
 ======================
 Kommuniziert mit dem VPS Server für Daten-Sync und Command-Polling.
 
-Server: https://growpi.nm-forum.de
+Server: https://your-growpi-host.example.com
 API-Prefix: /api/pi/
 
 Features:
@@ -37,7 +37,7 @@ class SyncConfig:
     def from_env(cls) -> 'SyncConfig':
         """Erstellt Config aus Environment-Variablen"""
         return cls(
-            server_url=os.getenv('GROWPI_SERVER_URL', 'https://growpi.nm-forum.de'),
+            server_url=os.getenv('GROWPI_SERVER_URL', 'https://your-growpi-host.example.com'),
             api_token=os.getenv('GROWPI_API_TOKEN'),
             pi_id=os.getenv('GROWPI_PI_ID'),
             timeout=int(os.getenv('GROWPI_TIMEOUT', '10'))
@@ -59,7 +59,7 @@ class GrowPiClient:
         client = GrowPiClient()
 
         # Or with explicit config
-        config = SyncConfig(server_url="https://growpi.nm-forum.de")
+        config = SyncConfig(server_url="https://your-growpi-host.example.com")
         client = GrowPiClient(config)
 
         # Register Pi
@@ -73,7 +73,7 @@ class GrowPiClient:
         client.send_heartbeat(
             uptime_seconds=3600,
             version="1.0.0",
-            ip_local="192.168.1.100"
+            ip_local="<DEVICE_IP>"
         )
 
         # Send sensor data
@@ -206,7 +206,7 @@ class GrowPiClient:
             httpx.HTTPStatusError: Bei Server-Fehlern
 
         Example:
-            >>> result = client.send_heartbeat(3600, '1.0.0', '192.168.1.100')
+            >>> result = client.send_heartbeat(3600, '1.0.0', '<DEVICE_IP>')
             >>> if result['commands_pending']:
             ...     commands = client.get_commands()
         """
@@ -610,7 +610,7 @@ def get_client() -> GrowPiClient:
     Example:
         >>> from grow_pi.api.client import get_client
         >>> client = get_client()
-        >>> client.send_heartbeat(3600, '1.0.0', '192.168.1.100')
+        >>> client.send_heartbeat(3600, '1.0.0', '<DEVICE_IP>')
     """
     global _client
     if _client is None:

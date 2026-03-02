@@ -41,7 +41,7 @@ The Pi software is responsible for:
 ### 2.3 Hardware Connections
 
 ```
-Raspberry Pi 3B+ (growpi / 192.168.0.86)
+Raspberry Pi 3B+ (growpi / <PI_HOST>)
 │
 ├── GPIO Pins (PWM Output) - ACTIVE CONFIG 2025-12-05
 │   ├── GPIO 16 (Pin 36) → Lamp Channel 1 (Far Red)
@@ -1171,7 +1171,7 @@ Pi                                     Server
 │      {                                 │
 │        "apiKey": "zone-key",           │
 │        "version": "1.0.0",             │
-│        "ipAddress": "192.168.1.100"    │
+│        "ipAddress": "<DEVICE_IP>"    │
 │      }                                 │
 │                                        │
 │ ◀──────────── 200 OK ──────────────── │

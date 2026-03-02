@@ -225,7 +225,7 @@ Wenn du bereit bist, auf dem Raspberry Pi zu deployen:
 
 ```bash
 # 1. Auf Raspberry Pi
-ssh admin@192.168.0.86
+ssh admin@<PI_HOST>
 
 # 2. Installation
 cd /opt/grow-pi

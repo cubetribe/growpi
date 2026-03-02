@@ -210,7 +210,7 @@ app.register_blueprint(camera_bp)
 
 ### Nach JEDEM Schritt:
 1. Service neu starten
-2. Health-Check: `curl http://192.168.0.86:5000/api/health`
+2. Health-Check: `curl http://<PI_HOST>:5000/api/health`
 3. Betroffene Endpoints testen
 4. Bei Fehler: Rollback auf vorherigen Stand
 

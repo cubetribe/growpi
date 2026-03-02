@@ -1,321 +1,130 @@
-# GrowPi - Greenhouse Management System
+# GrowPi - Raspberry Pi Greenhouse Controller
 
-Professional greenhouse automation and monitoring platform powered by Raspberry Pi.
+GrowPi is a Raspberry Pi based greenhouse automation system with lighting control, sensor monitoring, and a local web UI.
 
-**Live Demo**: http://growpi.nm-forum.de
-**Version**: v6.25.2 (2026-03-02)
-**Status**: Production-Ready
+**Version**: v6.25.3 (2026-03-02)
+**Status**: Production-hardened on Raspberry Pi
+**Scope of this repository**: Pi controller backend + embedded web UI
 
-> **Note**: This repository contains the **Raspberry Pi backend** (pi-controller).
-> The **Next.js Web Frontend** has been moved to: [cubetribe/growpi_web_public](https://github.com/cubetribe/growpi_web_public)
-
----
-
-## Features
-
-### Real-time Monitoring
-- **Environmental Sensors**: Temperature, Humidity, Soil metrics (DHT22)
-- **4-Channel LED Control**: Far Red, Warm White, Cool White, UV
-- **Smart Automation**: Custom light curves with linear interpolation
-- **Energy Tracking**: Real-time electricity consumption monitoring (v6.3)
-- **Dehumidifier Control**: Automated humidity management (v6.4)
-
-### Web Interface
-- **Responsive Dashboard**: Optimized for mobile and desktop
-- **Live Charts**: 24h sensor data visualization (Recharts)
-- **Curve Editor**: Visual light schedule designer
-- **Cost Analysis**: Device-level energy consumption breakdown
-- **Camera Integration**: Live plant monitoring
-- **i18n**: German / English language support
+> The separate Next.js frontend repository is available at [cubetribe/growpi_web_public](https://github.com/cubetribe/growpi_web_public).
 
 ---
 
-## System Architecture (v6.5)
+## Highlights
 
-### Frontend (Modular - 408 LOC)
-```
-static/js/
-├── api.js          # Centralized API client (GrowPiAPI class)
-├── state.js        # Global state management (Pub/Sub)
-├── utils.js        # Tab switching + notifications
-└── modules/
-    ├── control.js      # Manual lamp control
-    ├── curves.js       # Curve editor (450 LOC)
-    ├── history.js      # Sensor charts
-    ├── environment.js  # Environment monitoring
-    ├── costs.js        # Energy cost tracking (NEW v6.3)
-    ├── room.js         # Dehumidifier control (NEW v6.4)
-    └── camera.js       # Camera module
-```
+- 4-channel PWM light control (Far Red, Warm White, Cool White, UV)
+- Time-curve automation with interpolation
+- DHT22 environment monitoring
+- SQLite logging (sensor, lamp, events, power)
+- Dehumidifier and smart plug integration
+- Camera/timelapse support
+- Process-split runtime (`grow-pi` controller + `growpi-web` API/UI)
+- systemd watchdog and restart hardening
+- Health endpoints for runtime monitoring (`/api/health/*`)
 
-### Backend (8 Flask Blueprints)
-```
-grow_pi/
-├── controllers/
-│   ├── lamp_controller.py
-│   ├── sensor_controller.py
-│   └── dehumidifier_controller.py
-├── web/
-│   ├── app.py (Flask app factory)
-│   └── blueprints/
-│       ├── health_bp.py      # /api/health
-│       ├── status_bp.py      # /api/status
-│       ├── lamp_bp.py        # /api/lamp/*
-│       ├── curves_bp.py      # /api/curves/*
-│       ├── logs_bp.py        # /api/logs/*
-│       ├── costs_bp.py       # /api/costs/* (NEW)
-│       ├── dehumidifier_bp.py # /api/room/* (NEW)
-│       └── camera_bp.py      # /api/camera/*
-└── utils/
-    ├── database.py
-    ├── mode_manager.py
-    └── config_manager.py
+---
+
+## Architecture
+
+```text
+Pi Runtime
+├── grow-pi.service      (controller loop, hardware I/O)
+├── growpi-web.service   (Flask API + embedded web UI on port 5000)
+└── SQLite               (local telemetry + config persistence)
+
+GitHub
+└── Actions self-hosted runner on Pi
+    └── auto-deploy workflow with live PASS/FAIL feedback
 ```
 
 ---
 
-## Quick Start
-
-### Requirements
-- Raspberry Pi 3B+ or higher
-- Python 3.9+
-- DHT22 sensor (GPIO 4)
-- 4-Channel PWM LED driver
-
-### Installation
+## Quick Start (Local Development)
 
 ```bash
-# Clone repository
-git clone https://github.com/yourusername/GrowPi.git
-cd GrowPi
-
-# Install backend
-cd pi-controller
+git clone https://github.com/cubetribe/growpi.git
+cd growpi/pi-controller
 python3 -m venv venv
 source venv/bin/activate
 pip install -r requirements.txt
-
-# Run tests
 pytest tests/ -v
-
-# Start server
 python -m grow_pi.web.api
 ```
 
-### Automatic Pi Deployment (GitHub Actions)
+Open UI/API:
 
-This repository supports auto-deploy to Raspberry Pi via a **self-hosted GitHub Actions runner**.
+```text
+http://localhost:5000
+```
+
+---
+
+## Raspberry Pi Deployment
+
+Use the installer in `pi-controller/`:
+
+```bash
+cd pi-controller
+chmod +x install.sh
+./install.sh
+```
+
+After installation:
+
+```bash
+sudo systemctl status grow-pi
+sudo systemctl status growpi-web
+curl -fsS http://127.0.0.1:5000/api/health/
+```
+
+Detailed deployment and operations guide:
+- [docs/DEPLOYMENT_GUIDE.md](docs/DEPLOYMENT_GUIDE.md)
+
+---
+
+## CI/CD to Raspberry Pi
+
+This repository includes GitHub Actions auto-deploy for a self-hosted Pi runner.
 
 - Workflow: `.github/workflows/pi-autodeploy.yml`
 - Deploy script: `scripts/pi/github_runner_deploy.sh`
-- Setup guide: `docs/GITHUB_ACTIONS_PI_AUTODEPLOY.md`
+- Runner setup: `scripts/pi/install_github_runner.sh`
+- Documentation: `docs/GITHUB_ACTIONS_PI_AUTODEPLOY.md`
 
-Important:
-- No inbound router ports are required.
-- The Pi runner connects outbound to GitHub over HTTPS and executes jobs locally.
-- GitHub Actions shows direct PASS/FAIL feedback from the Pi deployment.
-
-### Access Web Interface
-
-```
-http://192.168.0.86:5000
-```
+No inbound router ports are required. The Pi runner connects outbound to GitHub.
 
 ---
 
-## Hardware Configuration
+## Security and Configuration
 
-### Raspberry Pi 3B+
-- **Hostname**: growpi
-- **IP**: 192.168.0.86
-- **SSH**: Port 22 (admin user)
-
-### GPIO Pin Assignment (FINAL)
-
-| Channel | Name | GPIO | Pin | Status |
-|---------|------|------|-----|--------|
-| 1 | Far Red | 16 | 36 | Active |
-| 2 | Warm White | 13 | 33 | Active |
-| 3 | Cool White | 18 | 12 | Active |
-| 4 | UV | 12 | 32 | Active |
-| - | DHT22 Sensor | 4 | 7 | Verified |
+- Do not commit `.env` files or real credentials.
+- Use placeholders/examples (`.env.example`, `config.example.yaml`) only.
+- Tuya cloud credentials must be supplied via environment variables (`TUYA_ACCESS_ID`, `TUYA_ACCESS_SECRET`).
 
 ---
 
-## API Endpoints
+## License
 
-### Core Endpoints
-| Endpoint | Method | Description |
-|----------|--------|-------------|
-| `/api/health` | GET | System health check |
-| `/api/status` | GET | Temperature, humidity, lamp status |
-| `/api/curves` | GET | Get all lamp curves |
-| `/api/curves/<channel>` | PUT | Update lamp curve |
+This project is licensed under **GrowPi Non-Commercial License v1.0**.
 
-### Cost Tracking (v6.3)
-| Endpoint | Method | Description |
-|----------|--------|-------------|
-| `/api/costs?period=today` | GET | Energy consumption |
-| `/api/costs/config` | GET | kWh price configuration |
-| `/api/costs/config` | POST | Update kWh price |
+- Private / personal / non-commercial usage: free
+- Commercial or professional usage: requires prior permission from Dennis Westermann
 
-### Room Control (v6.4)
-| Endpoint | Method | Description |
-|----------|--------|-------------|
-| `/api/room` | GET | Dehumidifier status |
-| `/api/room/config` | GET | Automation config |
-| `/api/room/toggle` | POST | Manual override |
+See [LICENSE](LICENSE) for the full legal text.
 
-### Logging (v6.16 - Downsampling)
-| Endpoint | Method | Description |
-|----------|--------|-------------|
-| `/api/logs/sensors` | GET | Sensor readings (downsampled) |
-| `/api/logs/lamps` | GET | Lamp state changes (downsampled) |
-| `/api/logs/plugs` | GET | Smart plug power data (downsampled) |
-| `/api/logs/events` | GET | System events |
-| `/api/logs/stats` | GET | Logging statistics |
+Important: because commercial use is restricted, this is a **source-available** license model, not an OSI open-source license.
 
 ---
 
-## Testing
+## Changelog
 
-```bash
-# Run all unit tests
-cd pi-controller
-source venv/bin/activate
-pytest tests/ -v --cov=grow_pi
-
-# Expected: 140/140 tests PASSED (93% coverage)
-```
-
-```bash
-# Smoke tests (requires running server)
-cd pi-controller
-./smoke_test.sh http://localhost:5000
-
-# Expected: 14/14 API endpoints passing
-```
+- [CHANGELOG.md](CHANGELOG.md) (root project)
+- [pi-controller/CHANGELOG.md](pi-controller/CHANGELOG.md) (Pi controller)
 
 ---
 
-## Recent Updates
+## Contact
 
-### v6.16.0 (2025-12-08) - Critical Bug Fixes
+Rights holder: **Dennis Westermann**
 
-**Bug Fixes:**
-- Humidity Control Race-Condition (Input-Werte sprangen während Bearbeitung)
-- Stromverbrauchs-Historie zeigte nur 2-3h statt 24h+ Daten
-
-**API Improvements:**
-- Alle `/api/logs/*` Routes zu Blueprint-Architektur migriert
-- Intelligentes Downsampling für große Zeitbereiche
-- Keine hardcoded Limits mehr
-
-**Previous:**
-- v6.15.0: Interactive Bezier Curve Editor
-- v6.14.0: Room Control Verification
-- v6.13.0: Status-Desync Fix
-
-See [CHANGELOG.md](CHANGELOG.md) for complete history.
-
----
-
-## Project Structure
-
-```
-GrowPi/
-├── pi-controller/          # Raspberry Pi Backend
-│   ├── grow_pi/
-│   │   ├── controllers/    # Hardware controllers
-│   │   ├── database/       # SQLite + migrations
-│   │   ├── web/            # Flask app + blueprints
-│   │   │   ├── blueprints/ # API endpoints
-│   │   │   └── static/     # Embedded web UI
-│   │   └── utils/          # Utilities
-│   ├── tests/              # Unit tests (140 tests)
-│   └── smoke_test.sh       # API smoke tests
-├── docs/                   # Documentation
-│   ├── ARCHITECTURE.md
-│   ├── ROADMAP.md
-│   └── DEPLOYMENT_GUIDE.md
-├── agents/                 # AI Agent reports
-├── CHANGELOG.md            # Version history
-└── CLAUDE.md               # Claude Code instructions
-```
-
-> **Frontend**: The Next.js web dashboard is in a separate repository:
-> [cubetribe/growpi_web_public](https://github.com/cubetribe/growpi_web_public)
-
----
-
-## Development
-
-### Git Workflow
-- **Main Branch**: Production-ready code
-- **Feature Branches**: `feature/feature-name`
-- **Refactoring**: `refactoring/phase-X`
-
-### Code Standards
-- Python: PEP 8, type hints
-- JavaScript: ES6+, no external dependencies
-- Tests: pytest with fixtures
-
-### Contributing
-1. Fork the repository
-2. Create feature branch
-3. Run tests (`pytest`)
-4. Submit pull request
-
----
-
-## Documentation
-
-- [CHANGELOG.md](CHANGELOG.md) - Complete version history
-- [CLAUDE.md](CLAUDE.md) - Development instructions
-- [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) - System design
-- [docs/DEPLOYMENT_GUIDE.md](docs/DEPLOYMENT_GUIDE.md) - Deployment steps
-- [docs/HARDWARE_PINOUT.md](docs/HARDWARE_PINOUT.md) - GPIO configuration
-
----
-
-## Tech Stack
-
-### Backend (Raspberry Pi) - This Repository
-- **Runtime**: Python 3.13
-- **Framework**: Flask + Blueprints
-- **GPIO**: pigpio (hardware PWM)
-- **Sensors**: adafruit-circuitpython-dht
-- **Database**: SQLite (local logging)
-
-### Frontend (Separate Repository)
-- **Repository**: [cubetribe/growpi_web_public](https://github.com/cubetribe/growpi_web_public)
-- **Framework**: Next.js 13.5.1 (App Router)
-- **Language**: TypeScript (strict mode)
-- **Database**: PostgreSQL (Prisma ORM)
-- **UI**: shadcn/ui + TailwindCSS
-
----
-
-## Support
-
-**Developer**: Dennis Westermann (d.westermann@ol-mg.de)
-**Project Status**: Active Development
-**License**: Proprietary
-
----
-
-## Acknowledgments
-
-Built with:
-- Flask (Web framework)
-- pigpio (GPIO control)
-- SQLite (Data storage)
-- Recharts (Charting)
-- Vanilla JS (Frontend modules)
-
-Orchestrated with Claude Code (17 parallel agents for v6.5 refactoring)
-
----
-
-**Last Updated**: 2025-12-08
-**Version**: v6.16.0
+Commercial licensing requests: please open an issue in this repository.

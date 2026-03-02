@@ -1,6 +1,6 @@
 # GrowPi - Raspberry Pi 3B+ Hardware Pin-Belegung
 
-**Hardware**: Raspberry Pi 3B+ **Hostname**: growpi **IP**: 192.168.0.86
+**Hardware**: Raspberry Pi 3B+ **Hostname**: growpi **IP**: <PI_HOST>
 **Dokumentiert**: 2025-12-05 **Status**: ✅ FINAL - Alle 4 PWM Kanäle verifiziert
 
 ---
@@ -215,7 +215,7 @@ Pi GPIO → LED direkt (NIEMALS!)
 ```
 ┌──────────────────────────────────────────────────────────────┐
 │                  Raspberry Pi 3B+ (growpi)                    │
-│                  IP: 192.168.0.86                             │
+│                  IP: <PI_HOST>                             │
 │                                                               │
 │  Power: 5V/2.5A Micro-USB                                    │
 │                                                               │

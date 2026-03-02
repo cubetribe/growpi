@@ -1,0 +1,51 @@
+GrowPi Non-Commercial License v1.0
+
+Copyright (c) 2026 Dennis Westermann
+All rights reserved.
+
+This software and associated documentation files (the "Software") are made
+available under the terms below.
+
+1. License Grant (Non-Commercial Use Only)
+Permission is granted, free of charge, to any person obtaining a copy of the
+Software to use, copy, modify, and run the Software for private, personal,
+educational, or other non-commercial purposes.
+
+2. Commercial Use Requires Prior Permission
+Any commercial or professional use is prohibited without prior written
+permission from the copyright holder.
+
+Commercial/professional use includes, without limitation:
+- use by or for a business, company, public authority, or organization;
+- use in exchange for payment or other consideration;
+- use to operate, support, or deliver commercial services;
+- use in consulting, client projects, managed services, or SaaS;
+- internal business operations, even if no direct resale occurs.
+
+To request a commercial license, contact the copyright holder (Dennis
+Westermann) via this repository.
+
+3. Conditions
+If you distribute the Software or modified versions for non-commercial use, you
+must:
+- include this license text and copyright notice;
+- clearly state that changes were made.
+
+4. No Trademark License
+This license does not grant any right to use project, product, or author names,
+logos, or trademarks, except for reasonable attribution.
+
+5. Termination
+Any use outside the scope of this license automatically terminates the rights
+granted under this license.
+
+6. Warranty Disclaimer
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS
+FOR A PARTICULAR PURPOSE, AND NONINFRINGEMENT.
+
+7. Limitation of Liability
+IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM,
+DAMAGES, OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT, OR
+OTHERWISE, ARISING FROM, OUT OF, OR IN CONNECTION WITH THE SOFTWARE OR THE USE
+OR OTHER DEALINGS IN THE SOFTWARE.

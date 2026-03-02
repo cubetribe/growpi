@@ -2,6 +2,18 @@
 
 Alle wichtigen Änderungen am GrowPi Pi-Controller werden hier dokumentiert.
 
+## [v6.25.3] - 2026-03-02 - Public Release Hardening & License Update
+
+### Security
+- **Hardcoded credential fallback entfernt**
+  - `grow_pi/utils/tuya_cloud.py` nutzt keine eingebauten Tuya-Cloud-Credentials mehr
+  - Cloud-Integration funktioniert nur noch mit gesetzten Umgebungsvariablen (`TUYA_ACCESS_ID`, `TUYA_ACCESS_SECRET`)
+
+### Changed
+- `VERSION` auf `6.25.3` erhöht (wird im Frontend über `/api/version` angezeigt)
+- Dokumentation auf public/sanitized Stand gebracht (keine internen Host/IP-Werte mehr)
+- Lizenzmodell auf Non-Commercial Source-Available umgestellt (siehe Root-`LICENSE`)
+
 ## [v6.25.2] - 2026-03-02 - Split-Process Consistency Hardening
 
 ### Fixed
