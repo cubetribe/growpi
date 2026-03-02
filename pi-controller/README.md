@@ -6,7 +6,7 @@ Python-basierter Controller-Service für den Raspberry Pi 3B+.
 
 Dieser Controller läuft auf dem Raspberry Pi und steuert Grow-Lampen via PWM.
 
-**Aktueller Stand: v6.25.0 (2026-03-02) - Process-Splitting Hardening**
+**Aktueller Stand: v6.25.2 (2026-03-02) - Split-Process Consistency Hardening**
 - Web-Interface auf Port 5000
 - **Tank-Mode Hardening**: Production-Ready Robustness
   - Circuit Breaker für DHT22 Sensor (Auto-Recovery nach Freeze)
@@ -379,14 +379,14 @@ sudo systemctl restart grow-pi
 ---
 
 **Python Version**: 3.13
-**Aktuelles Level**: v6.23.0 (Tank-Mode Hardening)
-**Stand**: 2025-12-26
+**Aktuelles Level**: v6.25.2 (Split-Process Consistency Hardening)
+**Stand**: 2026-03-02
 **Web-Interface**: http://192.168.0.86:5000
 **Changelog**: [CHANGELOG.md](CHANGELOG.md)
 
 ---
 
-## Tank-Mode Features (v6.25.0)
+## Tank-Mode Features (v6.25.2)
 
 ### Production-Ready Robustness
 

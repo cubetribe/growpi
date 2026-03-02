@@ -4,11 +4,11 @@ GrowPi PWM Controller
 Controls 5 LED lamp channels via GPIO PWM signals using pigpio daemon.
 
 Hardware PWM Channels (Pi 3B+):
-- Channel 1 (Red):        GPIO-12 (Pin 32)
-- Channel 2 (Blue):       GPIO-13 (Pin 33)
-- Channel 3 (Warm White): GPIO-18 (Pin 12) - VERIFIED
-- Channel 4 (Cool White): GPIO-19 (Pin 35)
-- Channel 5 (UV):         GPIO-21 (Pin 40) - Software PWM
+- Channel 1 (Far Red):    GPIO-16 (Pin 36)
+- Channel 2 (Warm White): GPIO-13 (Pin 33)
+- Channel 3 (Cool White): GPIO-18 (Pin 12) - VERIFIED
+- Channel 4 (UV):         GPIO-12 (Pin 32)
+- Channel 5 (UV Boost):   GPIO-21 (Pin 40) - Software PWM (legacy)
 """
 
 import logging
@@ -222,10 +222,22 @@ class PWMController:
         Returns:
             Dict mapping channel number to current intensity
         """
-        return {
-            ch: self.channels[ch].current_intensity
-            for ch in self.channels
-        }
+        if not self._initialized:
+            return {}
+
+        # In split-process mode, another process can update pigpio duty cycles.
+        # Always prefer the actual hardware state when pigpio is available.
+        if not self.simulation_mode and self.pi and self.pi.connected:
+            for ch, channel in self.channels.items():
+                try:
+                    duty = int(self.pi.get_PWM_dutycycle(channel.gpio_pin))
+                    channel.current_intensity = max(0, min(100, duty))
+                except Exception as e:
+                    logger.warning(
+                        f"Failed to read PWM duty for channel {ch} (GPIO-{channel.gpio_pin}): {e}"
+                    )
+
+        return {ch: channel.current_intensity for ch, channel in self.channels.items()}
 
     def get_channel_info(self) -> List[Dict]:
         """

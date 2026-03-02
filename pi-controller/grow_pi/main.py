@@ -492,14 +492,28 @@ class GrowPiController:
 
         # Use per-channel curve controller if available
         if self.curve_controller:
+            # In split-process mode curve edits are made by the web service.
+            # Refresh from DB before applying current intensities.
+            try:
+                self.curve_controller.reload_from_database()
+            except Exception as e:
+                logger.warning(f"Failed to refresh curves from database: {e}")
+
             intensities = self.curve_controller.get_current_intensities(now)
 
             for channel, intensity in intensities.items():
                 last = self.last_intensities.get(channel, -1)
                 if intensity != last:
-                    self.pwm_controller.set_intensity(channel, intensity)
-                    self.last_intensities[channel] = intensity
-                    changed = True
+                    applied = self.pwm_controller.set_intensity(channel, intensity)
+                    if applied:
+                        self.last_intensities[channel] = intensity
+                        changed = True
+                    else:
+                        logger.warning(
+                            "Failed to apply curve intensity for channel %s: target=%s%%",
+                            channel,
+                            intensity,
+                        )
 
             if changed:
                 state_str = ", ".join(

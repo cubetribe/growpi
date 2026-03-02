@@ -191,6 +191,12 @@ def get_current_intensities():
         return jsonify(create_response(False, error="Curves not available")), 503
 
     try:
+        # Keep API output in sync even if curves are edited from another process.
+        try:
+            _curve_controller.reload_from_database()
+        except Exception as e:
+            logger.warning(f"Failed to refresh curves from database: {e}")
+
         intensities = _curve_controller.get_current_intensities()
         return jsonify(create_response(True, {
             "intensities": intensities,

@@ -248,6 +248,7 @@ if DHT_AVAILABLE:
             break
 
 # Initialize DataLogger
+db = None
 data_logger: Optional['DataLogger'] = None
 if DB_AVAILABLE:
     try:
@@ -290,6 +291,27 @@ if MODE_MANAGER_AVAILABLE:
         logger.info(f"ModeManager initialized (current mode: {mode_manager.get_mode()})")
     except Exception as e:
         logger.error(f"Failed to initialize ModeManager: {e}")
+
+# Register shared dependencies for blueprints (status/health/etc.)
+try:
+    from . import dependencies as web_dependencies
+    web_dependencies.init_pwm_controller(pwm_controller)
+    web_dependencies.init_dht_sensor(
+        dht_sensor,
+        DHT_AVAILABLE and dht_sensor is not None
+    )
+    web_dependencies.init_data_logger(data_logger, db)
+    web_dependencies.init_curve_controller(
+        curve_controller,
+        curve_controller is not None
+    )
+    web_dependencies.init_mode_manager(
+        mode_manager if MODE_MANAGER_AVAILABLE else None,
+        MODE_MANAGER_AVAILABLE and mode_manager is not None
+    )
+    logger.info("Blueprint dependencies initialized")
+except Exception as e:
+    logger.warning(f"Failed to initialize blueprint dependencies: {e}")
 
 # Initialize DehumidifierController and inject into blueprint
 dehumidifier_controller = None
@@ -563,7 +585,11 @@ def set_lamp(channel: int):
             return jsonify(create_response(False, error="Intensity must be 0-100")), 400
 
         # Set lamp intensity
-        pwm_controller.set_intensity(channel, intensity)
+        if not pwm_controller.set_intensity(channel, intensity):
+            logger.error(
+                f"Failed to set lamp {channel} ({LAMP_CHANNELS[channel].name}) to {intensity}%"
+            )
+            return jsonify(create_response(False, error="Failed to set PWM intensity")), 500
         logger.info(f"Set lamp {channel} ({LAMP_CHANNELS[channel].name}) to {intensity}%")
 
         # Log the change
@@ -763,8 +789,14 @@ def _apply_curve_values() -> dict:
     if curve_controller and pwm_controller:
         intensities = curve_controller.get_current_intensities()
         for channel, intensity in intensities.items():
-            pwm_controller.set_intensity(channel, intensity)
-            applied[channel] = intensity
+            if pwm_controller.set_intensity(channel, intensity):
+                applied[channel] = intensity
+            else:
+                logger.warning(
+                    "Failed to apply curve intensity on mode switch for channel %s: target=%s%%",
+                    channel,
+                    intensity,
+                )
         logger.info(f"Applied curve intensities: {applied}")
     return applied
 

@@ -2,6 +2,48 @@
 
 Alle wichtigen Änderungen am GrowPi Pi-Controller werden hier dokumentiert.
 
+## [v6.25.2] - 2026-03-02 - Split-Process Consistency Hardening
+
+### Fixed
+- **`/api/status` liefert wieder echte Lampenwerte**
+  - Blueprint-Dependencies werden im aktiven `web/api.py` jetzt korrekt initialisiert
+  - Status-Endpoint liest den PWM-State pro Request nur einmal und gibt konsistente Kanalwerte zurück
+- **Fehler beim PWM-Setzen werden nicht mehr als Erfolg behandelt**
+  - `set_lamp` liefert bei fehlgeschlagenem Hardware-Write jetzt einen 500-Fehler
+  - Mode-Wechsel (`manual`/`auto`) protokolliert fehlgeschlagene Kanal-Updates statt stillschweigend fortzufahren
+- **Auto-Kurven-Update robuster bei Hardwarefehlern**
+  - Controller aktualisiert `last_intensities` nur noch bei erfolgreichem PWM-Write
+  - Verhindert Cache-Drift zwischen Sollwert und realem Lampenzustand
+
+### Changed
+- **Kurven-Intensitäten API aktualisiert Kurven explizit aus DB**
+  - `/api/curves/intensities` lädt vor der Berechnung neu aus der Datenbank
+  - Erhöht Konsistenz in Split-Process-Szenarien
+
+### Added
+- Unit-Tests für Controller-Kurven-Synchronisierung:
+  - `tests/unit/test_main_curve_sync.py`
+
+### Validation
+- `venv/bin/python -m pytest -q tests/unit` -> **156 passed**
+- `venv/bin/python -m py_compile` auf geänderten Modulen -> **PASS**
+
+## [v6.25.1] - 2026-03-02 - Curve/State Sync Hardening
+
+### Fixed
+- **Auto-Kurven nach Process-Splitting synchronisiert**
+  - Controller lädt Kurven vor jedem Auto-Update aus der Datenbank nach (`reload_from_database()`)
+  - Änderungen aus der Web-UI werden dadurch im Controller-Prozess zuverlässig wirksam
+- **Ist-Zustand aus echter Hardware statt Prozess-Cache**
+  - `PWMController.get_current_state()` liest bei pigpio die aktuellen Duty-Cycles direkt vom Daemon
+  - Web-Status und physischer Lampenzustand bleiben konsistent auch bei getrennten Prozessen
+
+### Added
+- Unit-Tests für PWM-State-Synchronisierung:
+  - `tests/unit/test_pwm_controller_state_sync.py`
+
+---
+
 ## [v6.25.0] - 2026-03-02 - Process Splitting & Runtime Hardening
 
 ### Added
