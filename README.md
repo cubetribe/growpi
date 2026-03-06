@@ -2,7 +2,7 @@
 
 GrowPi is a Raspberry Pi based greenhouse automation system with lighting control, sensor monitoring, and a local web UI.
 
-**Version**: v6.25.3 (2026-03-02)
+**Version**: v6.25.4 (2026-03-06)
 **Status**: Production-hardened on Raspberry Pi
 **Scope of this repository**: Pi controller backend + embedded web UI
 
@@ -21,6 +21,7 @@ GrowPi is a Raspberry Pi based greenhouse automation system with lighting contro
 - Process-split runtime (`grow-pi` controller + `growpi-web` API/UI)
 - systemd watchdog and restart hardening
 - Health endpoints for runtime monitoring (`/api/health/*`)
+- Raspberry Pi power/throttling signals in health output
 
 ---
 
@@ -79,6 +80,26 @@ curl -fsS http://127.0.0.1:5000/api/health/
 
 Detailed deployment and operations guide:
 - [docs/DEPLOYMENT_GUIDE.md](docs/DEPLOYMENT_GUIDE.md)
+
+## Troubleshooting
+
+If lamps are dark after a reboot but curves are expected to be on:
+
+```bash
+curl -fsS http://<PI_HOST>:5000/api/status
+curl -fsS http://<PI_HOST>:5000/api/curves/intensities
+```
+
+`/api/status` should match the real PWM outputs. If it differs from `/api/curves/intensities`, inspect:
+
+```bash
+ssh admin@<PI_HOST>
+sudo journalctl -u grow-pi -b --no-pager
+sudo journalctl -u growpi-web -b --no-pager
+vcgencmd get_throttled
+```
+
+If `vcgencmd` reports undervoltage or throttling, treat that as a hardware incident first: PSU, cable, USB load, and hub power budget.
 
 ---
 

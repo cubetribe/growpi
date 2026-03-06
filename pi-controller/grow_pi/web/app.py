@@ -201,7 +201,9 @@ def _initialize_hardware(app: Flask) -> None:
                 from grow_pi.config import load_config
 
             config = load_config()
-            app.pwm_controller.initialize(config.lamps.channels)
+            # This entrypoint is also used in split-process deployments.
+            # Preserve existing outputs when the web runtime attaches.
+            app.pwm_controller.initialize(config.lamps.channels, skip_zero_init=True)
 
         logger.info("PWM Controller initialized successfully")
     except Exception as e:

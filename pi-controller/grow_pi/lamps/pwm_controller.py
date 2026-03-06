@@ -119,7 +119,7 @@ class PWMController:
                 # Set PWM range to 0-100 for easier percentage control
                 self.pi.set_PWM_range(channel.gpio_pin, 100)
 
-                # BUGFIX 2025-12-07: Bei Warm-Restart NICHT auf 0 setzen!
+                # BUGFIX 2025-12-07: Bei Warm-Restart/Attach NICHT auf 0 setzen!
                 if not skip_zero_init:
                     self.pi.set_PWM_dutycycle(channel.gpio_pin, 0)
 
@@ -129,7 +129,13 @@ class PWMController:
                 )
 
             self._initialized = True
-            init_mode = "warm (PWM preserved)" if skip_zero_init else "cold (PWM reset to 0)"
+
+            if skip_zero_init:
+                # Secondary processes and warm restarts must attach to the live
+                # pigpiod state instead of trusting zeroed in-memory defaults.
+                self.get_current_state()
+
+            init_mode = "warm/attached (PWM preserved)" if skip_zero_init else "cold (PWM reset to 0)"
             logger.info(f"PWM Controller initialized with {len(self.channels)} channels ({init_mode})")
             return True
 

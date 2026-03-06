@@ -17,13 +17,20 @@ class DummyCurveController:
 
 
 class DummyPWMController:
-    def __init__(self, fail_channels=None):
+    def __init__(self, fail_channels=None, current_state=None):
         self.fail_channels = set(fail_channels or [])
         self.calls = []
+        self.current_state = dict(current_state or {})
 
     def set_intensity(self, channel, intensity):
         self.calls.append((channel, intensity))
-        return channel not in self.fail_channels
+        if channel in self.fail_channels:
+            return False
+        self.current_state[channel] = intensity
+        return True
+
+    def get_current_state(self):
+        return dict(self.current_state)
 
 
 def _build_controller(curve_controller, pwm_controller, last_intensities=None):
@@ -71,3 +78,16 @@ def test_update_intensity_from_curve_continues_when_reload_fails():
     assert curve.reload_calls == 1
     assert pwm.calls == [(2, 20)]
     assert ctrl.last_intensities[2] == 20
+
+
+def test_update_intensity_from_curve_reapplies_when_hardware_drifted():
+    curve = DummyCurveController({1: 100})
+    pwm = DummyPWMController(current_state={1: 0})
+    ctrl = _build_controller(curve, pwm, last_intensities={1: 100})
+
+    changed = GrowPiController._update_intensity_from_curve(ctrl)
+
+    assert changed is True
+    assert curve.reload_calls == 1
+    assert pwm.calls == [(1, 100)]
+    assert pwm.current_state[1] == 100

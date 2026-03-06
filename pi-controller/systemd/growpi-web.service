@@ -22,6 +22,7 @@ RestartPreventExitStatus=0 SIGTERM SIGINT
 TimeoutStartSec=120
 TimeoutStopSec=30
 KillSignal=SIGTERM
+OOMPolicy=kill
 Environment=PYTHONUNBUFFERED=1
 StandardOutput=journal
 StandardError=journal

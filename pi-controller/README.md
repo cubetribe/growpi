@@ -6,7 +6,7 @@ Python-basierter Controller-Service für den Raspberry Pi 3B+.
 
 Dieser Controller läuft auf dem Raspberry Pi und steuert Grow-Lampen via PWM.
 
-**Aktueller Stand: v6.25.3 (2026-03-02) - Public Release Hardening**
+**Aktueller Stand: v6.25.4 (2026-03-06) - Boot Safety & Power Diagnostics**
 - Web-Interface auf Port 5000
 - **Tank-Mode Hardening**: Production-Ready Robustness
   - Circuit Breaker für DHT22 Sensor (Auto-Recovery nach Freeze)
@@ -18,6 +18,7 @@ Dieser Controller läuft auf dem Raspberry Pi und steuert Grow-Lampen via PWM.
   - `/api/health/ready` - Kubernetes Readiness Probe
   - `/api/health/live` - Liveness Probe
   - `/api/health/metrics` - Prometheus-Style Metriken
+  - `system.power` enthält Raspberry-Pi-Unterspannungs-/Throttling-Status
 - **Pi Health Monitoring**: Live System-Metriken im Dashboard
 - Live-Kamera Livestream (USB-Webcam, 720p, Auto-Detection)
 - **TinyTuya Lokale Steuerung**: Smart Plugs ohne Cloud-API
@@ -97,7 +98,19 @@ sudo systemctl status growpi-web
 ```bash
 sudo journalctl -u grow-pi -f
 sudo journalctl -u growpi-web -f
+sudo journalctl --list-boots
 ```
+
+### 6. Incident Quick Check
+
+```bash
+curl -fsS http://127.0.0.1:5000/api/status
+curl -fsS http://127.0.0.1:5000/api/curves/intensities
+vcgencmd get_throttled
+```
+
+- Wenn `api/status` und `api/curves/intensities` nicht übereinstimmen, stimmt der physische PWM-Zustand nicht mit dem Sollwert überein.
+- Wenn `vcgencmd get_throttled` Unterspannung oder Throttling meldet, zuerst Netzteil, Kabel und USB-Last prüfen.
 
 ---
 
@@ -188,14 +201,14 @@ pi-controller/
 | 13    | **Tank-Mode Hardening**  | ✅ Done (2025-12-26) |
 | 14    | RS485 Bodensensoren      | ⏳ Geplant |
 
-### Health Monitoring API (v6.23.0 - Enhanced)
+### Health Monitoring API (v6.25.4 - Enhanced)
 
 ```bash
 # Comprehensive Health Check (mit CPU-Temp, RAM, Disk, Sensor Status)
 curl "http://<PI_HOST>:5000/api/health/"
 # → {
 #     "status": "healthy",
-#     "version": "6.23.0",
+#     "version": "6.25.4",
 #     "timestamp": "2025-12-26T10:30:00Z",
 #     "system": {
 #       "cpu_temp": 52.3,
@@ -205,7 +218,12 @@ curl "http://<PI_HOST>:5000/api/health/"
 #       "memory_status": "normal",
 #       "disk_percent": 45.3,
 #       "disk_status": "normal",
-#       "uptime_seconds": 345678
+#       "uptime_seconds": 345678,
+#       "power": {
+#         "available": true,
+#         "raw": "0x0",
+#         "healthy": true
+#       }
 #     },
 #     "sensor": {
 #       "available": true,

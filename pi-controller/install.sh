@@ -157,12 +157,17 @@ sudo systemctl daemon-reload
 sudo systemctl enable grow-pi
 sudo systemctl enable growpi-web
 
-# Step 7: Configure hardware watchdog
+# Step 7: Configure hardware watchdog + persistent journald
 echo ""
-echo -e "${GREEN}[7/7] Konfiguriere Hardware-Watchdog...${NC}"
+echo -e "${GREEN}[7/7] Konfiguriere Hardware-Watchdog & Journald...${NC}"
 sudo mkdir -p /etc/systemd/system.conf.d
 sudo cp ${SCRIPT_DIR}/systemd/99-growpi-watchdog.conf /etc/systemd/system.conf.d/99-growpi-watchdog.conf
+sudo mkdir -p /etc/systemd/journald.conf.d
+sudo cp ${SCRIPT_DIR}/systemd/99-growpi-journald.conf /etc/systemd/journald.conf.d/99-growpi-journald.conf
+sudo mkdir -p /var/log/journal
 enable_kernel_watchdog
+sudo systemctl restart systemd-journald || true
+sudo journalctl --flush || true
 sudo systemctl daemon-reexec
 
 echo ""
@@ -189,6 +194,7 @@ echo ""
 echo "5. Logs anzeigen:"
 echo "   sudo journalctl -u grow-pi -f"
 echo "   sudo journalctl -u growpi-web -f"
+echo "   sudo journalctl --list-boots"
 echo ""
 echo "6. Test-Modus (ohne dauerhaft zu laufen):"
 echo "   cd ${INSTALL_DIR} && source venv/bin/activate"

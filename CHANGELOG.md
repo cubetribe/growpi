@@ -7,6 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [6.25.4] - 2026-03-06
+
+### Fixed
+- **Cold-boot split-process lamp outage**: `growpi-web` now attaches to live PWM state without zeroing outputs, so the controller’s boot-time curve application survives service startup.
+- **Curve controller now repairs PWM drift**: auto mode re-applies curve values when actual GPIO duty cycles no longer match the desired state, even if cached targets are unchanged.
+
+### Added
+- Raspberry Pi power/throttling diagnostics in the health API via `vcgencmd get_throttled` parsing.
+- Persistent journald installer drop-in so future incidents retain cross-boot logs more reliably.
+
+### Changed
+- systemd service hardening uses valid `OOMPolicy=kill` instead of the previously ignored `OOMPolicy=restart`.
+- README troubleshooting now includes a direct incident workflow for PWM/state divergence and undervoltage checks.
+
+---
+
 ## [6.25.3] - 2026-03-02
 
 ### Added

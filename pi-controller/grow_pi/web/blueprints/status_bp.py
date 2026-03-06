@@ -17,6 +17,11 @@ import time
 
 logger = logging.getLogger(__name__)
 
+try:
+    from ...utils.power_monitor import read_power_status
+except ImportError:
+    from grow_pi.utils.power_monitor import read_power_status
+
 # Create blueprint
 status_bp = Blueprint('status', __name__)
 
@@ -110,7 +115,7 @@ def get_system_metrics() -> Dict:
     Collect system health metrics with caching.
 
     Returns:
-        Dictionary with CPU temp, load, memory, disk, and uptime
+        Dictionary with CPU temp, load, memory, disk, uptime, and power state
     """
     global _system_metrics_cache, _cache_timestamp
 
@@ -126,6 +131,7 @@ def get_system_metrics() -> Dict:
     disk = psutil.disk_usage('/')
     boot_time = psutil.boot_time()
     uptime_seconds = int(current_time - boot_time)
+    power = read_power_status()
 
     metrics = {
         "cpu_temp": round(cpu_temp, 1) if cpu_temp else None,
@@ -135,7 +141,8 @@ def get_system_metrics() -> Dict:
         "memory_status": get_status_from_value(memory.percent, MEMORY_NORMAL, MEMORY_WARNING, MEMORY_CRITICAL),
         "disk_percent": round(disk.percent, 1),
         "disk_status": get_status_from_value(disk.percent, DISK_NORMAL, DISK_WARNING, DISK_CRITICAL),
-        "uptime_seconds": uptime_seconds
+        "uptime_seconds": uptime_seconds,
+        "power": power,
     }
 
     # Update cache
@@ -325,11 +332,23 @@ def health_check():
 
         # Determine overall status based on system health
         overall_status = "healthy"
-        if system_metrics.get("cpu_temp_status") == "critical" or \
+        power_status = system_metrics.get("power", {})
+        power_critical = any(
+            power_status.get(key, False)
+            for key in ("under_voltage_now", "arm_frequency_capped_now", "currently_throttled")
+        )
+        power_warning = any(
+            power_status.get(key, False)
+            for key in ("under_voltage_occurred", "arm_frequency_capped_occurred", "throttling_occurred")
+        )
+
+        if power_critical or \
+           system_metrics.get("cpu_temp_status") == "critical" or \
            system_metrics.get("memory_status") == "critical" or \
            system_metrics.get("disk_status") == "critical":
             overall_status = "critical"
-        elif system_metrics.get("cpu_temp_status") == "warning" or \
+        elif power_warning or \
+             system_metrics.get("cpu_temp_status") == "warning" or \
              system_metrics.get("memory_status") == "warning" or \
              system_metrics.get("disk_status") == "warning":
             overall_status = "warning"

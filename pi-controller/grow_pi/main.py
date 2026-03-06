@@ -500,20 +500,35 @@ class GrowPiController:
                 logger.warning(f"Failed to refresh curves from database: {e}")
 
             intensities = self.curve_controller.get_current_intensities(now)
+            actual_state = self.pwm_controller.get_current_state()
 
             for channel, intensity in intensities.items():
                 last = self.last_intensities.get(channel, -1)
-                if intensity != last:
-                    applied = self.pwm_controller.set_intensity(channel, intensity)
-                    if applied:
+                actual = actual_state.get(channel, -1)
+
+                if intensity == actual:
+                    if last != intensity:
                         self.last_intensities[channel] = intensity
-                        changed = True
-                    else:
-                        logger.warning(
-                            "Failed to apply curve intensity for channel %s: target=%s%%",
-                            channel,
-                            intensity,
-                        )
+                    continue
+
+                if intensity == last and actual != intensity:
+                    logger.warning(
+                        "Detected PWM drift on channel %s: actual=%s%% target=%s%% - reapplying",
+                        channel,
+                        actual,
+                        intensity,
+                    )
+
+                applied = self.pwm_controller.set_intensity(channel, intensity)
+                if applied:
+                    self.last_intensities[channel] = intensity
+                    changed = True
+                else:
+                    logger.warning(
+                        "Failed to apply curve intensity for channel %s: target=%s%%",
+                        channel,
+                        intensity,
+                    )
 
             if changed:
                 state_str = ", ".join(

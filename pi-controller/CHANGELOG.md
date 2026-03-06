@@ -4,6 +4,31 @@ Alle wichtigen Änderungen am GrowPi Pi-Controller werden hier dokumentiert.
 
 ## [v6.25.3] - 2026-03-02 - Public Release Hardening & License Update
 
+## [v6.25.4] - 2026-03-06 - Boot Safety & Power Diagnostics
+
+### Fixed
+- **Split-Process Cold-Boot Regression**
+  - `grow_pi/web/api.py` und `grow_pi/web/app.py` attachen den PWM-Controller jetzt ohne Zero-Init
+  - Verhindert, dass `growpi-web` die vom Controller gesetzten Kurvenwerte beim Boot wieder auf 0 setzt
+- **PWM Drift Recovery**
+  - `grow_pi/main.py` vergleicht Sollwerte jetzt zusätzlich mit dem echten pigpio-Hardwarezustand
+  - Bei Abweichungen werden Kurvenwerte erneut auf die GPIOs geschrieben
+
+### Added
+- **Raspberry Pi Power Diagnostics**
+  - Neues Modul `grow_pi/utils/power_monitor.py`
+  - `/api/health` enthält jetzt `system.power` mit `vcgencmd get_throttled` Flags
+- **Persistent Journald Setup**
+  - Neue Drop-In-Datei: `systemd/99-growpi-journald.conf`
+  - `install.sh` aktiviert persistente Journale und flush't nach der Installation
+
+### Changed
+- `systemd/grow-pi.service` und `systemd/growpi-web.service` verwenden jetzt gültiges `OOMPolicy=kill`
+
+### Validation
+- Fokus-Tests für PWM-Attach, Curve-Reconcile und Power-Parsing ergänzt
+- Live-Incident-Quick-Fix am Produktions-Pi durchgeführt: Lampenstatus wieder mit Kurvensollwert synchronisiert
+
 ### Security
 - **Hardcoded credential fallback entfernt**
   - `grow_pi/utils/tuya_cloud.py` nutzt keine eingebauten Tuya-Cloud-Credentials mehr

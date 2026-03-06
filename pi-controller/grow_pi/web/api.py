@@ -202,18 +202,23 @@ try:
             from grow_pi.config import load_config
         config = load_config()
 
-        # Check for warm restart state - don't reset PWM to 0 if state exists
-        skip_zero = False
+        # The web process is a secondary runtime in split-process mode.
+        # It must never zero live PWM outputs during startup.
+        skip_zero = True
+        warm_restart = False
         try:
             try:
                 from ..utils.pwm_state import state_exists
             except ImportError:
                 from grow_pi.utils.pwm_state import state_exists
-            skip_zero = state_exists()
-            if skip_zero:
-                logger.info("Warm restart detected - preserving PWM values")
+            warm_restart = state_exists()
         except ImportError:
             pass
+
+        if warm_restart:
+            logger.info("Warm restart detected - preserving PWM values")
+        else:
+            logger.info("Web runtime startup - attaching to existing PWM state without zero-init")
 
         pwm_controller.initialize(config.lamps.channels, skip_zero_init=skip_zero)
     logger.info("PWM Controller initialized successfully")

@@ -47,7 +47,7 @@ TimeoutStartSec=120
 TimeoutStopSec=30
 KillMode=mixed
 KillSignal=SIGTERM
-OOMPolicy=restart
+OOMPolicy=kill
 
 # Security hardening
 NoNewPrivileges=true
