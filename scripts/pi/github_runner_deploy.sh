@@ -34,12 +34,29 @@ fi
 log "Sync ${SOURCE_DIR} -> ${TARGET_DIR}"
 sudo mkdir -p "${TARGET_DIR}"
 sudo rsync -a --delete \
+  --exclude '.env' \
+  --exclude '.env.*' \
+  --exclude 'data/' \
+  --exclude 'logs/' \
   --exclude 'venv/' \
+  --exclude 'config/config.yaml' \
+  --exclude 'config/devices.json' \
+  --exclude 'config/room_config.json' \
+  --exclude '*.backup' \
+  --exclude '*.backup_*' \
+  --exclude 'grow_pi.backup*/' \
   --exclude '__pycache__/' \
   --exclude '.pytest_cache/' \
   --exclude '*.pyc' \
   --exclude '.coverage' \
   "${SOURCE_DIR}/" "${TARGET_DIR}/"
+
+log "Install Python dependencies"
+if [[ ! -x "${TARGET_DIR}/venv/bin/python" ]]; then
+  sudo python3 -m venv "${TARGET_DIR}/venv"
+fi
+sudo "${TARGET_DIR}/venv/bin/python" -m pip install --upgrade pip
+sudo "${TARGET_DIR}/venv/bin/python" -m pip install -r "${TARGET_DIR}/requirements.txt"
 
 log "Restart systemd services: ${SERVICE_CONTROLLER}, ${SERVICE_WEB}"
 sudo systemctl restart "${SERVICE_CONTROLLER}" "${SERVICE_WEB}"

@@ -167,13 +167,15 @@ try:
     from .blueprints.logs_bp import logs_bp, init_logs_bp
     from .blueprints.calendar_bp import calendar_bp
     from .blueprints.status_bp import status_bp
+    from .blueprints.health_bp import health_bp
     app.register_blueprint(costs_bp)
     app.register_blueprint(dehumidifier_bp)
     app.register_blueprint(curves_bp)
     app.register_blueprint(logs_bp)
     app.register_blueprint(calendar_bp)
     app.register_blueprint(status_bp, url_prefix='/api')
-    logging.info("Registered costs_bp, dehumidifier_bp, curves_bp, logs_bp, calendar_bp, and status_bp blueprints")
+    app.register_blueprint(health_bp)
+    logging.info("Registered costs_bp, dehumidifier_bp, curves_bp, logs_bp, calendar_bp, status_bp, and health_bp blueprints")
 except ImportError as e:
     logging.warning(f"Could not import blueprints: {e}")
 

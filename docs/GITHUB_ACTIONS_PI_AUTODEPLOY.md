@@ -20,11 +20,20 @@ Der Runner baut nur **ausgehende HTTPS-Verbindungen** zu GitHub auf (Polling/Job
 - Deploy-Skript: `scripts/pi/github_runner_deploy.sh`
 - Runner-Setup-Skript: `scripts/pi/install_github_runner.sh`
 
-## Deployment-Ablauf pro Push
+## Deployment-Ablauf
+
+Automatisch deployt wird nur `main`. Andere Branches können über Pull Request
+validiert und nach Merge deployt werden. Zusätzlich kann der Workflow manuell
+über `workflow_dispatch` gestartet werden.
+
 1. Workflow startet auf Runner-Label `growpi`.
 2. `pi-controller/` wird nach `/opt/grow-pi` synchronisiert.
-3. `grow-pi` und `growpi-web` werden via systemd neu gestartet.
-4. Verifikation:
+3. Runtime-lokale Dateien bleiben erhalten (`.env`, `config/config.yaml`,
+   lokale JSON-Config, Logs, Daten, Backups, `venv`).
+4. Python-Abhängigkeiten werden aus `requirements.txt` im Ziel-`venv`
+   installiert.
+5. `grow-pi` und `growpi-web` werden via systemd neu gestartet.
+6. Verifikation:
    - Services sind `active`
    - `/api/version` antwortet
    - API-Version entspricht `/opt/grow-pi/VERSION`
@@ -58,6 +67,8 @@ REPO_SLUG=cubetribe/growpi RUNNER_NAME=growpi-01 RUNNER_LABELS=growpi,prod ./scr
 
 ## Manuelle Auslösung
 Workflow kann jederzeit über `workflow_dispatch` in GitHub manuell gestartet werden.
+Bei einem bekannten Hardwarefehler sollte der manuelle Deploy erst nach Prüfung
+von `/api/health` gestartet werden.
 
 ## Troubleshooting
 - Runner-Status auf Pi:

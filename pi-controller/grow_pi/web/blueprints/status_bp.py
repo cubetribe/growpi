@@ -152,6 +152,87 @@ def get_system_metrics() -> Dict:
     return metrics
 
 
+def _append_issue(issues: List[str], issue: str) -> None:
+    """Append a health issue once while keeping insertion order."""
+    if issue not in issues:
+        issues.append(issue)
+
+
+def evaluate_health_status(system_metrics: Dict, circuit_breaker_info: Dict) -> Tuple[str, List[str]]:
+    """
+    Determine overall health status from system and sensor circuit breaker data.
+
+    Returns:
+        Tuple of overall status and explicit issue names.
+    """
+    issues: List[str] = []
+    status_rank = 0
+
+    def mark_warning(issue: str) -> None:
+        nonlocal status_rank
+        status_rank = max(status_rank, 1)
+        _append_issue(issues, issue)
+
+    def mark_critical(issue: str) -> None:
+        nonlocal status_rank
+        status_rank = max(status_rank, 2)
+        _append_issue(issues, issue)
+
+    power_status = system_metrics.get("power", {}) or {}
+    if power_status.get("error") and power_status.get("healthy") is False:
+        mark_warning("power.read_failed")
+
+    current_power_flags = (
+        "under_voltage_now",
+        "arm_frequency_capped_now",
+        "currently_throttled",
+        "soft_temperature_limit_now",
+    )
+    historical_power_flags = (
+        "under_voltage_occurred",
+        "arm_frequency_capped_occurred",
+        "throttling_occurred",
+        "soft_temperature_limit_occurred",
+    )
+
+    for issue in power_status.get("issues_now", []) or []:
+        mark_critical(f"power.{issue}")
+    for flag in current_power_flags:
+        if power_status.get(flag, False):
+            mark_critical(f"power.{flag}")
+
+    for issue in power_status.get("issues_occurred", []) or []:
+        mark_warning(f"power.{issue}")
+    for flag in historical_power_flags:
+        if power_status.get(flag, False):
+            mark_warning(f"power.{flag}")
+
+    metric_statuses = {
+        "cpu_temp": system_metrics.get("cpu_temp_status"),
+        "memory": system_metrics.get("memory_status"),
+        "disk": system_metrics.get("disk_status"),
+    }
+    for metric, metric_status in metric_statuses.items():
+        if metric_status == "critical":
+            mark_critical(f"system.{metric}.critical")
+        elif metric_status == "warning":
+            mark_warning(f"system.{metric}.warning")
+
+    breaker_state = str(circuit_breaker_info.get("state", "")).lower()
+    if breaker_state == "open":
+        mark_critical("sensor.circuit_breaker.open")
+    elif breaker_state in {"half-open", "half_open", "halfopen"}:
+        mark_warning("sensor.circuit_breaker.half_open")
+    elif breaker_state == "unknown" or circuit_breaker_info.get("error"):
+        mark_warning("sensor.circuit_breaker.unknown")
+
+    if status_rank >= 2:
+        return "critical", issues
+    if status_rank == 1:
+        return "warning", issues
+    return "healthy", issues
+
+
 # ============================================================================
 # API Routes
 # ============================================================================
@@ -330,31 +411,11 @@ def health_check():
             logger.warning(f"Could not get circuit breaker status: {cb_err}")
             circuit_breaker_info = {"state": "unknown", "error": str(cb_err)}
 
-        # Determine overall status based on system health
-        overall_status = "healthy"
-        power_status = system_metrics.get("power", {})
-        power_critical = any(
-            power_status.get(key, False)
-            for key in ("under_voltage_now", "arm_frequency_capped_now", "currently_throttled")
-        )
-        power_warning = any(
-            power_status.get(key, False)
-            for key in ("under_voltage_occurred", "arm_frequency_capped_occurred", "throttling_occurred")
-        )
-
-        if power_critical or \
-           system_metrics.get("cpu_temp_status") == "critical" or \
-           system_metrics.get("memory_status") == "critical" or \
-           system_metrics.get("disk_status") == "critical":
-            overall_status = "critical"
-        elif power_warning or \
-             system_metrics.get("cpu_temp_status") == "warning" or \
-             system_metrics.get("memory_status") == "warning" or \
-             system_metrics.get("disk_status") == "warning":
-            overall_status = "warning"
+        overall_status, health_issues = evaluate_health_status(system_metrics, circuit_breaker_info)
 
         return jsonify({
             "status": overall_status,
+            "issues": health_issues,
             "version": get_api_version(),
             "pwm_available": pwm_controller is not None,
             "sensor_available": dht_sensor is not None or not is_dht_available(),

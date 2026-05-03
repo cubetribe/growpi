@@ -58,6 +58,16 @@ Open UI/API:
 http://localhost:5000
 ```
 
+On macOS, port `5000` may already be owned by AirPlay Receiver
+(`ControlCenter` / AirTunes). If `http://127.0.0.1:5000/api/health/`
+returns `403 Forbidden` with `Server: AirTunes`, that is the Mac, not
+GrowPi. For local simulation use another port, for example:
+
+```bash
+cd pi-controller
+python test_environment/run_local.py --host 127.0.0.1 --port 8000
+```
+
 ---
 
 ## Raspberry Pi Deployment
@@ -80,6 +90,7 @@ curl -fsS http://127.0.0.1:5000/api/health/
 
 Detailed deployment and operations guide:
 - [docs/DEPLOYMENT_GUIDE.md](docs/DEPLOYMENT_GUIDE.md)
+- [docs/PI_OPERATIONS_RUNBOOK.md](docs/PI_OPERATIONS_RUNBOOK.md)
 
 ## Troubleshooting
 
@@ -100,6 +111,16 @@ vcgencmd get_throttled
 ```
 
 If `vcgencmd` reports undervoltage or throttling, treat that as a hardware incident first: PSU, cable, USB load, and hub power budget.
+
+If the app cannot connect at all, run the read-only LAN diagnosis from this
+workspace:
+
+```bash
+./scripts/pi/diagnose_local_pi.sh --scan
+```
+
+For the current Raspberry Pi operations checklist, hardware fault boundary, and
+stabilization plan, see [docs/PI_OPERATIONS_RUNBOOK.md](docs/PI_OPERATIONS_RUNBOOK.md).
 
 ---
 

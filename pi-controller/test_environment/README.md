@@ -38,6 +38,13 @@ python run_local.py
 
 Der Server startet auf `http://localhost:5000` im **SIMULATION MODE**.
 
+Hinweis fuer macOS: Port `5000` kann durch AirPlay Receiver belegt sein und
+dann `403 Forbidden` mit `Server: AirTunes` liefern. In diesem Fall:
+
+```bash
+python run_local.py --host 127.0.0.1 --port 8000
+```
+
 ### 3. API testen
 ```bash
 # System-Status abrufen
