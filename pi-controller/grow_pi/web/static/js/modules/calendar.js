@@ -29,6 +29,7 @@ const eventsSection = document.getElementById('eventsSection');
 const eventsPhaseLabel = document.getElementById('eventsPhaseLabel');
 const eventsList = document.getElementById('eventsList');
 const btnAddEvent = document.getElementById('btnAddEvent');
+const eventsCategoryFilters = document.getElementById('eventsCategoryFilters');
 
 // Status Dashboard elements
 const statusPhaseIcon = document.getElementById('statusPhaseIcon');
@@ -37,6 +38,13 @@ const statusPhaseDay = document.getElementById('statusPhaseDay');
 const statusGrowStart = document.getElementById('statusGrowStart');
 const statusPhaseStart = document.getElementById('statusPhaseStart');
 const btnEditGrowSettings = document.getElementById('btnEditGrowSettings');
+
+// Actionable Grow Tip Banner elements
+const growTipBanner = document.getElementById('growTipBanner');
+const growTipIcon = document.getElementById('growTipIcon');
+const growTipTitle = document.getElementById('growTipTitle');
+const growTipDesc = document.getElementById('growTipDesc');
+const growTipEnv = document.getElementById('growTipEnv');
 
 // Modal elements
 const dailyLogModal = document.getElementById('dailyLogModal');
@@ -88,6 +96,8 @@ let monthEvents = [];
 let selectedDate = null;
 let selectedDateEvents = []; // Events for the selected date
 let currentPhaseEvents = []; // Events for current phase (for events section)
+let selectedCategory = 'all'; // Current category filter
+let todayTipsData = null; // Loaded today tips
 
 // Phase translations
 const PHASE_LABELS = {
@@ -187,6 +197,16 @@ function setupEventListeners() {
         if (e.target === growSettingsModal) closeGrowSettingsModal();
     });
 
+    // Category filters
+    document.querySelectorAll('.cat-filter-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+            document.querySelectorAll('.cat-filter-btn').forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+            selectedCategory = btn.dataset.cat || 'all';
+            renderEventsList();
+        });
+    });
+
     // Add Event Modal
     btnAddEvent?.addEventListener('click', openAddEventModal);
     addEventModalClose?.addEventListener('click', closeAddEventModal);
@@ -208,6 +228,7 @@ async function loadGrows() {
             currentGrow = data.grows[0]; // Use first active grow
             updateGrowDisplay();
             await loadPhaseEvents(); // Load events for current phase
+            await loadTodayTips(); // Load actionable cultivation tips
             renderCalendar();
         } else {
             // No active grow found
@@ -215,6 +236,7 @@ async function loadGrows() {
             currentPhaseInfo.textContent = 'Starte einen neuen Grow';
             calendarGrid.innerHTML = '<div class="calendar-empty">Bitte starte einen neuen Grow</div>';
             eventsList.innerHTML = '<div class="events-empty">Kein aktiver Grow</div>';
+            growTipBanner?.classList.add('hidden');
         }
     } catch (error) {
         console.error('[Calendar] Failed to load grows:', error);
@@ -304,14 +326,61 @@ function updateGrowDisplay() {
         phaseButtonBloom?.classList.add('active');
     }
 
-    // Update Status Dashboard
+    // Update Status Dashboard & Tips
     updateStatusDashboard();
+    loadTodayTips();
+}
+
+async function loadTodayTips() {
+    if (!currentGrow || !growTipBanner) return;
+
+    try {
+        const data = await GrowPiAPI.getTodayTips();
+        if (data.success && data.active_grow) {
+            todayTipsData = data;
+            growTipBanner.classList.remove('hidden');
+
+            const activeTips = data.active_tips || [];
+            if (activeTips.length > 0) {
+                const primary = activeTips[0];
+                if (growTipIcon) growTipIcon.textContent = primary.icon || '💡';
+                const dayRange = primary.day_offset_max ? `Tag ${primary.day_offset_min}–${primary.day_offset_max}` : `Tag ${primary.day_offset_min}`;
+                if (growTipTitle) growTipTitle.textContent = `${primary.title} (${dayRange})`;
+                if (growTipDesc) growTipDesc.textContent = primary.description || '';
+            } else {
+                if (growTipIcon) growTipIcon.textContent = '💡';
+                if (growTipTitle) growTipTitle.textContent = `Tipp für ${PHASE_LABELS[data.active_grow.current_phase]?.de || 'Phase'} (Tag ${data.active_grow.phase_day})`;
+                if (growTipDesc) growTipDesc.textContent = data.primary_tip || 'Klima und Pflanzengesundheit regelmäßig prüfen.';
+            }
+
+            if (growTipEnv) {
+                if (data.target_env) {
+                    try {
+                        const envObj = typeof data.target_env === 'string' ? JSON.parse(data.target_env) : data.target_env;
+                        const tempText = envObj.temp ? `🌡️ ${envObj.temp.min}–${envObj.temp.max}°C` : '';
+                        const rhText = envObj.rh ? `💧 ${envObj.rh.min}–${envObj.rh.max}% rLF` : '';
+                        growTipEnv.innerHTML = `<span>${tempText}</span> <span>${rhText}</span>`;
+                    } catch {
+                        growTipEnv.innerHTML = '';
+                    }
+                } else {
+                    growTipEnv.innerHTML = '';
+                }
+            }
+        } else {
+            growTipBanner.classList.add('hidden');
+        }
+    } catch (e) {
+        console.warn('[Calendar] Failed to load today tips:', e);
+        growTipBanner?.classList.add('hidden');
+    }
 }
 
 function updateStatusDashboard() {
     if (!currentGrow) {
         // Hide dashboard when no grow
         document.getElementById('growStatusDashboard')?.classList.add('hidden');
+        growTipBanner?.classList.add('hidden');
         return;
     }
 
@@ -525,7 +594,7 @@ async function loadEventsForDate(dateStr) {
 
 function updateModalEvents() {
     const modalEventsContainer = document.getElementById('modalEvents');
-    const eventsListContainer = document.getElementById('eventsList');
+    const eventsListContainer = document.getElementById('modalEventsList');
 
     if (!modalEventsContainer || !eventsListContainer) return;
 
@@ -536,7 +605,15 @@ function updateModalEvents() {
 
     modalEventsContainer.style.display = 'block';
     eventsListContainer.innerHTML = selectedDateEvents
-        .map(event => renderEventBadge(event))
+        .map(event => `
+            <div class="modal-event-item">
+                <span class="modal-event-icon">${event.icon || '📌'}</span>
+                <div>
+                    <strong>${event.title}:</strong>
+                    <span>${event.description || ''}</span>
+                </div>
+            </div>
+        `)
         .join('');
 }
 
@@ -783,14 +860,45 @@ function renderEventsList() {
         return;
     }
 
-    const html = currentPhaseEvents.map(event => {
+    const filtered = selectedCategory === 'all'
+        ? currentPhaseEvents
+        : currentPhaseEvents.filter(e => e.category === selectedCategory);
+
+    if (filtered.length === 0) {
+        eventsList.innerHTML = `<div class="events-empty">Keine Meilensteine in dieser Kategorie</div>`;
+        return;
+    }
+
+    const catLabels = {
+        training: '✂️ Training & Entlaubung',
+        environment: '🌡️ Klima & Licht',
+        nutrients: '🧪 Düngung & Spülen',
+        observation: '🔬 Beobachtung',
+        harvest: '🌾 Ernte'
+    };
+
+    const html = filtered.map(event => {
         const dayRange = event.day_offset_max
-            ? `Tag ${event.day_offset_min}-${event.day_offset_max}`
+            ? `Tag ${event.day_offset_min}–${event.day_offset_max}`
             : `Tag ${event.day_offset_min}`;
 
         const isSystem = event.is_system;
         const isEnabled = event.is_enabled;
         const categoryClass = event.category || 'observation';
+        const catLabel = catLabels[categoryClass] || categoryClass;
+
+        // Parse climate targets if present
+        let envHtml = '';
+        if (event.env_params) {
+            try {
+                const env = typeof event.env_params === 'string' ? JSON.parse(event.env_params) : event.env_params;
+                const tempStr = env.temp ? `${env.temp.min}–${env.temp.max}°C` : '';
+                const rhStr = env.rh ? `${env.rh.min}–${env.rh.max}% rLF` : '';
+                if (tempStr || rhStr) {
+                    envHtml = `<span class="event-env-badge" title="Empfohlene Ziel-Klimawerte">🌡️ ${tempStr} | 💧 ${rhStr}</span>`;
+                }
+            } catch {}
+        }
 
         return `
             <div class="event-item ${categoryClass} ${isEnabled ? '' : 'disabled'}" data-id="${event.id}">
@@ -806,6 +914,8 @@ function renderEventsList() {
                         <span class="event-icon">${event.icon || '📅'}</span>
                         <span class="event-title">${event.title}</span>
                         <span class="event-day-badge">${dayRange}</span>
+                        <span class="event-cat-badge ${categoryClass}">${catLabel}</span>
+                        ${envHtml}
                     </div>
                     ${event.description ? `<div class="event-description">${event.description}</div>` : ''}
                 </div>

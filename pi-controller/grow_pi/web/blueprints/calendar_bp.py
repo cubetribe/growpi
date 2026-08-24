@@ -1315,3 +1315,118 @@ def delete_milestone(milestone_id: str):
     except Exception as e:
         logger.error(f"Error in delete_milestone: {e}")
         return jsonify(create_response(False, error=str(e))), 500
+
+
+@calendar_bp.route('/api/calendar/tips/today', methods=['GET'])
+def get_today_tips():
+    """
+    Get context-aware cultivation guidance, active milestones, and environmental
+    targets for the currently active grow cycle.
+    """
+    try:
+        db = get_db_connection()
+        if not db:
+            return jsonify(create_response(False, error="Database not available")), 500
+
+        with db.get_connection() as conn:
+            cursor = conn.cursor()
+
+            # Find active grow
+            cursor.execute("""
+                SELECT id, name, strain, start_date, current_phase, phase_started_at
+                FROM grows
+                WHERE is_active = 1
+                ORDER BY start_date DESC
+                LIMIT 1
+            """)
+            grow_row = cursor.fetchone()
+            if not grow_row:
+                return jsonify(create_response(True, {
+                    'active_grow': None,
+                    'tips': [],
+                    'message': 'No active grow cycle found'
+                }))
+
+            grow_id, name, strain, start_date, current_phase, phase_started_at = grow_row
+
+            # Calculate phase day and total grow day
+            now_date = datetime.now().date()
+            phase_start = datetime.fromisoformat(phase_started_at).date()
+            start_dt = datetime.strptime(start_date, '%Y-%m-%d').date()
+
+            phase_day = max(1, (now_date - phase_start).days + 1)
+            total_days = max(1, (now_date - start_dt).days + 1)
+
+            # Query all enabled milestones for current phase
+            cursor.execute("""
+                SELECT id, day_offset_min, day_offset_max, title, title_en,
+                       description, icon, category, env_params
+                FROM phase_milestones
+                WHERE phase = ? AND is_enabled = 1
+                ORDER BY day_offset_min ASC
+            """, (current_phase,))
+
+            rows = cursor.fetchall()
+            active_tips = []
+            upcoming_tips = []
+            target_env = None
+
+            for r in rows:
+                ms_id, d_min, d_max, title, title_en, desc, icon, cat, env_p = r
+                d_max_val = d_max if d_max is not None else d_min
+
+                item = {
+                    'id': ms_id,
+                    'day_offset_min': d_min,
+                    'day_offset_max': d_max,
+                    'title': title,
+                    'title_en': title_en,
+                    'description': desc,
+                    'icon': icon,
+                    'category': cat,
+                    'env_params': env_p
+                }
+
+                # Is it active today?
+                if d_min <= phase_day <= d_max_val:
+                    active_tips.append(item)
+                    if env_p and not target_env:
+                        target_env = env_p
+                # Is it upcoming in next 7 days?
+                elif phase_day < d_min <= (phase_day + 7):
+                    upcoming_tips.append(item)
+
+            # Highlight tip summary
+            primary_tip = None
+            if active_tips:
+                primary_tip = f"{active_tips[0]['icon']} {active_tips[0]['title']}: {active_tips[0]['description']}"
+            elif current_phase == 'flowering':
+                primary_tip = f"🌸 Blütetag {phase_day}: Auf gleichmäßige Beleuchtung, 40-50% rLF und stabile Blütendüngung achten."
+            elif current_phase == 'vegetative':
+                primary_tip = f"🌿 Wachstumstag {phase_day}: Gleichmäßiges Blätterdach formen, LST/Topping und Wachstumsklima (22-26°C, 55-65% rLF) einhalten."
+            elif current_phase == 'seedling':
+                primary_tip = f"🌱 Keimlingstag {phase_day}: Mäßig gießen, 21-25°C und 65-75% rLF halten."
+            elif current_phase == 'drying':
+                primary_tip = f"🌾 Trocknungstag {phase_day}: 16-20°C, 55-60% rLF und absolute Dunkelheit mit sanfter Umluft einhalten."
+            else:
+                primary_tip = f"🏺 Curingtag {phase_day}: Gläser regelmäßig lüften und Feuchtigkeit bei 58-62% rLF stabilisieren."
+
+            return jsonify(create_response(True, {
+                'active_grow': {
+                    'id': grow_id,
+                    'name': name,
+                    'strain': strain,
+                    'start_date': start_date,
+                    'current_phase': current_phase,
+                    'phase_day': phase_day,
+                    'total_days': total_days
+                },
+                'primary_tip': primary_tip,
+                'active_tips': active_tips,
+                'upcoming_tips': upcoming_tips,
+                'target_env': target_env
+            }))
+
+    except Exception as e:
+        logger.error(f"Error in get_today_tips: {e}")
+        return jsonify(create_response(False, error=str(e))), 500

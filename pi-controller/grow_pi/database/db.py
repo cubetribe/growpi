@@ -368,6 +368,9 @@ class Database:
             with self._cursor() as cursor:
                 cursor.executescript(SCHEMA_SQL)
 
+            self.initialize_default_milestones()
+            self.initialize_default_presets()
+
             self._initialized = True
             logger.info("Database initialized successfully")
 
@@ -1746,11 +1749,350 @@ class Database:
                 curves_json=preset_data["curves_json"],
                 is_system=preset_data["is_system"]
             )
-            result = self.insert_curve_preset(preset)
-            if result:
-                logger.info(f"Created system preset: {preset.name}")
-            else:
-                logger.warning(f"Failed to create system preset: {preset.name}")
+    def initialize_default_milestones(self) -> None:
+        """
+        Initialize standard cultivation milestones and grower recommendations.
+        Uses INSERT OR IGNORE to avoid duplicate key errors.
+        """
+        default_milestones = [
+            # Seedling (Tag 1-14)
+            {
+                "id": "ms-seed-001",
+                "phase": "seedling",
+                "day_min": 1,
+                "day_max": 3,
+                "title": "Keimung & Wurzelansatz",
+                "title_en": "Germination & Taproot",
+                "description": "Samen warm (22-25°C) und dunkel halten. Hohe Luftfeuchtigkeit (70-80% RH). Substrat nur feucht, nie nass halten.",
+                "icon": "🌱",
+                "category": "observation",
+                "env": '{"temp":{"min":22,"max":25},"rh":{"min":70,"max":80}}'
+            },
+            {
+                "id": "ms-seed-002",
+                "phase": "seedling",
+                "day_min": 3,
+                "day_max": 5,
+                "title": "Keimblätter entfalten",
+                "title_en": "Cotyledons Open",
+                "description": "Erste runde Keimblätter entfalten sich. Sanftes Licht (PPFD 100-150, DLI 10-12). Lampenabstand prüfen, um Spargeln zu verhindern.",
+                "icon": "🌿",
+                "category": "observation",
+                "env": '{"temp":{"min":22,"max":25},"rh":{"min":70,"max":80}}'
+            },
+            {
+                "id": "ms-seed-003",
+                "phase": "seedling",
+                "day_min": 5,
+                "day_max": 7,
+                "title": "Erstes echtes Blattpaar",
+                "title_en": "First True Leaves",
+                "description": "Die ersten typisch gezackten Blätter erscheinen. Photosynthese nimmt Fahrt auf. Vorsichtig gießen, Staunässe vermeiden.",
+                "icon": "🍃",
+                "category": "observation",
+                "env": '{"temp":{"min":22,"max":25},"rh":{"min":65,"max":75}}'
+            },
+            {
+                "id": "ms-seed-004",
+                "phase": "seedling",
+                "day_min": 7,
+                "day_max": 10,
+                "title": "Anzuchthaube lüften / entfernen",
+                "title_en": "Remove Humidity Dome",
+                "description": "Pflanzen schrittweise an trockenere Raumluft gewöhnen. Leichte, indirekte Umluft zuschalten zur Stammkräftigung.",
+                "icon": "💨",
+                "category": "environment",
+                "env": '{"temp":{"min":21,"max":25},"rh":{"min":60,"max":70}}'
+            },
+            {
+                "id": "ms-seed-005",
+                "phase": "seedling",
+                "day_min": 10,
+                "day_max": 14,
+                "title": "Erster Topfwechsel (Umtopfen)",
+                "title_en": "First Transplant Window",
+                "description": "Wenn Wurzeln den Anzuchttopf durchdrungen haben, in 1-3L Zwischentopf mit leicht gedüngter Erde umsetzen. Wurzelstimulator beigeben.",
+                "icon": "🪴",
+                "category": "training",
+                "env": '{"temp":{"min":21,"max":26},"rh":{"min":60,"max":70}}'
+            },
+
+            # Vegetative Phase (Tag 1-35+)
+            {
+                "id": "ms-veg-001",
+                "phase": "vegetative",
+                "day_min": 1,
+                "day_max": 7,
+                "title": "Wachstums-Düngung starten",
+                "title_en": "Start Vegetative Feeding",
+                "description": "Mit 25-50% des Herstellerschemas starten (viel Stickstoff/N für Blattmasse). pH-Wert einstellen: 6.2-6.5 (Erde) / 5.8 (Coco/Hydro).",
+                "icon": "🧪",
+                "category": "nutrients",
+                "env": '{"temp":{"min":22,"max":27},"rh":{"min":55,"max":65}}'
+            },
+            {
+                "id": "ms-veg-002",
+                "phase": "vegetative",
+                "day_min": 7,
+                "day_max": 14,
+                "title": "Erstes Topping (Kappen)",
+                "title_en": "First Topping",
+                "description": "Ab der 3. bis 5. Nodie den Haupttrieb mit steriler Klinge kappen. Fördert zwei dominante Haupttriebe und buschigen Wuchs.",
+                "icon": "✂️",
+                "category": "training",
+                "env": '{"temp":{"min":22,"max":27},"rh":{"min":55,"max":65}}'
+            },
+            {
+                "id": "ms-veg-003",
+                "phase": "vegetative",
+                "day_min": 10,
+                "day_max": 21,
+                "title": "LST (Low Stress Training)",
+                "title_en": "Low Stress Training",
+                "description": "Triebe mit weichem Pflanzendraht vorsichtig nach außen biegen. Ziel: Ein flaches, gleichmäßiges Blätterdach für optimale Lichtausbeute.",
+                "icon": "🔗",
+                "category": "training",
+                "env": '{"temp":{"min":22,"max":27},"rh":{"min":55,"max":65}}'
+            },
+            {
+                "id": "ms-veg-004",
+                "phase": "vegetative",
+                "day_min": 14,
+                "day_max": 28,
+                "title": "SCROG-Netz installieren",
+                "title_en": "Install SCROG Net",
+                "description": "Screen of Green Netz 20-30cm über Topfrand spannen. Wachsende Triebe täglich sanft unter das Netz flechten.",
+                "icon": "🕸️",
+                "category": "training",
+                "env": '{"temp":{"min":22,"max":27},"rh":{"min":50,"max":60}}'
+            },
+            {
+                "id": "ms-veg-005",
+                "phase": "vegetative",
+                "day_min": 21,
+                "day_max": 30,
+                "title": "Finales Umtopfen in Endtopf",
+                "title_en": "Final Transplant",
+                "description": "In den finalen Topf (11-20L) umpflanzen. Vor der Blüteumstellung mindestens 7-10 Tage einwurzeln und erholen lassen.",
+                "icon": "🪴",
+                "category": "training",
+                "env": '{"temp":{"min":22,"max":27},"rh":{"min":50,"max":60}}'
+            },
+            {
+                "id": "ms-veg-006",
+                "phase": "vegetative",
+                "day_min": -7,
+                "day_max": -3,
+                "title": "Vorblüte-Entlaubung & Lollipopping",
+                "title_en": "Pre-Flip Defoliation & Lollipopping",
+                "description": "KRITISCH VOR DEM FLIP: Unteres Drittel der Pflanze kahl machen (schwache Popcorn-Triebe entfernen) und große, lichtabdeckende Fächerblätter wegschneiden.",
+                "icon": "🍂",
+                "category": "training",
+                "env": '{"temp":{"min":22,"max":26},"rh":{"min":50,"max":60}}'
+            },
+            {
+                "id": "ms-veg-007",
+                "phase": "vegetative",
+                "day_min": -1,
+                "day_max": -1,
+                "title": "Pre-Flip Vorbereitung",
+                "title_en": "Pre-Flip Checklist",
+                "description": "Zelt sauber auswischen, Licht-Timer auf 12/12 vorbereiten, Pflanze gut wässern und für die Umstellung bereitmachen.",
+                "icon": "💡",
+                "category": "environment",
+                "env": '{"temp":{"min":21,"max":26},"rh":{"min":50,"max":60}}'
+            },
+
+            # Flowering Phase (Tag 1-63+)
+            {
+                "id": "ms-flow-001",
+                "phase": "flowering",
+                "day_min": 1,
+                "day_max": 1,
+                "title": "Flip zu 12/12 Lichtzyklus",
+                "title_en": "Flip to 12/12 Lighting",
+                "description": "Lichtzyklus auf 12h Licht / 12h Dunkelheit schalten. Absolute Dunkelheit in der Nachtphase sicherstellen (keine Stör-LEDs!).",
+                "icon": "💡",
+                "category": "environment",
+                "env": '{"temp":{"min":22,"max":26},"rh":{"min":45,"max":55}}'
+            },
+            {
+                "id": "ms-flow-002",
+                "phase": "flowering",
+                "day_min": 1,
+                "day_max": 14,
+                "title": "Der Stretch (Streckungsphase)",
+                "title_en": "The Stretch Phase",
+                "description": "Pflanze verdoppelt bis verdreifacht ihre Höhe. Weiterhin leichten Stickstoffanteil füttern, Lampenhöhe täglich kontrollieren.",
+                "icon": "📏",
+                "category": "observation",
+                "env": '{"temp":{"min":22,"max":26},"rh":{"min":45,"max":55}}'
+            },
+            {
+                "id": "ms-flow-003",
+                "phase": "flowering",
+                "day_min": 14,
+                "day_max": 18,
+                "title": "Erste Blütenansätze (Pistils)",
+                "title_en": "Early Flower Formation",
+                "description": "Erste weiße Härchen (Stigmen) an Triebspitzen sichtbar. Vollständig auf Blütedünger (hoher Phosphor & Kalium P-K Anteil) umstellen.",
+                "icon": "🌺",
+                "category": "observation",
+                "env": '{"temp":{"min":21,"max":26},"rh":{"min":45,"max":55}}'
+            },
+            {
+                "id": "ms-flow-004",
+                "phase": "flowering",
+                "day_min": 20,
+                "day_max": 21,
+                "title": "Haupt-Entlaubung (Tag-21 Schwazze)",
+                "title_en": "Day 21 Main Defoliation",
+                "description": "ESSENZIELLER BLÜTE-TIPP: Große Fächerblätter entfernen, die Blütenkelche verschatten. Bringt direktes Licht an tiefe Buds und senkt Schimmelrisiko massiv!",
+                "icon": "✂️",
+                "category": "training",
+                "env": '{"temp":{"min":21,"max":26},"rh":{"min":45,"max":50}}'
+            },
+            {
+                "id": "ms-flow-005",
+                "phase": "flowering",
+                "day_min": 21,
+                "day_max": 21,
+                "title": "SCROG & Biegen beenden",
+                "title_en": "Stop Training / Tucking",
+                "description": "Der Stretch ist beendet, Triebe verholzen. Kein weiteres Biegen – die Pflanze konzentriert ihre gesamte Energie auf Blütenmasse.",
+                "icon": "🕸️",
+                "category": "training",
+                "env": '{"temp":{"min":21,"max":26},"rh":{"min":45,"max":50}}'
+            },
+            {
+                "id": "ms-flow-006",
+                "phase": "flowering",
+                "day_min": 28,
+                "day_max": 35,
+                "title": "Bud-Building & Harzbildung",
+                "title_en": "Bud Swelling & Resin Production",
+                "description": "Blütenstände schwellen an, Trichome überziehen Zuckerblätter. Luftfeuchtigkeit auf 40-45% rLF senken, um Schimmel (Budrot) vorzubeugen.",
+                "icon": "💎",
+                "category": "observation",
+                "env": '{"temp":{"min":20,"max":25},"rh":{"min":40,"max":45}}'
+            },
+            {
+                "id": "ms-flow-007",
+                "phase": "flowering",
+                "day_min": 42,
+                "day_max": 45,
+                "title": "Zweite leichte Entlaubung (Tag 45)",
+                "title_en": "Day 45 Late Defoliation",
+                "description": "Nochmal gelbe oder störende Fächerblätter vorsichtig entfernen für maximalen Lichteinfall in den letzten Reifewochen.",
+                "icon": "🍂",
+                "category": "training",
+                "env": '{"temp":{"min":20,"max":24},"rh":{"min":38,"max":45}}'
+            },
+            {
+                "id": "ms-flow-008",
+                "phase": "flowering",
+                "day_min": 45,
+                "day_max": 55,
+                "title": "Trichom-Reifegrad prüfen",
+                "title_en": "Trichome Ripeness Check",
+                "description": "Mit 60x Lupe/Mikroskop Blütenkelche prüfen: Klar = unreif, Milchig/Trüb = Peak THC/Terpene, Bernstein = sedierend/körperbetont (CBN).",
+                "icon": "🔬",
+                "category": "observation",
+                "env": '{"temp":{"min":19,"max":24},"rh":{"min":35,"max":42}}'
+            },
+            {
+                "id": "ms-flow-009",
+                "phase": "flowering",
+                "day_min": 50,
+                "day_max": 60,
+                "title": "Spülen (Flush mit reinem Wasser)",
+                "title_en": "Start Flush Period",
+                "description": "WICHTIGER TIPP: 7-14 Tage vor der Ernte jeglichen Dünger absetzen. Nur noch pH-reguliertes Wasser gießen, damit die Pflanze eingelagerte Salze abbaut.",
+                "icon": "💧",
+                "category": "nutrients",
+                "env": '{"temp":{"min":19,"max":23},"rh":{"min":35,"max":40}}'
+            },
+            {
+                "id": "ms-flow-010",
+                "phase": "flowering",
+                "day_min": 56,
+                "day_max": 65,
+                "title": "Ernte-Fenster",
+                "title_en": "Harvest Window",
+                "description": "Ernte bei ca. 70-80% milchigen und 10-20% bernsteinfarbenen Trichomen. Optional 24-48h Dunkelphase vor dem Schnitt.",
+                "icon": "✂️",
+                "category": "harvest",
+                "env": '{"temp":{"min":18,"max":22},"rh":{"min":35,"max":40}}'
+            },
+
+            # Drying & Curing Phase
+            {
+                "id": "ms-dry-001",
+                "phase": "drying",
+                "day_min": 1,
+                "day_max": 1,
+                "title": "Ernte & Aufhängen (60/60 Regel)",
+                "title_en": "Harvest & Hang (60/60 Rule)",
+                "description": "Ganze Pflanze oder Äste kopfüber aufhängen. Ideal: 16-20°C, 55-60% rLF, absolut dunkel, leichte indirekte Umluft (nie direkt auf Buds!).",
+                "icon": "🌾",
+                "category": "harvest",
+                "env": '{"temp":{"min":16,"max":20},"rh":{"min":55,"max":62}}'
+            },
+            {
+                "id": "ms-dry-002",
+                "phase": "drying",
+                "day_min": 7,
+                "day_max": 12,
+                "title": "Zweig-Bruchtest (Snap Test)",
+                "title_en": "Stem Snap Test",
+                "description": "Kleine Zweige biegen: Wenn sie hörbar knacken statt sich elastisch zu biegen, ist das Material bereit für Curing-Gläser.",
+                "icon": "🔍",
+                "category": "observation",
+                "env": '{"temp":{"min":17,"max":20},"rh":{"min":55,"max":60}}'
+            },
+            {
+                "id": "ms-cure-001",
+                "phase": "curing",
+                "day_min": 1,
+                "day_max": 7,
+                "title": "Curing Start (Täglich lüften / Burpen)",
+                "title_en": "Start Curing (Daily Burping)",
+                "description": "Blüten in Gläser füllen (ca. 75% voll). 1-2x täglich für 10-15 Min öffnen. Zielfeuchte im Glas: 58-62% (Hygrometer im Glas).",
+                "icon": "🏺",
+                "category": "environment",
+                "env": '{"temp":{"min":18,"max":21},"rh":{"min":58,"max":62}}'
+            },
+            {
+                "id": "ms-cure-002",
+                "phase": "curing",
+                "day_min": 14,
+                "day_max": 28,
+                "title": "Reifung & Lagerung",
+                "title_en": "Curing Maturity & Storage",
+                "description": "Lüft-Intervalle auf alle 2-3 Tage reduzieren. Boveda/Integra 62% Pack hinzufügen für langfristig perfekte Terpene und Wirkung.",
+                "icon": "⭐",
+                "category": "observation",
+                "env": '{"temp":{"min":18,"max":21},"rh":{"min":58,"max":62}}'
+            }
+        ]
+
+        with self._cursor() as cursor:
+            for ms in default_milestones:
+                cursor.execute(
+                    """
+                    INSERT OR IGNORE INTO phase_milestones (
+                        id, phase, day_offset_min, day_offset_max,
+                        title, title_en, description, icon,
+                        category, env_params, is_system, is_enabled
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, 1)
+                    """,
+                    (
+                        ms["id"], ms["phase"], ms["day_min"], ms["day_max"],
+                        ms["title"], ms["title_en"], ms["description"], ms["icon"],
+                        ms["category"], ms.get("env"),
+                    )
+                )
+        logger.info(f"Initialized {len(default_milestones)} standard cultivation milestones")
 
 
 # Global database instance

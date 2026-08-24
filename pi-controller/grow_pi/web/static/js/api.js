@@ -483,13 +483,25 @@ export const GrowPiAPI = {
     // ==========================================
 
     /**
-     * Get milestones (optionally filtered by phase)
+     * Get milestones (optionally filtered by phase and category)
      * @param {string} phase - Optional phase filter (seedling/vegetative/flowering/drying/curing)
+     * @param {string} category - Optional category filter (training/environment/nutrients/observation/harvest)
      * @returns {Promise<Object>} Milestones list
      */
-    async getMilestones(phase = null) {
-        const url = phase ? `/api/calendar/milestones?phase=${phase}` : '/api/calendar/milestones';
-        return await get(url);
+    async getMilestones(phase = null, category = null) {
+        const params = new URLSearchParams();
+        if (phase) params.append('phase', phase);
+        if (category) params.append('category', category);
+        const query = params.toString() ? `?${params.toString()}` : '';
+        return await get(`/api/calendar/milestones${query}`);
+    },
+
+    /**
+     * Get daily context-aware cultivation recommendations and tips
+     * @returns {Promise<Object>} Today tips, active & upcoming milestones
+     */
+    async getTodayTips() {
+        return await get('/api/calendar/tips/today');
     },
 
     /**
@@ -504,7 +516,7 @@ export const GrowPiAPI = {
 
     /**
      * Toggle milestone enabled/disabled
-     * @param {number} id - Milestone ID
+     * @param {string} id - Milestone ID
      * @param {boolean} enabled - Enable state
      * @returns {Promise<Object>} Success response
      */
@@ -533,7 +545,7 @@ export const GrowPiAPI = {
 
     /**
      * Delete a custom milestone
-     * @param {number} id - Milestone ID
+     * @param {string} id - Milestone ID
      * @returns {Promise<Object>} Success response
      */
     async deleteMilestone(id) {

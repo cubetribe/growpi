@@ -310,11 +310,34 @@
                         </div>
                     </div>
 
+                    <!-- Actionable Grow Tip Banner -->
+                    <div class="grow-tip-banner hidden" id="growTipBanner">
+                        <div class="grow-tip-header">
+                            <div class="grow-tip-badge">💡 AKTUELLE PFLEGE-EMPFEHLUNG</div>
+                            <div class="grow-tip-env" id="growTipEnv"></div>
+                        </div>
+                        <div class="grow-tip-content">
+                            <span class="grow-tip-icon" id="growTipIcon">✂️</span>
+                            <div class="grow-tip-body">
+                                <div class="grow-tip-title" id="growTipTitle">Tipp lädt...</div>
+                                <div class="grow-tip-desc" id="growTipDesc">-</div>
+                            </div>
+                        </div>
+                    </div>
+
                     <!-- Events Section -->
                     <div class="events-section" id="eventsSection">
                         <div class="events-header">
-                            <h3 class="events-title">📅 Ereignisse für <span id="eventsPhaseLabel">-</span></h3>
-                            <button class="btn-small" id="btnAddEvent">+ Neues Event</button>
+                            <h3 class="events-title">📅 Meilensteine & Pflege-Guide für <span id="eventsPhaseLabel">-</span></h3>
+                            <button class="btn-small" id="btnAddEvent">+ Eigenes Event</button>
+                        </div>
+                        <div class="events-category-filters" id="eventsCategoryFilters">
+                            <button class="cat-filter-btn active" data-cat="all">Alle</button>
+                            <button class="cat-filter-btn" data-cat="training">✂️ Training & Entlaubung</button>
+                            <button class="cat-filter-btn" data-cat="nutrients">🧪 Düngung & Spülen</button>
+                            <button class="cat-filter-btn" data-cat="environment">🌡️ Klima & Licht</button>
+                            <button class="cat-filter-btn" data-cat="observation">🔬 Beobachtung</button>
+                            <button class="cat-filter-btn" data-cat="harvest">🌾 Ernte</button>
                         </div>
                         <div class="events-list" id="eventsList">
                             <!-- Events werden hier eingefügt -->
@@ -668,8 +691,8 @@
                 <div class="log-modal-body">
                     <!-- Events Section -->
                     <div id="modalEvents" class="modal-events" style="display: none;">
-                        <h4>📅 Anstehende Aufgaben</h4>
-                        <div id="eventsList" class="event-list"></div>
+                        <h4>📅 Meilensteine & Empfehlungen für diesen Tag</h4>
+                        <div id="modalEventsList" class="event-list"></div>
                     </div>
 
                     <!-- Fertilization Section -->

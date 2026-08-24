@@ -774,6 +774,121 @@ textarea.log-input {
 }
 
 /* ==========================================
+   Actionable Grow Tip Banner
+   ========================================== */
+
+.grow-tip-banner {
+    background: linear-gradient(135deg, rgba(17, 255, 85, 0.12) 0%, rgba(20, 30, 24, 0.95) 100%);
+    border-radius: 14px;
+    padding: 18px 20px;
+    border: 1px solid rgba(17, 255, 85, 0.35);
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4), 0 0 15px rgba(17, 255, 85, 0.1);
+    margin-bottom: 20px;
+    animation: fadeIn 0.3s ease-in-out;
+}
+
+.grow-tip-banner.hidden {
+    display: none;
+}
+
+.grow-tip-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 10px;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.grow-tip-badge {
+    font-size: 11px;
+    font-weight: 800;
+    letter-spacing: 0.8px;
+    color: #11ff55;
+    background: rgba(17, 255, 85, 0.2);
+    padding: 4px 10px;
+    border-radius: 6px;
+    border: 1px solid rgba(17, 255, 85, 0.4);
+}
+
+.grow-tip-env {
+    font-size: 12px;
+    color: #a7f3d0;
+    display: flex;
+    gap: 12px;
+    font-weight: 500;
+}
+
+.grow-tip-content {
+    display: flex;
+    align-items: flex-start;
+    gap: 16px;
+}
+
+.grow-tip-icon {
+    font-size: 32px;
+    line-height: 1;
+    background: rgba(0, 0, 0, 0.4);
+    padding: 10px;
+    border-radius: 10px;
+    border: 1px solid rgba(17, 255, 85, 0.25);
+    flex-shrink: 0;
+}
+
+.grow-tip-body {
+    flex: 1;
+    min-width: 0;
+}
+
+.grow-tip-title {
+    font-size: 15px;
+    font-weight: 700;
+    color: #ffffff;
+    margin-bottom: 4px;
+}
+
+.grow-tip-desc {
+    font-size: 13px;
+    color: #d1d5db;
+    line-height: 1.5;
+}
+
+/* ==========================================
+   Category Filters
+   ========================================== */
+
+.events-category-filters {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    margin-bottom: 14px;
+}
+
+.cat-filter-btn {
+    padding: 6px 12px;
+    font-size: 12px;
+    font-weight: 600;
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid #333;
+    border-radius: 20px;
+    color: #9ca3af;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.cat-filter-btn:hover {
+    background: rgba(255, 255, 255, 0.1);
+    color: #fff;
+    border-color: #555;
+}
+
+.cat-filter-btn.active {
+    background: rgba(17, 255, 85, 0.2);
+    border-color: #11ff55;
+    color: #11ff55;
+}
+
+/* ==========================================
    Events Section
    ========================================== */
 
@@ -789,7 +904,9 @@ textarea.log-input {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    margin-bottom: 16px;
+    margin-bottom: 14px;
+    flex-wrap: wrap;
+    gap: 10px;
 }
 
 .events-title {
@@ -802,9 +919,10 @@ textarea.log-input {
 .events-list {
     display: flex;
     flex-direction: column;
-    gap: 8px;
-    max-height: 300px;
+    gap: 10px;
+    max-height: 420px;
     overflow-y: auto;
+    padding-right: 4px;
 }
 
 .events-empty, .events-error, .events-loading {
@@ -818,22 +936,28 @@ textarea.log-input {
     display: flex;
     align-items: flex-start;
     gap: 12px;
-    padding: 12px;
+    padding: 14px;
     background: rgba(255, 255, 255, 0.03);
-    border-radius: 8px;
-    border-left: 3px solid #666;
-    transition: all 0.2s;
+    border-radius: 10px;
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    border-left: 4px solid #666;
+    transition: all 0.2s ease;
+}
+
+.event-item:hover {
+    background: rgba(255, 255, 255, 0.05);
+    border-color: rgba(255, 255, 255, 0.12);
 }
 
 .event-item.disabled {
-    opacity: 0.5;
+    opacity: 0.45;
 }
 
 .event-item.training { border-left-color: #3b82f6; }
 .event-item.environment { border-left-color: #22c55e; }
 .event-item.nutrients { border-left-color: #f97316; }
 .event-item.observation { border-left-color: #a855f7; }
-.event-item.harvest { border-left-color: #ef4444; }
+.event-item.harvest { border-left-color: #eab308; }
 
 .event-toggle {
     flex-shrink: 0;
@@ -897,15 +1021,17 @@ textarea.log-input {
     align-items: center;
     gap: 8px;
     flex-wrap: wrap;
+    margin-bottom: 4px;
 }
 
 .event-icon {
-    font-size: 16px;
+    font-size: 18px;
+    line-height: 1;
 }
 
 .event-title {
     font-size: 14px;
-    font-weight: 500;
+    font-weight: 600;
     color: #fff;
 }
 
@@ -917,13 +1043,39 @@ textarea.log-input {
     border-radius: 10px;
     color: #11ff55;
     white-space: nowrap;
+    font-weight: 600;
 }
+
+.event-env-badge {
+    font-size: 11px;
+    padding: 2px 8px;
+    background: rgba(59, 130, 246, 0.15);
+    border: 1px solid rgba(59, 130, 246, 0.3);
+    border-radius: 10px;
+    color: #93c5fd;
+    white-space: nowrap;
+}
+
+.event-cat-badge {
+    font-size: 10px;
+    padding: 2px 6px;
+    border-radius: 4px;
+    text-transform: uppercase;
+    font-weight: 700;
+    letter-spacing: 0.5px;
+}
+
+.event-cat-badge.training { background: rgba(59, 130, 246, 0.2); color: #93c5fd; }
+.event-cat-badge.environment { background: rgba(34, 197, 94, 0.2); color: #86efac; }
+.event-cat-badge.nutrients { background: rgba(249, 115, 22, 0.2); color: #fdba74; }
+.event-cat-badge.observation { background: rgba(168, 85, 247, 0.2); color: #d8b4fe; }
+.event-cat-badge.harvest { background: rgba(234, 179, 8, 0.2); color: #fde047; }
 
 .event-description {
     font-size: 12px;
-    color: #888;
+    color: #9ca3af;
     margin-top: 4px;
-    line-height: 1.4;
+    line-height: 1.45;
 }
 
 .event-delete-btn {
@@ -938,6 +1090,36 @@ textarea.log-input {
 
 .event-delete-btn:hover {
     opacity: 1;
+}
+
+/* Modal Events List */
+.modal-events {
+    background: rgba(17, 255, 85, 0.08);
+    border: 1px solid rgba(17, 255, 85, 0.25);
+    border-radius: 8px;
+    padding: 12px;
+    margin-bottom: 16px;
+}
+
+.modal-events h4 {
+    margin: 0 0 8px 0;
+    font-size: 13px;
+    color: #11ff55;
+    font-weight: 700;
+}
+
+.modal-event-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 0;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+    font-size: 12px;
+    color: #e5e7eb;
+}
+
+.modal-event-item:last-child {
+    border-bottom: none;
 }
 
 .btn-small {
