@@ -332,5 +332,7 @@ const GrowPiState = (function() {
     };
 })();
 
+export { GrowPiState };
+
 // Make available globally
 window.GrowPiState = GrowPiState;

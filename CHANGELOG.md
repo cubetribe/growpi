@@ -12,6 +12,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 - **Cold-boot split-process lamp outage**: `growpi-web` now attaches to live PWM state without zeroing outputs, so the controller’s boot-time curve application survives service startup.
 - **Curve controller now repairs PWM drift**: auto mode re-applies curve values when actual GPIO duty cycles no longer match the desired state, even if cached targets are unchanged.
+- **Web UI bootstrap failure**: the frontend now exports `GrowPiState` correctly for ES module imports, and the main page bootstraps each feature module independently so a single UI error no longer freezes the whole interface at `Verbinde...` / `Kamera lädt...`.
 
 ### Added
 - Raspberry Pi power/throttling diagnostics in the health API via `vcgencmd get_throttled` parsing.

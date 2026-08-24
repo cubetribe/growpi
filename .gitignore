@@ -105,6 +105,7 @@ Desktop.ini
 # Playwright
 # ============================================
 .playwright-mcp/
+.playwright-cli/
 
 # ============================================
 # Temporary Files
@@ -127,4 +128,8 @@ temp/
 # ============================================
 /Agents/
 /agents/
+/pi-controller/agents/
+/reports/v*/
+/docs/refactoring/
 /CC-GodMode-Prompts/
+/state/

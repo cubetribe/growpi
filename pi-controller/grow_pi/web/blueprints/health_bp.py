@@ -24,7 +24,19 @@ START_TIME = time.time()
 
 
 @health_bp.route('/', methods=['GET', 'POST'])
-def health_check() -> tuple:
+def health_check():
+    """
+    Trailing-slash alias for the canonical health contract.
+
+    `/api/health` is implemented by status_bp. Keep `/api/health/` equivalent
+    so user checks and docs do not accidentally hit a weaker health contract.
+    """
+    from .status_bp import health_check as canonical_health_check
+    return canonical_health_check()
+
+
+@health_bp.route('/detailed', methods=['GET', 'POST'])
+def detailed_health_check() -> tuple:
     """
     Comprehensive health check endpoint.
 
@@ -126,13 +138,22 @@ def health_check() -> tuple:
             sensor_healthy = False
             sensor_issues.append(f"Stale cache: {sensor_status['cache_age']:.1f}s old")
 
+        breaker = sensor_health.get("circuit_breaker", {})
+        breaker_state = str(breaker.get("state", "")).lower()
+        if breaker_state == "open":
+            sensor_healthy = False
+            sensor_issues.append("Circuit breaker open")
+        elif breaker_state in {"half-open", "half_open", "halfopen"}:
+            sensor_healthy = False
+            sensor_issues.append("Circuit breaker half-open")
+
         health["checks"]["sensors"] = {
             "status": "healthy" if sensor_healthy else "degraded",
             "error_count": sensor_status.get("error_count", 0),
             "cache_age": round(sensor_status.get("cache_age", 0), 2),
             "temp": sensor_status.get("temp"),
             "humidity": sensor_status.get("humidity"),
-            "circuit_breaker": sensor_health.get("circuit_breaker", {})
+            "circuit_breaker": breaker
         }
 
         if sensor_issues:

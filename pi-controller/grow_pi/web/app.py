@@ -223,8 +223,8 @@ def _initialize_hardware(app: Flask) -> None:
             logger.info("DHT22 Sensor initialized on GPIO-4")
         except Exception as e:
             logger.error(f"Failed to initialize DHT22: {e}")
-    except ImportError:
-        logger.warning("adafruit_dht not available - sensor will return mock data")
+    except (ImportError, NotImplementedError, Exception) as e:
+        logger.warning(f"adafruit_dht not available ({e}) - sensor will return mock data")
 
 
 def _initialize_data_logger(app: Flask) -> None:

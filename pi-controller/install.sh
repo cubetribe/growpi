@@ -114,14 +114,15 @@ echo "  pigpiod Status: $(pgrep pigpiod > /dev/null && echo 'running' || echo 'n
 echo ""
 echo -e "${GREEN}[3/7] Erstelle Installations-Verzeichnis...${NC}"
 sudo mkdir -p ${INSTALL_DIR}
-sudo chown $(whoami):$(whoami) ${INSTALL_DIR}
+sudo chown "$(whoami):$(whoami)" "${INSTALL_DIR}"
 
 # Step 4: Copy files
 echo ""
 echo -e "${GREEN}[4/7] Kopiere Dateien...${NC}"
-cp -r ${SCRIPT_DIR}/grow_pi ${INSTALL_DIR}/
-cp -r ${SCRIPT_DIR}/config ${INSTALL_DIR}/
-cp ${SCRIPT_DIR}/requirements.txt ${INSTALL_DIR}/
+cp -r "${SCRIPT_DIR}/grow_pi" "${INSTALL_DIR}/"
+cp -r "${SCRIPT_DIR}/config" "${INSTALL_DIR}/"
+cp "${SCRIPT_DIR}/requirements.txt" "${INSTALL_DIR}/"
+cp "${SCRIPT_DIR}/VERSION" "${INSTALL_DIR}/"
 
 # Create logs directory
 mkdir -p ${INSTALL_DIR}/logs
@@ -143,7 +144,7 @@ fi
 # Activate and install
 source venv/bin/activate
 pip install --upgrade pip
-pip install PyYAML pigpio
+pip install -r requirements.txt
 deactivate
 
 echo "  Dependencies installiert"

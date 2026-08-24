@@ -932,7 +932,7 @@ class Database:
             row = cursor.fetchone()
             return LampStateLog.from_row(row) if row else None
 
-    def should_log_lamp_state(self, channel: int, intensity: int, dedupe_seconds: int = 5) -> bool:
+    def should_log_lamp_state(self, channel: int, intensity: int, dedupe_seconds: int = 900) -> bool:
         """
         Check if lamp state should be logged (deduplication).
 
@@ -961,7 +961,7 @@ class Database:
             if last_intensity != intensity:
                 return True
 
-            # Check time difference
+            # Same intensity: check if heartbeat time difference elapsed
             try:
                 last_time = datetime.fromisoformat(last_time_str)
                 time_diff = (datetime.now() - last_time).total_seconds()
@@ -1422,58 +1422,70 @@ class Database:
                 'database_size_mb': round(db_size / (1024 * 1024), 2),
             }
 
-    def cleanup_old_data(self, retention_days: int = 30) -> Dict[str, int]:
+    def cleanup_old_data(self, retention_days: int = 7, include_unsynced: bool = True) -> Dict[str, int]:
         """
-        Delete data older than retention_days that has been synced.
+        Delete data older than retention_days.
 
-        Returns count of deleted records per table.
+        Args:
+            retention_days: Number of days of historical data to keep (default: 7)
+            include_unsynced: If True, delete even if unsynced (required for standalone operation)
+
+        Returns:
+            Dict mapping table names to number of deleted records.
         """
         cutoff = (datetime.now() - timedelta(days=retention_days)).isoformat()
         deleted = {}
 
         with self._cursor() as cursor:
-            # Delete synced sensor readings
+            sync_clause = "" if include_unsynced else " AND synced_at IS NOT NULL"
+
+            # Delete sensor readings older than cutoff
             cursor.execute(
-                """
-                DELETE FROM sensor_readings
-                WHERE created_at < ? AND synced_at IS NOT NULL
-                """,
+                f"DELETE FROM sensor_readings WHERE created_at < ?{sync_clause}",
                 (cutoff,)
             )
             deleted['sensor_readings'] = cursor.rowcount
 
-            # Delete synced lamp logs
+            # Delete lamp logs older than cutoff
             cursor.execute(
-                """
-                DELETE FROM lamp_state_log
-                WHERE created_at < ? AND synced_at IS NOT NULL
-                """,
+                f"DELETE FROM lamp_state_log WHERE created_at < ?{sync_clause}",
                 (cutoff,)
             )
             deleted['lamp_state_log'] = cursor.rowcount
 
-            # Delete old system events (always, regardless of sync)
+            # Delete old system events (always regardless of sync)
             cursor.execute(
                 "DELETE FROM system_events WHERE created_at < ?",
                 (cutoff,)
             )
             deleted['system_events'] = cursor.rowcount
 
-            # Delete synced plug logs
+            # Delete plug logs older than cutoff
             cursor.execute(
-                """
-                DELETE FROM plug_logs
-                WHERE created_at < ? AND synced_at IS NOT NULL
-                """,
+                f"DELETE FROM plug_logs WHERE created_at < ?{sync_clause}",
                 (cutoff,)
             )
             deleted['plug_logs'] = cursor.rowcount
 
-        # Optimize database after deletion
-        self._get_connection().execute('VACUUM')
-
-        logger.info(f"Cleanup completed: {deleted}")
+        logger.info(f"Cleanup completed (retention_days={retention_days}, include_unsynced={include_unsynced}): {deleted}")
         return deleted
+
+    def vacuum(self) -> bool:
+        """
+        Run SQLite VACUUM to defragment the database and reclaim disk space.
+
+        Returns:
+            True if vacuum succeeded, False otherwise.
+        """
+        try:
+            conn = self._get_connection()
+            # In WAL mode, execute VACUUM directly
+            conn.execute('VACUUM')
+            logger.info("Database VACUUM completed successfully")
+            return True
+        except Exception as e:
+            logger.error(f"Failed to vacuum database: {e}")
+            return False
 
     # =========================================================================
     # Curve Presets

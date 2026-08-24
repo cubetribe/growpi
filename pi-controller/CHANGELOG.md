@@ -13,6 +13,9 @@ Alle wichtigen Änderungen am GrowPi Pi-Controller werden hier dokumentiert.
 - **PWM Drift Recovery**
   - `grow_pi/main.py` vergleicht Sollwerte jetzt zusätzlich mit dem echten pigpio-Hardwarezustand
   - Bei Abweichungen werden Kurvenwerte erneut auf die GPIOs geschrieben
+- **Frontend Bootstrap Crash**
+  - `grow_pi/web/static/js/state.js` exportiert `GrowPiState` jetzt korrekt als ES-Modul
+  - `grow_pi/web/static/index.html` initialisiert UI-Module defensiv, damit ein einzelner Frontend-Fehler nicht mehr die komplette Web-Oberfläche blockiert
 
 ### Added
 - **Raspberry Pi Power Diagnostics**
@@ -28,6 +31,7 @@ Alle wichtigen Änderungen am GrowPi Pi-Controller werden hier dokumentiert.
 ### Validation
 - Fokus-Tests für PWM-Attach, Curve-Reconcile und Power-Parsing ergänzt
 - Live-Incident-Quick-Fix am Produktions-Pi durchgeführt: Lampenstatus wieder mit Kurvensollwert synchronisiert
+- Web-Quick-Fix live verifiziert: UI lädt wieder, Kamera-Preview sichtbar, Status-Badge online
 
 ### Security
 - **Hardcoded credential fallback entfernt**
