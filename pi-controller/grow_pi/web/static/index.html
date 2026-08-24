@@ -965,24 +965,34 @@
             window.showError = showError;
             window.showSuccess = showSuccess;
 
+            function runInitStep(name, initFn) {
+                try {
+                    initFn();
+                } catch (error) {
+                    console.error(`[Bootstrap] ${name} init failed`, error);
+                    showError(`${name} konnte nicht geladen werden`);
+                }
+            }
+
             document.addEventListener('DOMContentLoaded', () => {
-                // Initialize Modules
-                initControlTab();
-                initEnvironmentTab();
-                initCostsTab();
-                initCurvesTab();
-                initCameraModule();
-                initAccordion();
-                initTimelapseModule();
-                initCalendarTab();
-                initHealthMonitoring();
+                // Initialize modules independently so one failure does not block the UI.
+                runInitStep('Steuerung', initControlTab);
+                runInitStep('Room', initEnvironmentTab);
+                runInitStep('Kosten', initCostsTab);
+                runInitStep('Kurven', initCurvesTab);
+                runInitStep('Kamera', initCameraModule);
+                runInitStep('Accordion', initAccordion);
+                runInitStep('Timelapse', initTimelapseModule);
+                runInitStep('Kalender', initCalendarTab);
+                runInitStep('Health', initHealthMonitoring);
+                runInitStep('Verlauf', () => {
+                    const historyModule = new HistoryModule();
+                    historyModule.initHistoryTab();
+                });
 
-                const historyModule = new HistoryModule();
-                historyModule.initHistoryTab();
-
-                // Initialize Tabs
-                setupTabs();
-                setupMobileNav();
+                // Navigation must stay available even if a feature module fails.
+                runInitStep('Tabs', setupTabs);
+                runInitStep('Mobile Navigation', setupMobileNav);
             });
         </script>
     </body>

@@ -359,6 +359,28 @@ sudo systemctl restart grow-pi
 
 Die Version wird im Web-Interface oben rechts angezeigt und sollte mit der VERSION-Datei übereinstimmen.
 
+### Frontend hängt bei `Verbinde...` / `Kamera lädt...`
+
+Wenn die HTML-Seite lädt, aber Status, Kamera und Tabs nicht initialisiert werden:
+
+```bash
+# Prüfen, ob das Frontend die aktuelle state.js ausliefert
+curl -fsS http://<PI_HOST>:5000/js/state.js | tail -n 5
+
+# Erwartet:
+# export { GrowPiState };
+# window.GrowPiState = GrowPiState;
+
+# Web-Service neu starten
+sudo systemctl restart growpi-web
+
+# Browser-Cache leeren / Hard-Refresh
+# - macOS: Cmd + Shift + R
+# - Windows/Linux: Strg + Shift + R
+```
+
+Wenn die Seite danach weiter nur die Default-Texte zeigt, im Browser-Console-Log nach ES-Module-Importfehlern suchen.
+
 ### pigpiod nicht gestartet
 
 ```bash
@@ -410,8 +432,8 @@ sudo systemctl restart grow-pi
 ---
 
 **Python Version**: 3.13
-**Aktuelles Level**: v6.25.3 (Public Release Hardening)
-**Stand**: 2026-03-02
+**Aktuelles Level**: v6.25.4 (Boot Safety & Power Diagnostics)
+**Stand**: 2026-03-06
 **Web-Interface**: http://<PI_HOST>:5000
 **Changelog**: [CHANGELOG.md](CHANGELOG.md)
 **Lizenz**: Siehe [`../LICENSE`](../LICENSE) (private Nutzung frei, kommerziell nur mit Freigabe)
