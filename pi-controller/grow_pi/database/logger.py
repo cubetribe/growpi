@@ -41,7 +41,8 @@ class DataLogger:
         db: Optional[Database] = None,
         sensor_interval: int = 120,
         lamp_interval: int = 120,
-        dedupe_seconds: int = 5
+        dedupe_seconds: int = 900,
+        retention_days: int = 7
     ):
         """
         Initialize DataLogger.
@@ -50,14 +51,15 @@ class DataLogger:
             db: Database instance (uses global if None)
             sensor_interval: Seconds between sensor readings
             lamp_interval: Seconds between lamp state logs
-            dedupe_seconds: Min seconds between identical lamp logs
+            dedupe_seconds: Min seconds between identical lamp logs (heartbeat: 900s = 15m)
+            retention_days: Number of days of historical logs to keep (default: 7 days)
         """
         self.db = db or get_database()
-        self.sensor_interval = sensor_interval
         self.sensor_interval = sensor_interval
         self.lamp_interval = lamp_interval
         self.plug_interval = 60  # 1 minute - local TinyTuya, no quota limits
         self.dedupe_seconds = dedupe_seconds
+        self.retention_days = retention_days
 
         self.plug_controller = SmartPlugController()
 
@@ -71,8 +73,10 @@ class DataLogger:
         self._sensor_thread: Optional[threading.Thread] = None
         self._lamp_thread: Optional[threading.Thread] = None
         self._plug_thread: Optional[threading.Thread] = None
+        self._maintenance_thread: Optional[threading.Thread] = None
 
-        # Last logged values (for change detection)
+        # In-memory last logged values for fast deduplication (channel -> (intensity, monotonic_time))
+        self._last_lamp_cache: Dict[int, tuple] = {}
         self._last_lamp_states: Dict[int, int] = {}
 
     def set_sensor_reader(self, reader: Callable[[], tuple]) -> None:
@@ -104,6 +108,7 @@ class DataLogger:
             return
 
         self._running = True
+        self._stop_event.clear()
 
         # Log service start
         self.log_event(
@@ -142,6 +147,15 @@ class DataLogger:
         self._plug_thread.start()
         logger.info(f"Plug logging started (interval: {self.plug_interval}s)")
 
+        # Start automatic retention maintenance thread
+        self._maintenance_thread = threading.Thread(
+            target=self._maintenance_loop,
+            name="DataLogger-Maintenance",
+            daemon=True
+        )
+        self._maintenance_thread.start()
+        logger.info(f"Database retention maintenance started (retention: {self.retention_days} days)")
+
     def stop(self) -> None:
         """Stop the data logging threads."""
         if not self._running:
@@ -161,6 +175,8 @@ class DataLogger:
             self._lamp_thread.join(timeout=5)
         if self._plug_thread and self._plug_thread.is_alive():
             self._plug_thread.join(timeout=5)
+        if self._maintenance_thread and self._maintenance_thread.is_alive():
+            self._maintenance_thread.join(timeout=5)
 
         logger.info("DataLogger stopped")
 
@@ -318,21 +334,50 @@ class DataLogger:
         else:
             logger.warning("Humidity reading is None - skipping database insert")
 
+    def _maintenance_loop(self) -> None:
+        """
+        Background loop for automatic database retention cleanup & vacuum.
+        Runs once daily, with an initial run shortly after startup.
+        """
+        # Wait 10 seconds after startup before initial cleanup
+        if self._stop_event.wait(timeout=10.0):
+            return
+
+        while self._running:
+            try:
+                logger.info(f"Running database retention cleanup (retention: {self.retention_days} days)...")
+                deleted = self.db.cleanup_old_data(retention_days=self.retention_days, include_unsynced=True)
+                total_deleted = sum(deleted.values())
+                if total_deleted > 0:
+                    logger.info(f"Database retention cleanup removed {total_deleted} old records. Vacuuming...")
+                    self.db.vacuum()
+                else:
+                    logger.info("Database retention cleanup completed: no expired records found")
+            except Exception as e:
+                logger.error(f"Error in database maintenance loop: {e}")
+
+            # Wait 24 hours (86400s) or until stopped
+            self._stop_event.wait(timeout=86400.0)
+
     def _log_lamps(self, source: str = 'periodic') -> None:
-        """Read and log lamp states."""
+        """Read and log lamp states with in-memory deduplication."""
         if not self._lamp_reader:
             return
 
         states = self._lamp_reader()
+        now_mono = time.monotonic()
 
         for channel, info in states.items():
             intensity = info.get('intensity', 0)
             name = info.get('name', f'Channel {channel}')
 
-            # Check if we should log (deduplication)
+            # Fast in-memory deduplication for periodic logging
             if source == 'periodic':
-                if not self.db.should_log_lamp_state(channel, intensity, self.dedupe_seconds):
-                    continue
+                last_cached = self._last_lamp_cache.get(channel)
+                if last_cached is not None:
+                    last_intensity, last_time = last_cached
+                    if last_intensity == intensity and (now_mono - last_time < self.dedupe_seconds):
+                        continue
 
             state = LampStateLog(
                 channel=channel,
@@ -341,6 +386,7 @@ class DataLogger:
                 source=source
             )
             self.db.insert_lamp_state(state)
+            self._last_lamp_cache[channel] = (intensity, now_mono)
             logger.debug(f"Logged lamp {channel} ({name}): {intensity}%")
 
     def _log_plugs(self) -> None:

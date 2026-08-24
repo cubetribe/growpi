@@ -27,7 +27,11 @@ let elements = {
     // v6.24.1: Circuit breaker elements
     circuitBreakerStatus: null,
     btnResetCircuitBreaker: null,
-    btnRestartService: null
+    btnRestartService: null,
+    // v6.25.5: Power status elements
+    powerPanel: null,
+    powerStatusValue: null,
+    powerStatusHint: null
 };
 
 let pollInterval = null;
@@ -46,6 +50,11 @@ export function initHealthMonitoring() {
     elements.circuitBreakerStatus = document.getElementById('circuitBreakerStatus');
     elements.btnResetCircuitBreaker = document.getElementById('btnResetCircuitBreaker');
     elements.btnRestartService = document.getElementById('btnRestartService');
+
+    // v6.25.5: Power status elements
+    elements.powerPanel = document.getElementById('powerStatusPanel');
+    elements.powerStatusValue = document.getElementById('powerStatusValue');
+    elements.powerStatusHint = document.getElementById('powerStatusHint');
 
     if (!elements.cpuTemp || !elements.memory || !elements.disk || !elements.uptime) {
         console.warn('Health monitoring: DOM elements not found');
@@ -279,6 +288,55 @@ function updateHealthWidget(system) {
         100, // Always show full bar for uptime
         100
     );
+
+    // Power Supply / Undervoltage / Throttling (v6.25.5)
+    if (system.power) {
+        updatePowerStatus(system.power);
+    }
+}
+
+/**
+ * Update power supply status display.
+ */
+function updatePowerStatus(power) {
+    if (!elements.powerPanel || !elements.powerStatusValue) return;
+
+    if (!power) {
+        elements.powerPanel.style.display = 'none';
+        return;
+    }
+
+    elements.powerPanel.style.display = 'flex';
+
+    if (power.under_voltage_now) {
+        elements.powerPanel.className = 'power-status-panel power-critical';
+        elements.powerStatusValue.className = 'power-status-value power-val-critical';
+        elements.powerStatusValue.textContent = '⚠️ AKTIVE UNTERSPANNUNG';
+        if (elements.powerStatusHint) {
+            elements.powerStatusHint.textContent = 'Netzteil liefert zu wenig Spannung (< 4.63V). Bitte offizielles Raspberry Pi 5.1V / 3A Netzteil und kurzes USB-Kabel verwenden!';
+        }
+    } else if (power.currently_throttled) {
+        elements.powerPanel.className = 'power-status-panel power-warning';
+        elements.powerStatusValue.className = 'power-status-value power-val-warning';
+        elements.powerStatusValue.textContent = '⚠️ CPU GEDROSSELT';
+        if (elements.powerStatusHint) {
+            elements.powerStatusHint.textContent = 'Raspberry Pi CPU ist temperaturbedingt oder spannungsbedingt gedrosselt.';
+        }
+    } else if (power.under_voltage_occurred) {
+        elements.powerPanel.className = 'power-status-panel power-warning';
+        elements.powerStatusValue.className = 'power-status-value power-val-warning';
+        elements.powerStatusValue.textContent = '⚠️ Unterspannung aufgetreten';
+        if (elements.powerStatusHint) {
+            elements.powerStatusHint.textContent = 'Seit dem Booten ist zeitweise Unterspannung aufgetreten. Netzteil/Kabel überprüfen.';
+        }
+    } else {
+        elements.powerPanel.className = 'power-status-panel power-normal';
+        elements.powerStatusValue.className = 'power-status-value power-val-normal';
+        elements.powerStatusValue.textContent = 'OK (5.1V)';
+        if (elements.powerStatusHint) {
+            elements.powerStatusHint.textContent = '';
+        }
+    }
 }
 
 /**

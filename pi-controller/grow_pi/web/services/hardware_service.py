@@ -27,8 +27,8 @@ try:
     import board
     import adafruit_dht
     DHT_AVAILABLE = True
-except ImportError:
-    logger.warning("adafruit_dht not available - sensor will return mock data")
+except (ImportError, NotImplementedError, Exception) as e:
+    logger.warning(f"adafruit_dht not available ({e}) - sensor will return mock data")
 
 
 # ============================================================================

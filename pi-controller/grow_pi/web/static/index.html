@@ -52,18 +52,6 @@
             <div class="mobile-nav-overlay" id="mobileNavOverlay"></div>
 
             <div id="tab-control" class="tab-content active">
-                <!-- Camera Livestream -->
-                <section class="section camera-section" id="cameraContainer">
-                    <div class="camera-header">
-                        <h2 class="section-title">Live-Kamera</h2>
-                        <span class="camera-status" id="cameraStatus">Verbinde...</span>
-                    </div>
-                    <div class="camera-wrapper">
-                        <img id="cameraImage" class="camera-image" alt="Livestream" style="display: none;">
-                        <div id="cameraError" class="camera-error">Kamera lädt...</div>
-                    </div>
-                </section>
-
                 <div class="mode-section">
                     <div class="mode-switch">
                         <button
@@ -118,6 +106,15 @@
                                 Service Neustart
                             </button>
                         </div>
+                    </div>
+
+                    <!-- Power Supply Status (Unterspannung / Throttling) -->
+                    <div class="power-status-panel" id="powerStatusPanel" style="display: none;">
+                        <div class="power-status-header">
+                            <span class="power-status-label">⚡ Stromversorgung:</span>
+                            <span class="power-status-value" id="powerStatusValue">--</span>
+                        </div>
+                        <div class="power-status-hint" id="powerStatusHint"></div>
                     </div>
 
                     <div class="health-grid">
@@ -469,74 +466,6 @@
                     </div>
                 </section>
 
-                <!-- Timelapse Camera Section (v6.17.0) -->
-                <section class="section timelapse-section">
-                    <h2 class="section-title">Timelapse Kamera</h2>
-
-                    <!-- Enable Toggle + Status -->
-                    <div class="timelapse-header">
-                        <div class="timelapse-toggle-row">
-                            <div class="curve-toggle" id="timelapseToggle"></div>
-                            <span>Timelapse aktiv</span>
-                        </div>
-                        <span id="timelapseStatus" class="timelapse-status stopped">Inaktiv</span>
-                    </div>
-
-                    <!-- Configuration -->
-                    <div class="timelapse-config">
-                        <div class="config-row">
-                            <label for="timelapseInterval">Intervall (Sekunden)</label>
-                            <input type="number" id="timelapseInterval" min="30" max="600" step="10" value="300">
-                        </div>
-
-                        <div class="config-row toggle-row">
-                            <div class="curve-toggle enabled" id="skipDarkToggle"></div>
-                            <span>Dunkle Bilder uberspringen</span>
-                        </div>
-
-                        <div class="config-row">
-                            <label for="brightnessThreshold">Helligkeitsschwelle (0-255)</label>
-                            <input type="number" id="brightnessThreshold" min="0" max="255" step="5" value="15">
-                        </div>
-
-                        <!-- Brightness Test -->
-                        <div class="brightness-test-section">
-                            <button id="btnTestBrightness" class="btn btn-small">Helligkeit testen</button>
-                            <div id="brightnessTestResult" class="brightness-test-result">
-                                <span class="placeholder">Klicke um aktuelle Helligkeit zu testen</span>
-                            </div>
-                        </div>
-
-                        <button class="btn-save" id="btnSaveTimelapseConfig">
-                            Timelapse speichern
-                        </button>
-                    </div>
-
-                    <!-- Storage Info -->
-                    <div class="timelapse-storage">
-                        <span class="storage-label">Speicher:</span>
-                        <span id="timelapseStorageInfo">0 MB (0 Bilder)</span>
-                    </div>
-
-                    <!-- Image Gallery -->
-                    <div class="timelapse-gallery-section">
-                        <div class="gallery-header">
-                            <h3>Bilder-Galerie</h3>
-                            <div class="gallery-controls">
-                                <select id="timelapseFolderSelect" class="folder-select">
-                                    <option value="">Alle Ordner</option>
-                                </select>
-                                <button id="btnRefreshGallery" class="btn btn-small">Aktualisieren</button>
-                            </div>
-                        </div>
-                        <div id="timelapseGallery" class="timelapse-gallery">
-                            <div class="gallery-empty">
-                                <span>Keine Bilder vorhanden</span>
-                                <small>Timelapse aktivieren um Bilder aufzunehmen</small>
-                            </div>
-                        </div>
-                    </div>
-                </section>
             </div>
 
             <div id="tab-costs" class="tab-content">
@@ -955,9 +884,7 @@
             import { initEnvironmentTab } from './js/modules/environment.js';
             import { initCostsTab } from './js/modules/costs.js';
             import { showError, showSuccess, setupTabs, setupMobileNav } from './js/utils.js';
-            import { initCameraModule, cleanupCameraModule } from './js/modules/camera.js';
             import { initAccordion } from './js/modules/accordion.js';
-            import { initTimelapseModule, cleanupTimelapseModule } from './js/modules/timelapse.js';
             import { initCalendarTab } from './js/modules/calendar.js';
             import { initHealthMonitoring } from './js/modules/health.js';
 
@@ -980,9 +907,7 @@
                 runInitStep('Room', initEnvironmentTab);
                 runInitStep('Kosten', initCostsTab);
                 runInitStep('Kurven', initCurvesTab);
-                runInitStep('Kamera', initCameraModule);
                 runInitStep('Accordion', initAccordion);
-                runInitStep('Timelapse', initTimelapseModule);
                 runInitStep('Kalender', initCalendarTab);
                 runInitStep('Health', initHealthMonitoring);
                 runInitStep('Verlauf', () => {
